@@ -1,0 +1,4 @@
+[submodule "hhh"]
+	path = hhh
+	url = https://github.com/hanslhansl/hhh.git
+	branch = 1.0
