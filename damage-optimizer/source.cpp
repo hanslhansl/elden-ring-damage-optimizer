@@ -749,3 +749,44 @@ public:
 		return result.value();
 	}
 };
+
+
+
+int main(int argc, char* argv[])
+{
+	std::string file = "D:\\Paul\\Computer\\Programmieren\\C++\\Haupt-Projektmappe\\elden_ring_damage_calculator\\regulation-vanilla-v1.12.3.js";
+	std::ifstream stream(file);
+	json data = json::parse(stream);
+
+	auto&& [main, time1] = misc::TimeFunctionExecution([&]() { return *new Main(data); });
+	misc::printl();
+
+	Weapon::AttackOptions atk_options = { 161, Class::VAGABOND, { 24, 10 }, true, false };
+	auto [attack_rating, time2] = misc::TimeFunctionExecution([&]() {
+		return main.maximize_attack_rating([](const Weapon& w) { return w.dlc; }, [](const Weapon::AttackRating& war) { return war.total_attack_power; }, atk_options); });
+	misc::printl();
+
+	misc::print("stats: ");
+	for (auto stat : attack_rating.stats)
+		misc::print(int(stat), " ");
+	misc::printl("\n");
+
+	misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
+	misc::printl();
+	for (int i = 0; i < attack_rating.attack_power.size(); i++)
+		if (attack_rating.attack_power.at(i).first != 0)
+			misc::printl(attack_power_type_to_string(AttackPowerType(i)), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
+				" = ", attack_rating.attack_power.at(i).first);
+	misc::printl();
+
+	/*for (auto&& [apt, att] : attack_rating.split_attack_power)
+		misc::printl(attack_power_type_to_string(apt), ": ", att[0], " + ", att[1]);
+	misc::printl();*/
+
+	misc::printl("create weapon list: ", time1);
+	misc::printl("query best stats: ", time2);
+
+
+
+	return 0;
+}
