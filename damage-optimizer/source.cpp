@@ -494,7 +494,7 @@ struct ReinforceTypesDict
 	}
 };
 
-class Main
+class damage_optimizer
 {
 	using WeaponDict = json;
 
@@ -578,8 +578,10 @@ private:
 	}
 
 public:
-	Main(const json& data)
+	damage_optimizer(const std::filesystem::path& file_path)
 	{
+		json data = json::parse(std::ifstream(file_path));
+
 		for (auto&& [id_, calcCorrectGraph] : data.at("calcCorrectGraphs").items())
 			this->calcCorrectGraphsById.emplace(std::stoi(id_), evaluate_CalcCorrectGraph(calcCorrectGraph.get<std::vector<CalcCorrectGraphDict>>()));
 
@@ -758,7 +760,7 @@ int main(int argc, char* argv[])
 	std::ifstream stream(file);
 	json data = json::parse(stream);
 
-	auto&& [main, time1] = misc::TimeFunctionExecution([&]() { return *new Main(data); });
+	auto&& [main, time1] = misc::TimeFunctionExecution([&]() { return damage_optimizer("D:\\Paul\\Computer\\Programmieren\\C++\\Haupt-Projektmappe\\elden_ring_damage_calculator\\regulation-vanilla-v1.12.3.js"); });
 	misc::printl();
 
 	Weapon::AttackOptions atk_options = { 161, Class::VAGABOND, { 24, 10 }, true, false };
@@ -779,13 +781,9 @@ int main(int argc, char* argv[])
 				" = ", attack_rating.attack_power.at(i).first);
 	misc::printl();
 
-	/*for (auto&& [apt, att] : attack_rating.split_attack_power)
-		misc::printl(attack_power_type_to_string(apt), ": ", att[0], " + ", att[1]);
-	misc::printl();*/
 
 	misc::printl("create weapon list: ", time1);
 	misc::printl("query best stats: ", time2);
-
 
 
 	return 0;
