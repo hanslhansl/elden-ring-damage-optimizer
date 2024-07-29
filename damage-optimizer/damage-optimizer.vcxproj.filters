@@ -7,8 +7,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source.cpp">
+    <ClCompile Include="calculator.cpp">
       <Filter>Files</Filter>
     </ClCompile>
+    <ClCompile Include="ui.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="calculator.hpp">
+      <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui.hpp">
+      <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include.hpp">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
