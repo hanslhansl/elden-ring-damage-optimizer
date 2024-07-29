@@ -1,10 +1,17 @@
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 
+#include <set>
+#include <map>
+#include <array>
+#include <vector>
+#include <string>
+
 #include <nlohmann/json.hpp>
 #include <BS_thread_pool.hpp>
 
 #include "hhh/misc.hpp"
+#include "hhh/extended_enum.hpp"
 #include "hhh/math/functions.hpp"
 
 
@@ -238,9 +245,31 @@ constexpr auto ineffective_attribute_penalty = 0.4;
 constexpr auto defaultDamageCalcCorrectGraphId = 0;
 constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
+HHH_ENUM_DEFINE(Affinity_, int, int,
+	STANDARD, 0,
+	HEAVY, 1,
+	KEEN, 2,
+	QUALITY, 3,
+	MAGIC, 4,
+	FIRE, 5,
+	FLAME_ART, 6,
+	LIGHTNING, 7,
+	SACRED, 8,
+	COLD, 9,
+	POISON, 10,
+	BLOOD, 11,
+	OCCULT, 12,
+	UNIQUE, -1
+);
+void from_json(const json& j, Affinity_& a)
+{
+	a = Affinity_::from_value(j.get<int>());
+}
+
 struct Weapon
 {
-	enum class Affinity
+	using Affinity = Affinity_;
+	/*enum class Affinity
 	{
 		STANDARD = 0,
 		HEAVY = 1,
@@ -256,7 +285,7 @@ struct Weapon
 		BLOOD = 11,
 		OCCULT = 12,
 		UNIQUE = -1,
-	};
+	};*/
 
 	enum class Type
 	{
@@ -307,8 +336,8 @@ struct Weapon
 
 	struct AttackOptions
 	{
-		int player_level;
-		Class starting_class;
+		int available_stat_points;
+		Stats minimum_stats;
 		std::array<size_t, 2> upgrade_level;	// normal, somber
 		bool two_handing;
 		bool disable_two_handing_attack_power_bonus = false;
@@ -334,6 +363,30 @@ struct Weapon
 			this->ineffective_attributes.reserve(ALL_ATTRIBUTES.size());
 			this->ineffective_attack_power_types.clear();
 			this->ineffective_attack_power_types.reserve(ALL_ATTACK_POWER_TYPES.size());
+		}
+	};
+
+	struct Filter
+	{
+		std::set<std::string> full_names;
+		std::set<std::string> base_names;
+		std::set<bool> dlc;
+		std::set<bool> sorcery_tools;
+		std::set<bool> incantation_tools;
+		std::set<Type> types;
+		std::set<Affinity> affinities;
+
+		bool operator()(const Weapon& weapon) const
+		{
+			auto satisfies = [](const auto& set, const auto& val) { return set.empty() or set.contains(val); };
+
+			return satisfies(this->full_names, weapon.full_name) and
+				satisfies(this->base_names, weapon.base_name) and
+				satisfies(this->dlc, weapon.dlc) and
+				satisfies(this->sorcery_tools, weapon.sorcery_tool) and
+				satisfies(this->incantation_tools, weapon.incantation_tool) and
+				satisfies(this->types, weapon.type) and
+				satisfies(this->affinities, weapon.affinity);
 		}
 	};
 
@@ -607,7 +660,6 @@ public:
 
 		auto create_weapon = [&](const json& weapon_data) {
 			auto&& attackElementCorrect = this->attackElementCorrectsById.at(weapon_data.at("attackElementCorrectId").get<int>());
-			//auto attackElementCorrect = mdmap::items(this->attackElementCorrectsById, weapon_data.at("attackElementCorrectId").get<int>());
 
 			const auto& reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
 
@@ -679,14 +731,12 @@ public:
 		misc::printl(this->weapons.size(), " weapons");
 	}
 
-	template<typename WeaponFilter, typename Proj>
-		requires requires (const WeaponFilter& weapon_filter, const Weapon& w, const Proj& proj, const Weapon::AttackRating& war)
-	{ { weapon_filter(w) } -> std::convertible_to<bool>; proj(war) < proj(war);
-	}
-	Weapon::AttackRating maximize_attack_rating(const WeaponFilter& weapon_filter, const Proj& proj, Weapon::AttackOptions attack_options) const
+	template<typename Proj>
+		requires requires (const Weapon& w, const Proj& proj, const Weapon::AttackRating& war) { proj(war) < proj(war); }
+	Weapon::AttackRating maximize_attack_rating(const Weapon::Filter& weapon_filter, const Proj& proj, Weapon::AttackOptions attack_options) const
 	{
 		// get all possible stat variations
-		const auto all_stat_variations = this->get_all_stat_variations(attack_options.player_level + 79, ALL_CLASS_STATS.at(attack_options.starting_class));
+		const auto all_stat_variations = this->get_all_stat_variations(attack_options.available_stat_points, attack_options.minimum_stats);
 
 		// filter weapons
 		std::vector<const Weapon*> filtered_weapons{};
@@ -756,16 +806,12 @@ public:
 
 int main(int argc, char* argv[])
 {
-	std::string file = "D:\\Paul\\Computer\\Programmieren\\C++\\Haupt-Projektmappe\\elden_ring_damage_calculator\\regulation-vanilla-v1.12.3.js";
-	std::ifstream stream(file);
-	json data = json::parse(stream);
-
-	auto&& [main, time1] = misc::TimeFunctionExecution([&]() { return damage_optimizer("D:\\Paul\\Computer\\Programmieren\\C++\\Haupt-Projektmappe\\elden_ring_damage_calculator\\regulation-vanilla-v1.12.3.js"); });
+	auto&& [main, time1] = misc::TimeFunctionExecution([&]() { return damage_optimizer("D:\\Paul\\Computer\\Programmieren\\C++\\elden-ring-damage-optimizer\\regulation-vanilla-v1.12.3.js"); });
 	misc::printl();
 
-	Weapon::AttackOptions atk_options = { 161, Class::VAGABOND, { 24, 10 }, true, false };
+	Weapon::AttackOptions atk_options = { 161 + 79, ALL_CLASS_STATS.at(Class::VAGABOND), {24, 10}, true, false};
 	auto [attack_rating, time2] = misc::TimeFunctionExecution([&]() {
-		return main.maximize_attack_rating([](const Weapon& w) { return w.dlc; }, [](const Weapon::AttackRating& war) { return war.total_attack_power; }, atk_options); });
+		return main.maximize_attack_rating(Weapon::Filter{ {}, {}, { true } }, [](const Weapon::AttackRating& war) { return war.total_attack_power; }, atk_options); });
 	misc::printl();
 
 	misc::print("stats: ");
