@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <LLVMInstallDir>D:\Paul\Computer\Programmieren\llvm</LLVMInstallDir>
+    <LLVMToolsVersion>18.1.6</LLVMToolsVersion>
+  </PropertyGroup>
+</Project>

@@ -9,9 +9,9 @@
 
 #include <nlohmann/json.hpp>
 #include <BS_thread_pool.hpp>
+#include <better-enums/enum.h>
 
 #include "hhh/misc.hpp"
-#include "hhh/extended_enum.hpp"
 #include "hhh/math/functions.hpp"
 
 
@@ -24,44 +24,30 @@ template<class Key, class T>
 using map = std::map<Key, T>;
 using floating = double;
 
-enum class Attribute
-{
+BETTER_ENUM(Attribute, int,
 	STRENGTH,
 	DEXTERITY,
 	INTELLIGENCE,
 	FAITH,
 	ARCAINE
-};
-constexpr std::array ALL_ATTRIBUTES = {
-	Attribute::STRENGTH,
-	Attribute::DEXTERITY,
-	Attribute::INTELLIGENCE,
-	Attribute::FAITH,
-	Attribute::ARCAINE
-};
-std::array<std::string, ALL_ATTRIBUTES.size()> ALL_ATTRIBUTE_STRINGS = {
-	"str",
-	"dex",
-	"int",
-	"fai",
-	"arc"
-};
-Attribute attribute_from_string(const std::string_view& str)
+);
+constexpr auto attribute_to_json_string(Attribute at)
 {
-	for (int i = 0; i < ALL_ATTRIBUTES.size(); i++)
-		if (str == ALL_ATTRIBUTE_STRINGS[i])
-			return ALL_ATTRIBUTES[i];
+	switch (at)
+	{
+		case Attribute::STRENGTH:		return "str";
+		case Attribute::DEXTERITY:		return "dex";
+		case Attribute::INTELLIGENCE:	return "int";
+		case Attribute::FAITH:			return "fai";
+		case Attribute::ARCAINE:		return "arc";
+	}
 
-	throw std::invalid_argument("invalid attribute string");
+	throw std::invalid_argument("invalid attribute");
 }
-std::string attribute_to_string(const Attribute& attr)
-{
-	return ALL_ATTRIBUTE_STRINGS.at(int(attr));
-}
-using Stats = std::array<int, ALL_ATTRIBUTES.size()>;
+constexpr auto attribute_json_string_table = better_enums::make_map(attribute_to_json_string);
+using Stats = std::array<int, Attribute::_size()>;
 
-enum class Class
-{
+BETTER_ENUM(Class, int,
 	HERO,
 	BANDIT,
 	ASTROLOGER,
@@ -72,7 +58,7 @@ enum class Class
 	VAGABOND,
 	PROPHET,
 	SAMURAI
-};
+);
 const map<Class, Stats> ALL_CLASS_STATS{
 	{Class::HERO,		{ 16, 9,  7,  8, 11}},
 	{Class::BANDIT,		{ 9, 13,  9,  8, 14}},
@@ -86,8 +72,7 @@ const map<Class, Stats> ALL_CLASS_STATS{
 	{Class::SAMURAI,	{12, 15,  9,  8,  8}}
 };
 
-enum class AttackPowerType
-{
+BETTER_ENUM(AttackPowerType, int,
 	PHYSICAL = 0,
 	MAGIC = 1,
 	FIRE = 2,
@@ -99,62 +84,16 @@ enum class AttackPowerType
 	FROST = 8,
 	SLEEP = 9,
 	MADNESS = 10,
-	DEATH_BLIGHT = 11,
-};
-std::string attack_power_type_to_string(const AttackPowerType& apt)
-{
-	switch (apt)
-	{
-	case AttackPowerType::PHYSICAL:
-		return "physical";
-	case AttackPowerType::MAGIC:
-		return "magic";
-	case AttackPowerType::FIRE:
-		return "fire";
-	case AttackPowerType::LIGHTNING:
-		return "lightning";
-	case AttackPowerType::HOLY:
-		return "holy";
-	case AttackPowerType::POISON:
-		return "poison";
-	case AttackPowerType::SCARLET_ROT:
-		return "scarlet_rot";
-	case AttackPowerType::BLEED:
-		return "bleed";
-	case AttackPowerType::FROST:
-		return "frost";
-	case AttackPowerType::SLEEP:
-		return "sleep";
-	case AttackPowerType::MADNESS:
-		return "madness";
-	case AttackPowerType::DEATH_BLIGHT:
-		return "death_blight";
-	default:
-		throw std::invalid_argument("invalid AttackPowerType");
-	}
-}
-constexpr std::array ALL_ATTACK_POWER_TYPES = {
-	AttackPowerType::PHYSICAL,
-	AttackPowerType::MAGIC,
-	AttackPowerType::FIRE,
-	AttackPowerType::LIGHTNING,
-	AttackPowerType::HOLY,
-	AttackPowerType::POISON,
-	AttackPowerType::SCARLET_ROT,
-	AttackPowerType::BLEED,
-	AttackPowerType::FROST,
-	AttackPowerType::SLEEP,
-	AttackPowerType::MADNESS,
-	AttackPowerType::DEATH_BLIGHT
-};
-constexpr std::array ALL_DAMAGE_TYPES = {
+	DEATH_BLIGHT = 11
+	)
+constexpr std::array<AttackPowerType, 5> ALL_DAMAGE_TYPES = {
 	AttackPowerType::PHYSICAL,
 	AttackPowerType::MAGIC,
 	AttackPowerType::FIRE,
 	AttackPowerType::LIGHTNING,
 	AttackPowerType::HOLY
 };
-constexpr std::array ALL_STATUS_TYPES = {
+constexpr std::array<AttackPowerType, 7> ALL_STATUS_TYPES = {
 	AttackPowerType::POISON,
 	AttackPowerType::SCARLET_ROT,
 	AttackPowerType::BLEED,
@@ -165,14 +104,77 @@ constexpr std::array ALL_STATUS_TYPES = {
 };
 
 using ScalingCurve = std::array<floating, 149>;
-using AttributeScaling = std::array<floating, ALL_ATTRIBUTES.size()>;
-using AttackElementCorrects = std::array<AttributeScaling, ALL_ATTACK_POWER_TYPES.size()>;
+using AttributeScaling = std::array<floating, Attribute::_size()>;
+using AttackElementCorrects = std::array<AttributeScaling, AttackPowerType::_size()>;
 using AttackElementCorrectsById = map<int, AttackElementCorrects>;
 
-void from_json(const json& j, Attribute& a)
-{
-	a = attribute_from_string(j.get<std::string>());
-}
+BETTER_ENUM(Affinity_, int,
+	STANDARD = 0,
+	HEAVY = 1,
+	KEEN = 2,
+	QUALITY = 3,
+	MAGIC = 4,
+	FIRE = 5,
+	FLAME_ART = 6,
+	LIGHTNING = 7,
+	SACRED = 8,
+	COLD = 9,
+	POISON = 10,
+	BLOOD = 11,
+	OCCULT = 12,
+	UNIQUE = -1
+);
+
+BETTER_ENUM(Type_, int,
+	DAGGER = 1,
+	STRAIGHT_SWORD = 3,
+	GREATSWORD = 5,
+	COLOSSAL_SWORD = 7,
+	CURVED_SWORD = 9,
+	CURVED_GREATSWORD = 11,
+	KATANA = 13,
+	TWINBLADE = 14,
+	THRUSTING_SWORD = 15,
+	HEAVY_THRUSTING_SWORD = 16,
+	AXE = 17,
+	GREATAXE = 19,
+	HAMMER = 21,
+	GREAT_HAMMER = 23,
+	FLAIL = 24,
+	SPEAR = 25,
+	GREAT_SPEAR = 28,
+	HALBERD = 29,
+	REAPER = 31,
+	FIST = 35,
+	CLAW = 37,
+	WHIP = 39,
+	COLOSSAL_WEAPON = 41,
+	LIGHT_BOW = 50,
+	BOW = 51,
+	GREATBOW = 53,
+	CROSSBOW = 55,
+	BALLISTA = 56,
+	GLINTSTONE_STAFF = 57,
+	DUAL_CATALYST = 59,
+	SACRED_SEAL = 61,
+	SMALL_SHIELD = 65,
+	MEDIUM_SHIELD = 67,
+	GREATSHIELD = 69,
+	TORCH = 87,
+	HAND_TO_HAND = 88,
+	PERFUME_BOTTLE = 89,
+	THRUSTING_SHIELD = 90,
+	THROWING_BLADE = 91,
+	BACKHAND_BLADE = 92,
+	LIGHT_GREATSWORD = 93,
+	GREAT_KATANA = 94,
+	BEAST_CLAW = 95
+)
+
+constexpr auto ineffective_attribute_penalty = 0.4;
+constexpr auto defaultDamageCalcCorrectGraphId = 0;
+constexpr auto defaultStatusCalcCorrectGraphId = 6;
+
 namespace nlohmann
 {
 	template<>
@@ -182,12 +184,12 @@ namespace nlohmann
 		{
 			for (auto&& [attr_str, val] : j.items())
 			{
-				auto attr = attribute_from_string(attr_str);
+				auto attr = attribute_json_string_table.to_enum(attr_str.c_str());
 
 				if (val.is_boolean())
-					ac[int(attr)] = val.get<bool>();
+					ac[attr._to_integral()] = val.get<bool>();
 				else if (val.is_number())
-					ac[int(attr)] = val.get<floating>();
+					ac[attr._to_integral()] = val.get<floating>();
 				else
 					throw std::invalid_argument(std::string("invalid json type") + val.type_name());
 			}
@@ -201,10 +203,7 @@ namespace nlohmann
 			for (auto&& [apt_str, ac_j] : j.items())
 			{
 				auto apt_int = std::stoi(apt_str);
-				auto apt = AttackPowerType(apt_int);
-
-				if (!std::ranges::contains(ALL_ATTACK_POWER_TYPES, apt))
-					throw std::invalid_argument("invalid value for AttackPowerType");
+				auto apt = AttackPowerType::_from_integral(apt_int);
 
 				aec[apt_int] = ac_j.get<AttributeScaling>();
 			}
@@ -216,10 +215,10 @@ namespace nlohmann
 	{
 		static void from_json(const json& j, Stats& s)
 		{
-			for (int i = 0; i < ALL_ATTRIBUTES.size(); i++)
+			for (const auto& [attr_str, val] : j.items())
 			{
-				auto attr_str = attribute_to_string(ALL_ATTRIBUTES[i]);
-				s[i] = j.value(attr_str, 0);
+				auto attr = attribute_json_string_table.to_enum(attr_str.c_str());
+				s[attr._to_integral()] = val.get<int>();
 			}
 		}
 	};
@@ -230,109 +229,51 @@ namespace nlohmann
 		{
 			for (const auto& [apt_str, val] : j.items())
 			{
-				auto apt = AttackPowerType(std::stoi(apt_str));
-
-				if (!std::ranges::contains(ALL_ATTACK_POWER_TYPES, apt))
-					throw std::invalid_argument("invalid value for AttackPowerType");
+				auto apt = AttackPowerType::_from_integral(std::stoi(apt_str));
 
 				m[apt] = val.get<T>();
 			}
 		}
 	};
-}
 
-constexpr auto ineffective_attribute_penalty = 0.4;
-constexpr auto defaultDamageCalcCorrectGraphId = 0;
-constexpr auto defaultStatusCalcCorrectGraphId = 6;
-
-HHH_ENUM_DEFINE(Affinity_, int, int,
-	STANDARD, 0,
-	HEAVY, 1,
-	KEEN, 2,
-	QUALITY, 3,
-	MAGIC, 4,
-	FIRE, 5,
-	FLAME_ART, 6,
-	LIGHTNING, 7,
-	SACRED, 8,
-	COLD, 9,
-	POISON, 10,
-	BLOOD, 11,
-	OCCULT, 12,
-	UNIQUE, -1
-);
-void from_json(const json& j, Affinity_& a)
-{
-	a = Affinity_::from_value(j.get<int>());
+	template<>
+	struct adl_serializer<Attribute>
+	{
+		static Attribute from_json(const json& j)
+		{
+			return attribute_json_string_table.to_enum(j.get<std::string>().c_str());
+		}
+	};
+	template<>
+	struct adl_serializer<AttackPowerType>
+	{
+		static AttackPowerType from_json(const json& j)
+		{
+			return AttackPowerType::_from_integral(j.get<int>());
+		}
+	};
+	template<>
+	struct adl_serializer<Affinity_>
+	{
+		static Affinity_ from_json(const json& j)
+		{
+			return Affinity_::_from_integral(j.get<int>());
+		}
+	};
+	template<>
+	struct adl_serializer<Type_>
+	{
+		static Type_ from_json(const json& j)
+		{
+			return Type_::_from_integral(j.get<int>());
+		}
+	};
 }
 
 struct Weapon
 {
 	using Affinity = Affinity_;
-	/*enum class Affinity
-	{
-		STANDARD = 0,
-		HEAVY = 1,
-		KEEN = 2,
-		QUALITY = 3,
-		MAGIC = 4,
-		FIRE = 5,
-		FLAME_ART = 6,
-		LIGHTNING = 7,
-		SACRED = 8,
-		COLD = 9,
-		POISON = 10,
-		BLOOD = 11,
-		OCCULT = 12,
-		UNIQUE = -1,
-	};*/
-
-	enum class Type
-	{
-		DAGGER = 1,
-		STRAIGHT_SWORD = 3,
-		GREATSWORD = 5,
-		COLOSSAL_SWORD = 7,
-		CURVED_SWORD = 9,
-		CURVED_GREATSWORD = 11,
-		KATANA = 13,
-		TWINBLADE = 14,
-		THRUSTING_SWORD = 15,
-		HEAVY_THRUSTING_SWORD = 16,
-		AXE = 17,
-		GREATAXE = 19,
-		HAMMER = 21,
-		GREAT_HAMMER = 23,
-		FLAIL = 24,
-		SPEAR = 25,
-		GREAT_SPEAR = 28,
-		HALBERD = 29,
-		REAPER = 31,
-		FIST = 35,
-		CLAW = 37,
-		WHIP = 39,
-		COLOSSAL_WEAPON = 41,
-		LIGHT_BOW = 50,
-		BOW = 51,
-		GREATBOW = 53,
-		CROSSBOW = 55,
-		BALLISTA = 56,
-		GLINTSTONE_STAFF = 57,
-		DUAL_CATALYST = 59,
-		SACRED_SEAL = 61,
-		SMALL_SHIELD = 65,
-		MEDIUM_SHIELD = 67,
-		GREATSHIELD = 69,
-		TORCH = 87,
-		HAND_TO_HAND = 88,
-		PERFUME_BOTTLE = 89,
-		THRUSTING_SHIELD = 90,
-		THROWING_BLADE = 91,
-		BACKHAND_BLADE = 92,
-		LIGHT_GREATSWORD = 93,
-		GREAT_KATANA = 94,
-		BEAST_CLAW = 95,
-	};
+	using Type = Type_;
 
 	struct AttackOptions
 	{
@@ -349,8 +290,8 @@ struct Weapon
 		Stats stats;
 		std::array<size_t, 2> upgrade_level;
 		floating total_attack_power;
-		std::array<std::pair<floating, std::array<floating, 2>>, ALL_ATTACK_POWER_TYPES.size()> attack_power;	// first = second[0] + second[1]
-		std::array<floating, ALL_ATTACK_POWER_TYPES.size()> spell_scaling;
+		std::array<std::pair<floating, std::array<floating, 2>>, AttackPowerType::_size()> attack_power;	// first = second[0] + second[1]
+		std::array<floating, AttackPowerType::_size()> spell_scaling;
 		std::vector<Attribute> ineffective_attributes;
 		std::vector<AttackPowerType> ineffective_attack_power_types;
 
@@ -360,9 +301,9 @@ struct Weapon
 			this->attack_power.fill({});
 			this->spell_scaling.fill({});
 			this->ineffective_attributes.clear();
-			this->ineffective_attributes.reserve(ALL_ATTRIBUTES.size());
+			this->ineffective_attributes.reserve(Attribute::_size());
 			this->ineffective_attack_power_types.clear();
-			this->ineffective_attack_power_types.reserve(ALL_ATTACK_POWER_TYPES.size());
+			this->ineffective_attack_power_types.reserve(AttackPowerType::_size());
 		}
 	};
 
@@ -413,11 +354,11 @@ struct Weapon
 	// scaling amount at each upgrade level (0-10 or 0-25) for each player attribute (e.g. Attribute.STRENGTH)
 	const std::vector<AttributeScaling> attribute_scaling;
 	// base attack power at each upgrade level for each attack power type
-	const std::vector<std::array<floating, ALL_ATTACK_POWER_TYPES.size()>> base_attack_power;
+	const std::vector<std::array<floating, AttackPowerType::_size()>> base_attack_power;
 	// map indicating which attack power types scale with which player attributes
 	const AttackElementCorrectsById::mapped_type& attack_power_attribute_scaling;
 	// map indicating which scaling curve is used for each attack power type
-	const std::array<const ScalingCurve*, ALL_ATTACK_POWER_TYPES.size()> attack_power_scaling_curves;
+	const std::array<const ScalingCurve*, AttackPowerType::_size()> attack_power_scaling_curves;
 	// thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
 	const std::array<std::pair<floating, std::string>, 6>& scaling_tiers;
 
@@ -428,7 +369,7 @@ struct Weapon
 			two_handing = false;
 
 		// Bows and ballistae can only be two handed
-		constexpr std::array bow_types = { Weapon::Type::LIGHT_BOW, Weapon::Type::BOW, Weapon::Type::GREATBOW, Weapon::Type::BALLISTA };
+		constexpr std::array<Weapon::Type, 4> bow_types = { Weapon::Type::LIGHT_BOW, Weapon::Type::BOW, Weapon::Type::GREATBOW, Weapon::Type::BALLISTA };
 		if (std::ranges::contains(bow_types, this->type))
 			two_handing = true;
 
@@ -446,8 +387,8 @@ struct Weapon
 		result.stats = stats;
 		result.upgrade_level = attack_options.upgrade_level;
 
-		for (auto attribute : ALL_ATTRIBUTES)
-			if (adjusted_stats[int(attribute)] < this->requirements[int(attribute)])
+		for (auto attribute : Attribute::_values())
+			if (adjusted_stats[attribute._to_integral()] < this->requirements[attribute._to_integral()])
 				result.ineffective_attributes.push_back(attribute);
 
 		size_t upgrade_level;
@@ -460,10 +401,10 @@ struct Weapon
 		else
 			throw std::runtime_error("invalid base attack power size");
 
-		for (auto&& attack_power_type : ALL_ATTACK_POWER_TYPES)
+		for (auto&& attack_power_type : AttackPowerType::_values())
 		{
 			auto base_attack_power = this->base_attack_power[upgrade_level][int(attack_power_type)];
-			auto is_damage_type = attack_power_type <= AttackPowerType::HOLY;
+			auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
 
 			if (base_attack_power != 0 or this->sorcery_tool or this->incantation_tool)	// or (is_damage_type and (this->sorcery_tool or this->incantation_tool))
 			{
@@ -480,7 +421,7 @@ struct Weapon
 				{
 					auto& effective_stats = (!attack_options.disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
 
-					for (auto&& attribute : ALL_ATTRIBUTES)
+					for (auto&& attribute : Attribute::_values())
 					{
 						auto&& attribute_correct = scaling_attributes.at(int(attribute));
 						floating scaling{};
@@ -664,7 +605,7 @@ public:
 			const auto& reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
 
 			auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<map<AttackPowerType, int>>();
-			std::array<const ScalingCurve*, ALL_ATTACK_POWER_TYPES.size()> weaponCalcCorrectGraphs{};
+			std::array<const ScalingCurve*, AttackPowerType::_size()> weaponCalcCorrectGraphs{};
 			for (auto damage_type : ALL_DAMAGE_TYPES)
 				weaponCalcCorrectGraphs.at(int(damage_type)) = &this->calcCorrectGraphsById.at(misc::map_get(calcCorrectGraphIds, damage_type, defaultDamageCalcCorrectGraphId));
 			for (auto status_type : ALL_STATUS_TYPES)
@@ -672,7 +613,7 @@ public:
 
 			auto unupgradedAttack = weapon_data.at("attack").get<std::vector<std::pair<AttackPowerType, int>>>();
 			auto statusSpEffectParamIds = weapon_data.value("statusSpEffectParamIds", std::array<int, 3>{});
-			std::vector<std::array<floating, ALL_ATTACK_POWER_TYPES.size()>> attack{};
+			std::vector<std::array<floating, AttackPowerType::_size()>> attack{};
 			for (const auto& reinforceParam : reinforceParams)
 			{
 				auto& attack_at_upgrade_level = attack.emplace_back();
@@ -752,15 +693,15 @@ public:
 		misc::printl(total_combinations, " variations total");
 
 		// process one weapon
-		std::vector<std::optional<Weapon::AttackRating>> optional_results(filtered_weapons.size());
-		auto do_weapon = [&](/*size_t ,const Weapon& weapon, std::optional<Weapon::AttackRating>& best_attack_rating, */size_t i)
+		std::vector<Weapon::AttackRating> optional_results(filtered_weapons.size());
+		auto do_weapon = [&](size_t i)
 			{
 				const Weapon& weapon = *filtered_weapons[i];
-				std::optional<Weapon::AttackRating>& best_attack_rating = optional_results[i];
+				auto& best_attack_rating = optional_results[i];
 
 				Weapon::AttackRating intermediate_attack_rating{};
-				intermediate_attack_rating.ineffective_attack_power_types.reserve(ALL_ATTACK_POWER_TYPES.size());
-				intermediate_attack_rating.ineffective_attributes.reserve(ALL_ATTRIBUTES.size());
+				intermediate_attack_rating.ineffective_attack_power_types.reserve(AttackPowerType::_size());
+				intermediate_attack_rating.ineffective_attributes.reserve(Attribute::_size());
 				decltype(proj(intermediate_attack_rating)) best_attack_rating_proj_result{};
 
 				// loop through all stat variations and find the one resulting in the best attack rating
@@ -769,10 +710,10 @@ public:
 					weapon.get_attack_rating(attack_options, stats, intermediate_attack_rating);
 					auto intermediate_attack_rating_proj_result = proj(intermediate_attack_rating);
 
-					if (!best_attack_rating.has_value() or best_attack_rating_proj_result < intermediate_attack_rating_proj_result)
+					if (best_attack_rating.weapon == nullptr or best_attack_rating_proj_result < intermediate_attack_rating_proj_result)
 					{
 						best_attack_rating_proj_result = std::move(intermediate_attack_rating_proj_result);
-						best_attack_rating.emplace(std::move(intermediate_attack_rating));
+						best_attack_rating = std::move(intermediate_attack_rating);
 					}
 
 					intermediate_attack_rating.reset();
@@ -782,7 +723,7 @@ public:
 				misc::print("completed " + std::to_string(i) + ": " + weapon.full_name + "\n");
 			};
 
-
+		//do_weapon(0);
 		// create a thread pool
 		BS::thread_pool pool(20);
 
@@ -793,12 +734,15 @@ public:
 		pool.wait();
 
 		// loop through all optional attack ratings and get the best one
-		std::optional<Weapon::AttackRating> result{};
+		Weapon::AttackRating result{};
 		for (auto&& optional_result : optional_results)
-			if (optional_result.has_value() and (!result.has_value() or proj(result.value()) < proj(optional_result.value())))
-				result.emplace(std::move(optional_result.value()));
+			if (optional_result.weapon != nullptr and (result.weapon == nullptr or proj(result) < proj(optional_result)))
+				result = std::move(optional_result);
 
-		return result.value();
+		if (result.weapon == nullptr)
+			throw std::runtime_error("no weapon found");
+
+		return result;
 	}
 };
 
@@ -823,7 +767,7 @@ int main(int argc, char* argv[])
 	misc::printl();
 	for (int i = 0; i < attack_rating.attack_power.size(); i++)
 		if (attack_rating.attack_power.at(i).first != 0)
-			misc::printl(attack_power_type_to_string(AttackPowerType(i)), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
+			misc::printl(AttackPowerType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
 				" = ", attack_rating.attack_power.at(i).first);
 	misc::printl();
 
