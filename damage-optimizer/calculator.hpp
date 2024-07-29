@@ -245,35 +245,61 @@ namespace calculator
 
 	std::vector<Stats> get_stat_variations(const size_t attribute_points, const Stats LOWER);
 
+	template<typename Proj>
+	struct optimization_context
+	{
+		Proj proj;
+		std::vector<Weapon::AttackRating> optional_results;
+		std::unique_ptr<BS::thread_pool> pool;
+
+		Weapon::AttackRating wait_and_get_result() const
+		{
+			// wait for all threads to finish
+			this->pool->wait();
+			misc::printl();
+
+			// loop through all optional attack ratings and get the best one
+			Weapon::AttackRating result{};
+			for (auto&& optional_result : optional_results)
+				if (optional_result.weapon != nullptr and (result.weapon == nullptr or this->proj(result) < this->proj(optional_result)))
+					result = std::move(optional_result);
+
+			return result;
+		}
+	};
+
 	struct filtered_weapons
 	{
 		std::vector<const Weapon*> weapons;
 
 		template<typename Proj>
-			requires requires (const Weapon& w, const Proj& proj, const Weapon::AttackRating& war) { proj(war) < proj(war); }
-		Weapon::AttackRating maximize_attack_rating(const std::vector<Stats>& stat_variations, const Proj& proj, const Weapon::AttackOptions& attack_options) const
+			requires requires (const Weapon& w, Proj&& proj, const Weapon::AttackRating& war) { proj(war) < proj(war); }
+		auto optimize_attack_rating(const std::vector<Stats>& stat_variations, Proj&& proj, const Weapon::AttackOptions& attack_options) const
 		{
 			// print some stats
 			auto total_combinations = this->weapons.size() * stat_variations.size();
 			misc::printl(total_combinations, " variations total\n");
 
+			// create an optimization context
+			optimization_context<Proj> context{ std::move(proj), {}, nullptr };
+			context.optional_results.resize(this->weapons.size());
+
 			// process one weapon
-			std::vector<Weapon::AttackRating> optional_results(this->weapons.size());
 			auto do_weapon = [&](size_t i)
 				{
 					const Weapon& weapon = *this->weapons[i];
-					auto& best_attack_rating = optional_results[i];
+					auto& best_attack_rating = context.optional_results[i];
 
 					Weapon::AttackRating intermediate_attack_rating{};
 					intermediate_attack_rating.ineffective_attack_power_types.reserve(AttackPowerType::_size());
 					intermediate_attack_rating.ineffective_attributes.reserve(Attribute::_size());
-					decltype(proj(intermediate_attack_rating)) best_attack_rating_proj_result{};
+					decltype(context.proj(intermediate_attack_rating)) best_attack_rating_proj_result{};
 
 					// loop through all stat variations and find the one resulting in the best attack rating
 					for (auto&& stats : stat_variations)
 					{
 						weapon.get_attack_rating(attack_options, stats, intermediate_attack_rating);
-						auto intermediate_attack_rating_proj_result = proj(intermediate_attack_rating);
+						auto intermediate_attack_rating_proj_result = context.proj(intermediate_attack_rating);
 
 						if (best_attack_rating.weapon == nullptr or best_attack_rating_proj_result < intermediate_attack_rating_proj_result)
 						{
@@ -288,28 +314,13 @@ namespace calculator
 					misc::print("completed " + std::to_string(i) + ": " + weapon.full_name + "\n");
 				};
 
-			//do_weapon(0);
 			// create a thread pool
-			BS::thread_pool pool(20);
+			context.pool = std::make_unique<BS::thread_pool>(20);
 
-			// loop through all weapons and get the best attack rating each
-			pool.detach_sequence(0ull, this->weapons.size(), do_weapon);
+			// loop through all weapons and get the best attack rating each asynchronously
+			context.pool->detach_sequence(0ull, this->weapons.size(), do_weapon);
 
-			// wait for all threads to finish
-			pool.wait();
-
-			// loop through all optional attack ratings and get the best one
-			Weapon::AttackRating result{};
-			for (auto&& optional_result : optional_results)
-				if (optional_result.weapon != nullptr and (result.weapon == nullptr or proj(result) < proj(optional_result)))
-					result = std::move(optional_result);
-
-			if (result.weapon == nullptr)
-				throw std::runtime_error("no weapon found");
-
-			misc::printl();
-
-			return result;
+			return context;
 		}
 	};
 

@@ -353,7 +353,7 @@ void calculator::test()
 	misc::printl();
 
 	auto [attack_rating, attack_rating_time] = misc::TimeFunctionExecution([&]()
-		{ return filtered_weaps.maximize_attack_rating(stat_variations, [](const Weapon::AttackRating& war) { return war.total_attack_power; }, atk_options); });
+		{ return filtered_weaps.optimize_attack_rating(stat_variations, [](const Weapon::AttackRating& war) { return war.total_attack_power; }, atk_options).wait_and_get_result(); });
 	misc::printl();
 
 	misc::print("stats: ");
