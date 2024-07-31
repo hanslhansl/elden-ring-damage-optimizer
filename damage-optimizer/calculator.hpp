@@ -3,7 +3,6 @@
 #include "include.hpp"
 
 
-
 namespace calculator
 {
 	template<class Key, class T>
@@ -150,12 +149,12 @@ namespace calculator
 	constexpr auto defaultDamageCalcCorrectGraphId = 0;
 	constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
-	struct Weapon
+	struct weapon
 	{
 		using Affinity = Affinity_;
 		using Type = Type_;
 
-		struct AttackOptions
+		struct attack_options
 		{
 			int available_stat_points;
 			Stats minimum_stats;
@@ -164,9 +163,9 @@ namespace calculator
 			bool disable_two_handing_attack_power_bonus = false;
 		};
 
-		struct AttackRating
+		struct attack_rating
 		{
-			const Weapon* weapon;
+			const weapon* weapon;
 			Stats stats;
 			std::array<size_t, 2> upgrade_level;
 			floating total_attack_power;
@@ -178,17 +177,26 @@ namespace calculator
 			void reset();
 		};
 
-		struct Filter
+		struct filter
 		{
-			std::set<std::string> full_names;
-			std::set<std::string> base_names;
 			std::set<bool> dlc;
-			std::set<bool> sorcery_tools;
-			std::set<bool> incantation_tools;
+			//std::set<bool> sorcery_tools;
+			//std::set<bool> incantation_tools;
 			std::set<Type> types;
 			std::set<Affinity> affinities;
+			std::set<std::string> base_names;
 
-			bool operator()(const Weapon& weapon) const;
+			bool operator()(const weapon& weapon) const;
+		};
+
+		struct all_filter_options
+		{
+			std::vector<bool> dlc;
+			//std::vector<bool> sorcery_tools;
+			//std::vector<bool> incantation_tools;
+			std::vector<Type> types;
+			std::vector<Affinity> affinities;
+			std::vector<std::string> base_names;
 		};
 
 		// the full unique name of the weapon, e.g. "Heavy Nightrider Glaive"
@@ -224,7 +232,7 @@ namespace calculator
 
 		Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const;
 
-		void get_attack_rating(const AttackOptions& attack_options, const Stats& stats, AttackRating& result) const;
+		void get_attack_rating(const attack_options& attack_options, const Stats& stats, attack_rating& result) const;
 	};
 
 	struct CalcCorrectGraphDict
@@ -243,23 +251,154 @@ namespace calculator
 		friend void from_json(const json& j, ReinforceTypesDict& r);
 	};
 
-	std::vector<Stats> get_stat_variations(const size_t attribute_points, const Stats LOWER);
+	constexpr size_t get_stat_variation_count(const int attribute_points, const Stats& min_stats)
+	{
+		constexpr auto N = Stats{}.size();
+		constexpr auto UPPER = 99;
+		const auto SUM = attribute_points;
+		size_t count = 0;
+
+		if (attribute_points > UPPER * min_stats.size())
+			throw std::invalid_argument("attribute_points must be <= " + std::to_string(UPPER) + " * " + std::to_string(N));
+
+		if (std::ranges::any_of(min_stats, [](int v) { return v > UPPER; }))
+			throw std::invalid_argument("min_stats must be <= " + std::to_string(UPPER));
+
+		for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
+		{
+			auto SUM_i = SUM - i;
+			for (auto j = min_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
+			{
+				auto SUM_i_j = SUM_i - j;
+
+				if (0ll == min_stats[4])
+				{
+					auto a1 = std::max(min_stats[2], SUM_i_j - min_stats[3] - UPPER);
+					auto b1 = std::min(UPPER, SUM_i_j - min_stats[3]);
+					auto b1_a1_1 = b1 - a1 + 1;
+					if (b1_a1_1 > 0)
+						count += (1 - min_stats[3]) * b1_a1_1;
+
+					auto a2 = a1;
+					auto b2 = std::min(UPPER, SUM_i_j - UPPER - 1);
+					auto b2_a2_1 = b2 - a2 + 1;
+					if (b2_a2_1 > 0)
+						count += UPPER * b2_a2_1;
+
+					auto a3 = std::max(min_stats[2], SUM_i_j - UPPER);
+					auto b3 = b1;
+					auto b3_a3_1 = b3 - a3 + 1;
+					if (b3_a3_1 > 0)
+						count += SUM_i_j * b3_a3_1 - (a3 + b3) * b3_a3_1 / 2;
+
+					auto a4 = std::max(min_stats[2], SUM_i_j - UPPER - UPPER);
+					auto b4 = std::min(UPPER, SUM_i_j - min_stats[3] - UPPER - 1);
+					auto b4_a4_1 = b4 - a4 + 1;
+					if (b4_a4_1 > 0)
+						count += (UPPER + 1 - SUM_i_j + UPPER) * b4_a4_1 + (a4 + b4) * b4_a4_1 / 2;
+
+					auto a5 = std::max(min_stats[2], SUM_i_j - UPPER);
+					auto b5 = b4;
+					auto b5_a5_1 = b5 - a5 + 1;
+					if (b5_a5_1 > 0)
+						count += SUM_i_j * b5_a5_1;
+				}
+				else
+				{
+					auto a2 = std::max(min_stats[2], SUM_i_j - min_stats[3] - UPPER);
+					auto b2 = std::min({ UPPER, SUM_i_j - UPPER - min_stats[4], SUM_i_j - UPPER - 1 });
+					auto b2_a2_1 = b2 - a2 + 1;
+					if (b2_a2_1 > 0)
+						count += (1 + UPPER - min_stats[3]) * b2_a2_1;
+
+					auto a3 = std::max(min_stats[2], SUM_i_j - UPPER);
+					auto b3 = std::min(UPPER, SUM_i_j - UPPER - min_stats[4]);
+					auto b3_a3_1 = b3 - a3 + 1;
+					if (b3_a3_1 > 0)
+						count += (1 + SUM_i_j - min_stats[3]) * b3_a3_1 - (a3 + b3) * b3_a3_1 / 1;
+
+					auto a4 = std::max({ min_stats[2], SUM_i_j - min_stats[3] - UPPER, SUM_i_j - min_stats[4] - UPPER + 1 });
+					auto b4 = std::min(UPPER, SUM_i_j - min_stats[4] - min_stats[3]);
+					auto b4_a4_1 = b4 - a4 + 1;
+					if (b4_a4_1 > 0)
+						count += (SUM_i_j - min_stats[4] - min_stats[3] + 1) * b4_a4_1 - (a4 + b4) * b4_a4_1 / 2;
+
+					auto a5 = std::max(min_stats[2], SUM_i_j - UPPER - UPPER);
+					auto b5 = std::min({ UPPER, SUM_i_j - UPPER - 1 - min_stats[3], SUM_i_j - min_stats[4] - UPPER });
+					auto b5_a5_1 = b5 - a5 + 1;
+					if (b5_a5_1 > 0)
+						count += (UPPER - SUM_i_j + UPPER + 1) * b5_a5_1 + (a5 + b5) * b5_a5_1 / 2;
+
+					auto a7 = std::max(min_stats[2], SUM_i_j - UPPER);
+					auto b7 = b5;
+					auto b7_a7_1 = b7 - a7 + 1;
+					if (b7_a7_1 > 0)
+						count += (UPPER + 1) * b7_a7_1;
+
+					auto a8 = std::max(min_stats[2], SUM_i_j - UPPER - min_stats[4] + 1);
+					auto b8 = std::min(UPPER, SUM_i_j - min_stats[3] - UPPER - 1);
+					auto b8_a8_1 = b8 - a8 + 1;
+					if (b8_a8_1 > 0)
+						count += (UPPER - min_stats[4] + 1) * b8_a8_1;
+				}
+			}
+		}
+
+
+		return count;
+	}
+	constexpr std::vector<Stats> get_stat_variations(const int attribute_points, const Stats& min_stats)
+	{
+		constexpr auto N = Stats{}.size();
+		constexpr auto UPPER = 99;
+		const auto SUM = attribute_points;
+
+		auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
+		std::vector<Stats> stat_variations{};
+		stat_variations.reserve(possible_occurances);
+
+		for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
+		{
+			auto SUM_i = SUM - i;
+			for (auto j = min_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
+			{
+				auto SUM_i_j = SUM_i - j;
+				for (auto k = min_stats[2]; k <= std::min(UPPER, SUM_i_j); ++k)
+				{
+					auto SUM_i_j_k = SUM_i_j - k;
+					for (auto l = min_stats[3]; l <= std::min(UPPER, SUM_i_j_k); ++l)
+					{
+						auto SUM_i_j_k_l = SUM_i_j_k - l;
+						auto m = SUM_i_j_k_l;
+						if (min_stats[4] <= m && m <= UPPER)
+						{
+							Stats indices = { i, j, k, l, m };
+							stat_variations.push_back({ i, j, k, l, m });
+						}
+					}
+				}
+			}
+		}
+
+		return stat_variations;
+	}
+
 
 	template<typename Proj>
 	struct optimization_context
 	{
 		Proj proj;
-		std::vector<Weapon::AttackRating> optional_results;
+		std::vector<weapon::attack_rating> optional_results;
 		std::unique_ptr<BS::thread_pool> pool;
 
-		Weapon::AttackRating wait_and_get_result() const
+		weapon::attack_rating wait_and_get_result() const
 		{
 			// wait for all threads to finish
 			this->pool->wait();
 			misc::printl();
 
 			// loop through all optional attack ratings and get the best one
-			Weapon::AttackRating result{};
+			weapon::attack_rating result{};
 			for (auto&& optional_result : optional_results)
 				if (optional_result.weapon != nullptr and (result.weapon == nullptr or this->proj(result) < this->proj(optional_result)))
 					result = std::move(optional_result);
@@ -270,11 +409,11 @@ namespace calculator
 
 	struct filtered_weapons
 	{
-		std::vector<const Weapon*> weapons;
+		std::vector<const weapon*> weapons;
 
 		template<typename Proj>
-			requires requires (const Weapon& w, Proj&& proj, const Weapon::AttackRating& war) { proj(war) < proj(war); }
-		auto optimize_attack_rating(const std::vector<Stats>& stat_variations, Proj&& proj, const Weapon::AttackOptions& attack_options) const
+			requires requires (const weapon& w, Proj&& proj, const weapon::attack_rating& war) { proj(war) < proj(war); }
+		auto optimize_attack_rating(const std::vector<Stats>& stat_variations, Proj&& proj, const weapon::attack_options& attack_options) const
 		{
 			// print some stats
 			auto total_combinations = this->weapons.size() * stat_variations.size();
@@ -287,10 +426,10 @@ namespace calculator
 			// process one weapon
 			auto do_weapon = [&](size_t i)
 				{
-					const Weapon& weapon = *this->weapons[i];
+					const weapon& weapon = *this->weapons[i];
 					auto& best_attack_rating = context.optional_results[i];
 
-					Weapon::AttackRating intermediate_attack_rating{};
+					weapon::attack_rating intermediate_attack_rating{};
 					intermediate_attack_rating.ineffective_attack_power_types.reserve(AttackPowerType::_size());
 					intermediate_attack_rating.ineffective_attributes.reserve(Attribute::_size());
 					decltype(context.proj(intermediate_attack_rating)) best_attack_rating_proj_result{};
@@ -334,11 +473,13 @@ namespace calculator
 
 		static ScalingCurve evaluate_CalcCorrectGraph(const std::vector<CalcCorrectGraphDict>& calcCorrectGraph);
 	public:
-		std::vector<Weapon> weapons{};
+		std::vector<weapon> weapons{};
 
 		weapon_container(const std::filesystem::path& file_path);
 
-		filtered_weapons filter(const Weapon::Filter& weapon_filter) const;
+		weapon::all_filter_options get_all_filter_options() const;
+
+		filtered_weapons filter(const weapon::filter& weapon_filter) const;
 	};
 
 	void test();
@@ -386,14 +527,14 @@ namespace nlohmann
 		static calculator::AttackPowerType from_json(const json& j);
 	};
 	template<>
-	struct adl_serializer<calculator::Weapon::Affinity>
+	struct adl_serializer<calculator::weapon::Affinity>
 	{
-		static calculator::Weapon::Affinity from_json(const json& j);
+		static calculator::weapon::Affinity from_json(const json& j);
 	};
 	template<>
-	struct adl_serializer<calculator::Weapon::Type>
+	struct adl_serializer<calculator::weapon::Type>
 	{
-		static calculator::Weapon::Type from_json(const json& j);
+		static calculator::weapon::Type from_json(const json& j);
 	};
 }
 

@@ -15,6 +15,7 @@
 #include <better-enums/enum.h>
 
 #include <wx/wx.h>
+#include <wx/spinctrl.h>
 
 #include "hhh/misc.hpp"
 #include "hhh/math/functions.hpp"
