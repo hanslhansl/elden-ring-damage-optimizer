@@ -43,7 +43,10 @@ namespace ui
         wxChoice* choice;
         std::array<wxSpinCtrl*, attribute_names.size()> attribute_ctrls;
         wxSpinCtrl* player_level_ctrl;
+        wxStaticText* attribute_points_text;
         wxStaticText* stat_variations_text;
+
+        void update_stat_variations();
 
         void OnChange(wxCommandEvent& event);
         void OnChoiceSelected(wxCommandEvent& event);
@@ -58,18 +61,57 @@ namespace ui
         wxListBox* types_list;
         wxListBox* affinities_list;
         wxListBox* base_names_list;
+        wxStaticText* filtered_weapons_text;
 
-        calculator::weapon::all_filter_options all_filter_options;
-        calculator::weapon::filter filter;
+        calculator::weapon_container* weapon_container{};
+        calculator::weapon::all_filter_options all_filter_options{};
+        calculator::weapon::filter filter{};
+        calculator::filtered_weapons filtered_weapons{};
+
+        void update_filtered_weapons();
 
         void onListBox(wxCommandEvent& event);
 
     public:
+
         FilterPanel(wxWindow* parent);
 
-        void update_filter_options(calculator::weapon::all_filter_options&& all_filter_options_);
+        void update_filter_options(calculator::weapon_container& weapon_container);
 
         const calculator::weapon::filter& get_filter() const;
+    };
+
+    class Upgrade_LevelPanel : public wxPanel
+    {
+        wxSpinCtrl* normal_upgrade_level_ctrl;
+        wxSpinCtrl* somber_upgrade_level_ctrl;
+
+    public:
+        Upgrade_LevelPanel(wxWindow* parent);
+    };
+
+    class OptimizePanel : public wxPanel
+    {
+        inline static const std::array<wxString, calculator::DamageTypes::_size()> damage_type_names =
+            []() {  std::array<wxString, calculator::DamageTypes::_size()> ret{};
+            std::ranges::transform(calculator::DamageTypes::_names(), ret.begin(), [](const char* p) { return p; }); return ret; }();
+
+        inline static const std::array<wxString, calculator::StatusTypes::_size()> status_type_names =
+            []() {  std::array<wxString, calculator::StatusTypes::_size()> ret{};
+            std::ranges::transform(calculator::StatusTypes::_names(), ret.begin(), [](const char* p) { return p; }); return ret; }();
+
+        wxRadioButton* total_attack_power_button;
+
+        wxRadioButton* individual_attack_power_button;
+        wxListBox* individual_attack_power_list;
+
+        wxRadioButton* status_effect_button;
+        wxListBox* status_effect_list;
+
+        wxRadioButton* spell_scaling_button;
+
+    public:
+        OptimizePanel(wxWindow* parent);
     };
 
     class MyFrame : public wxFrame
@@ -77,6 +119,8 @@ namespace ui
         std::unique_ptr<calculator::weapon_container> weapon_container;
         StatsPanel* stats_panel;
         FilterPanel* filter_panel;
+        Upgrade_LevelPanel* upgrade_level_panel;
+        OptimizePanel* optimize_panel;
 
         void OnLoadRegulation(wxCommandEvent& event);
         void OnGenerateRegulation(wxCommandEvent& event);

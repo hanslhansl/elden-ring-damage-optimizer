@@ -83,10 +83,9 @@ void calculator::weapon::get_attack_rating(const attack_options& attack_options,
 	{
 		auto base_attack_power = this->base_attack_power[upgrade_level][attack_power_type._to_integral()];
 
-		auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
-
-		if (base_attack_power != 0 or this->sorcery_tool or this->incantation_tool)	// or (is_damage_type and (this->sorcery_tool or this->incantation_tool))
+		if (base_attack_power != 0 or this->sorcery_tool or this->incantation_tool)
 		{
+			auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
 			auto&& scaling_attributes = this->attack_power_attribute_scaling.at(attack_power_type._to_integral());
 			floating total_scaling = 1.;
 
@@ -313,17 +312,11 @@ calculator::weapon::all_filter_options calculator::weapon_container::get_all_fil
 	return all_filter_options;
 }
 
-calculator::filtered_weapons calculator::weapon_container::filter(const weapon::filter& weapon_filter) const
+void calculator::weapon_container::apply_filter(const weapon::filter& weapon_filter, filtered_weapons& filtered) const
 {
-	// filter weapons
-	filtered_weapons filtered{};
-	filtered.weapons.reserve(this->weapons.size());
 	for (const auto& weapon : this->weapons)
 		if (weapon_filter(weapon))
 			filtered.weapons.push_back(&weapon);
-
-	misc::printl(filtered.weapons.size(), "/", weapons.size(), " weapons");
-	return filtered;
 }
 
 void calculator::test()
@@ -333,7 +326,7 @@ void calculator::test()
 	weapon::attack_options atk_options = { 161 + 79, ALL_CLASS_STATS.at(Class::VAGABOND), {24, 10}, true, false };
 	auto [stat_variations, stat_variations_time] = misc::TimeFunctionExecution([&]() { return get_stat_variations(atk_options.available_stat_points, atk_options.minimum_stats); });
 
-	auto [filtered_weaps, filtered_weapons_time] = misc::TimeFunctionExecution([&]() { return weap_contain.filter(weapon::filter{ { true } }); });
+	auto [filtered_weaps, filtered_weapons_time] = misc::TimeFunctionExecution([&]() { filtered_weapons filtered{}; weap_contain.apply_filter(weapon::filter{ { true } }, filtered); return filtered; });
 	misc::printl();
 
 	auto [attack_rating, attack_rating_time] = misc::TimeFunctionExecution([&]()

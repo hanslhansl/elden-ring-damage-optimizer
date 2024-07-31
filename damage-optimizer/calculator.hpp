@@ -259,7 +259,8 @@ namespace calculator
 		size_t count = 0;
 
 		if (attribute_points > UPPER * min_stats.size())
-			throw std::invalid_argument("attribute_points must be <= " + std::to_string(UPPER) + " * " + std::to_string(N));
+			return 0;
+			//throw std::invalid_argument("attribute_points must be <= " + std::to_string(UPPER) + " * " + std::to_string(N));
 
 		if (std::ranges::any_of(min_stats, [](int v) { return v > UPPER; }))
 			throw std::invalid_argument("min_stats must be <= " + std::to_string(UPPER));
@@ -354,6 +355,8 @@ namespace calculator
 		const auto SUM = attribute_points;
 
 		auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
+		if (possible_occurances == 0)
+			return {};
 		std::vector<Stats> stat_variations{};
 		stat_variations.reserve(possible_occurances);
 
@@ -479,7 +482,7 @@ namespace calculator
 
 		weapon::all_filter_options get_all_filter_options() const;
 
-		filtered_weapons filter(const weapon::filter& weapon_filter) const;
+		void apply_filter(const weapon::filter& weapon_filter, filtered_weapons& filtered) const;
 	};
 
 	void test();
