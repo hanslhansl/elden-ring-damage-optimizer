@@ -8,7 +8,7 @@ namespace calculator
 	template<class Key, class T>
 	using map = std::map<Key, T>;
 	using floating = double;
-	struct weapon;
+	struct Weapon;
 
 	BETTER_ENUM(Attribute, int,
 		STRENGTH,
@@ -20,8 +20,7 @@ namespace calculator
 	constexpr const char* attribute_to_json_string(Attribute at);
 	constexpr auto attribute_json_string_table = better_enums::make_map(attribute_to_json_string);
 	using Stats = std::array<int, Attribute::_size()>;
-
-	using Full_Stats = std::array<int, 8>;
+	using FullStats = std::array<int, 8>;
 
 	BETTER_ENUM(Class, int,
 		HERO,
@@ -152,7 +151,7 @@ namespace calculator
 	constexpr auto defaultDamageCalcCorrectGraphId = 0;
 	constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
-	struct attack_options
+	struct AttackOptions
 	{
 		int available_stat_points;
 		std::array<size_t, 2> upgrade_level;	// normal, somber
@@ -199,7 +198,7 @@ namespace calculator
 			};
 			struct miscellaneous
 			{
-				const weapon* weapon_;
+				const Weapon* weapon_;
 				std::array<size_t, 2> upgrade_level;
 				bool two_handing;
 				std::vector<AttackPowerType> ineffective_attack_power_types;
@@ -275,22 +274,22 @@ namespace calculator
 		using full = detail::sparse_attack_rating<detail::total_attack_power, detail::attack_power, detail::status_effect, detail::spell_scaling, detail::miscellaneous>;
 	}
 
-	struct weapon
+	struct Weapon
 	{
 		using Affinity = Affinity_;
 		using Type = Type_;
 
-		struct filter
+		struct Filter
 		{
 			std::set<bool> dlc;
 			std::set<Type> types;
 			std::set<Affinity> affinities;
 			std::set<std::string> base_names;
 
-			bool operator()(const weapon& weapon) const;
+			bool operator()(const Weapon& weapon) const;
 		};
 
-		struct all_filter_options
+		struct AllFilterOptions
 		{
 			std::vector<bool> dlc;
 			//std::vector<bool> sorcery_tools;
@@ -334,7 +333,7 @@ namespace calculator
 		Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const;
 
 		template<typename T>
-		void get_sparse_attack_rating(const attack_options& attack_options_, const Stats& stats, T& result) const
+		void get_sparse_attack_rating(const AttackOptions& attack_options_, const Stats& stats, T& result) const
 		{
 			auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options_.two_handing, stats);
 
@@ -453,7 +452,7 @@ namespace calculator
 			}
 		}
 
-		void get_full_attack_rating(const attack_options& attack_options_, const Stats& stats, attack_rating::full& result) const;
+		//void get_full_attack_rating(const AttackOptions& attack_options_, const Stats& stats, attack_rating::full& result) const;
 	};
 
 	struct CalcCorrectGraphDict
@@ -607,7 +606,7 @@ namespace calculator
 		return stat_variations;
 	}
 
-	struct optimization_context
+	struct OptimizationContext
 	{
 		using var_vec = std::variant<
 			std::vector<attack_rating::total>,
@@ -627,12 +626,12 @@ namespace calculator
 
 		var_vec optional_results;
 		BS::thread_pool pool;
-		const std::vector<const weapon*>& weapons;
-		attack_options atk_opt;
+		const std::vector<const Weapon*>& weapons;
+		AttackOptions atk_opt;
 
 		template<typename T>
 			requires requires (T t) { t.value(); }
-		optimization_context(int threads, const std::vector<Stats>& stat_variations, const std::vector<const weapon*>& filtered_weapons_, attack_options atk_opt_, std::type_identity<T>) :
+		OptimizationContext(int threads, const std::vector<Stats>& stat_variations, const std::vector<const Weapon*>& filtered_weapons_, AttackOptions atk_opt_, std::type_identity<T>) :
 			optional_results{}, pool(threads), weapons(filtered_weapons_), atk_opt(atk_opt_)
 		{
 			// create a vector of optional results for each weapon
@@ -642,7 +641,7 @@ namespace calculator
 			// process one weapon
 			auto do_weapon = [&](size_t i)
 				{
-					const weapon& weapon = *this->weapons[i];
+					const Weapon& weapon = *this->weapons[i];
 
 					T intermediate_attack_rating{};
 					intermediate_attack_rating.reserve();
@@ -675,9 +674,9 @@ namespace calculator
 		attack_rating::full wait_and_get_result();
 	};
 
-	using filtered_weapons = std::vector<const weapon*>;
+	using FilteredWeapons = std::vector<const Weapon*>;
 
-	class weapon_container
+	class WeaponContainer
 	{
 		using WeaponDict = json;
 
@@ -687,14 +686,14 @@ namespace calculator
 
 		static ScalingCurve evaluate_CalcCorrectGraph(const std::vector<CalcCorrectGraphDict>& calcCorrectGraph);
 	public:
-		std::vector<weapon> weapons{};
+		std::vector<Weapon> weapons{};
 
-		weapon_container() = default;
-		weapon_container(const std::filesystem::path& file_path);
+		WeaponContainer() = default;
+		WeaponContainer(const std::filesystem::path& file_path);
 
-		weapon::all_filter_options get_all_filter_options() const;
+		Weapon::AllFilterOptions get_all_filter_options() const;
 
-		filtered_weapons apply_filter(const weapon::filter& weapon_filter) const;
+		FilteredWeapons apply_filter(const Weapon::Filter& weapon_filter) const;
 	};
 
 	void test();
@@ -742,14 +741,14 @@ namespace nlohmann
 		static calculator::AttackPowerType from_json(const json& j);
 	};
 	template<>
-	struct adl_serializer<calculator::weapon::Affinity>
+	struct adl_serializer<calculator::Weapon::Affinity>
 	{
-		static calculator::weapon::Affinity from_json(const json& j);
+		static calculator::Weapon::Affinity from_json(const json& j);
 	};
 	template<>
-	struct adl_serializer<calculator::weapon::Type>
+	struct adl_serializer<calculator::Weapon::Type>
 	{
-		static calculator::weapon::Type from_json(const json& j);
+		static calculator::Weapon::Type from_json(const json& j);
 	};
 }
 

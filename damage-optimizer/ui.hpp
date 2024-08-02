@@ -136,10 +136,10 @@ namespace ui
 
     class MainFrame : public wxFrame
     {
-        calculator::weapon_container weapon_container;
-        calculator::weapon::all_filter_options all_filter_options{};
-        calculator::weapon::filter filter{};
-        calculator::filtered_weapons filtered_weapons{};
+        calculator::WeaponContainer weapon_container;
+        calculator::Weapon::AllFilterOptions all_filter_options{};
+        calculator::Weapon::Filter filter{};
+        calculator::FilteredWeapons filtered_weapons{};
 
         StatsPanel* stats_panel;
         FilterPanel* filter_panel;
@@ -176,11 +176,3 @@ namespace ui
 // This defines the equivalent of main() for the current platform.
 //wxIMPLEMENT_APP(ui::MyApp);
 wxIMPLEMENT_APP_CONSOLE(ui::MyApp);
-
-//int main()
-//{
-//
-//    calculator::test();
-//
-//    return 0;
-//}

@@ -216,27 +216,27 @@ void ui::MainFrame::optimize()
     bool two_handing = this->two_handing_panel->two_handing_checkbox->GetValue();
 
     // set up attack options
-    calculator::attack_options atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
+    calculator::AttackOptions atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
 
     // run optimization
-    std::unique_ptr<calculator::optimization_context> opt_context;
+    std::unique_ptr<calculator::OptimizationContext> opt_context;
 
     if (this->optimize_for_panel->total_attack_power_button->GetValue())
-        opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
+        opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
     else if (this->optimize_for_panel->individual_attack_power_button)
     {
         auto index = this->optimize_for_panel->individual_attack_power_list->GetSelection();
 
         if (index == calculator::DamageType::PHYSICAL)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
 		else if (index == calculator::DamageType::MAGIC)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
         else if (index == calculator::DamageType::FIRE)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
         else if (index == calculator::DamageType::LIGHTNING)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
         else if (index == calculator::DamageType::HOLY)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
 		else
 			throw std::runtime_error("unknown damage type");
     }
@@ -245,19 +245,19 @@ void ui::MainFrame::optimize()
         auto index = this->optimize_for_panel->status_effect_list->GetSelection() + calculator::StatusType::POISON;
 
         if (index == calculator::StatusType::POISON)
-			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
         else if (index == calculator::StatusType::SCARLET_ROT)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
 		else if (index == calculator::StatusType::BLEED)
-			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
 		else if (index == calculator::StatusType::FROST)
-			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
         else if (index == calculator::StatusType::SLEEP)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
         else if (index == calculator::StatusType::MADNESS)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
         else if (index == calculator::StatusType::DEATH_BLIGHT)
-            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
         else
             throw std::runtime_error("unknown status type");
     }
@@ -511,7 +511,7 @@ void ui::MainFrame::OnLoadRegulation(wxCommandEvent& event)
 
     try
     {
-        this->weapon_container = calculator::weapon_container(path.ToStdString());
+        this->weapon_container = calculator::WeaponContainer(path.ToStdString());
     }
     catch (const std::exception& e)
     {
