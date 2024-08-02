@@ -27,6 +27,11 @@ namespace ui
 
         ID_UPGRADE_LEVEL_SPINCTRLS,
 
+        ID_OPTIMIZE_FOR_TOTAL_ATTACK_POWER_RADIO,
+        ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_RADIO,
+        ID_OPTIMIZE_FOR_STATUS_EFFECT_RADIO,
+        ID_OPTIMIZE_FOR_SPELL_SCALING_RADIO,
+
         ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_LIST,
         ID_OPTIMIZE_FOR_STATUS_EFFECT_LIST,
         ID_OPTIMIZE_FOR_SPELL_SCALING_LIST,
@@ -85,6 +90,13 @@ namespace ui
         UpgradeLevelPanel(wxWindow* parent);
     };
 
+    struct TwoHandingPanel : wxPanel
+    {
+        wxCheckBox* two_handing_checkbox;
+
+        TwoHandingPanel(wxWindow* parent);
+    };
+
     struct OptimizeForPanel : wxPanel
     {
         inline static const std::array<wxString, calculator::DamageType::_size()> damage_type_names =
@@ -132,6 +144,7 @@ namespace ui
         StatsPanel* stats_panel;
         FilterPanel* filter_panel;
         UpgradeLevelPanel* upgrade_level_panel;
+        TwoHandingPanel* two_handing_panel;
         OptimizeForPanel* optimize_for_panel;
         OptimizePanel* optimize_panel;
         ResultPanel* result_panel;
@@ -145,6 +158,7 @@ namespace ui
         void OnListBox(wxCommandEvent& event);
         void OnSpinCtrl(wxCommandEvent& event);
         void OnButton(wxCommandEvent& event);
+        void OnRadioButton(wxCommandEvent& event);
 
         void OnLoadRegulation(wxCommandEvent& event);
         void OnGenerateRegulation(wxCommandEvent& event);

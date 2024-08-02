@@ -21,6 +21,8 @@ namespace calculator
 	constexpr auto attribute_json_string_table = better_enums::make_map(attribute_to_json_string);
 	using Stats = std::array<int, Attribute::_size()>;
 
+	using Full_Stats = std::array<int, 8>;
+
 	BETTER_ENUM(Class, int,
 		HERO,
 		BANDIT,
@@ -206,13 +208,13 @@ namespace calculator
 			template<typename...Bases>
 			struct sparse_attack_rating : Bases...
 			{
-				static constexpr auto has_total_attack_power = (std::same_as<total_attack_power, Bases> || ...);	// done
+				static constexpr auto has_total_attack_power = (std::same_as<total_attack_power, Bases> || ...);
 				static constexpr auto has_individual_attack_power = (meta::is_non_type_parameter_template_instance<Bases, individual_attack_power> || ...);
-				static constexpr auto has_attack_power = (std::same_as<attack_power, Bases> || ...);	// done
+				static constexpr auto has_attack_power = (std::same_as<attack_power, Bases> || ...);
 				static constexpr auto has_individual_status_effect = (meta::is_non_type_parameter_template_instance<Bases, individual_status_effect> || ...);
-				static constexpr auto has_status_effect = (std::same_as<status_effect, Bases> || ...);	// done
-				static constexpr auto has_spell_scaling = (std::same_as<spell_scaling, Bases> || ...);	// done
-				static constexpr auto has_miscellaneous = (std::same_as<miscellaneous, Bases> || ...);	// done
+				static constexpr auto has_status_effect = (std::same_as<status_effect, Bases> || ...);
+				static constexpr auto has_spell_scaling = (std::same_as<spell_scaling, Bases> || ...);
+				static constexpr auto has_miscellaneous = (std::same_as<miscellaneous, Bases> || ...);
 
 				Stats stats{};
 				std::vector<Attribute> ineffective_attributes{};
@@ -272,7 +274,6 @@ namespace calculator
 
 		using full = detail::sparse_attack_rating<detail::total_attack_power, detail::attack_power, detail::status_effect, detail::spell_scaling, detail::miscellaneous>;
 	}
-
 
 	struct weapon
 	{
@@ -359,11 +360,14 @@ namespace calculator
 			else
 				throw std::runtime_error("invalid base attack power size");
 
+			bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
+
 			auto loop_cycle = [&](const AttackPowerType& attack_power_type)
 				{
-					auto base_attack_power = this->base_attack_power[upgrade_level][attack_power_type._to_integral()];
+					auto temp_index = attack_power_type._to_integral();
+					auto base_attack_power = this->base_attack_power[upgrade_level][temp_index];	//
 
-					if (base_attack_power != 0 or this->sorcery_tool or this->incantation_tool)
+					if (base_attack_power != 0 || is_sorcery_or_incantation_tool)	//
 					{
 						auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
 						auto&& scaling_attributes = this->attack_power_attribute_scaling.at(attack_power_type._to_integral());
@@ -402,6 +406,10 @@ namespace calculator
 						{
 							auto res = base_attack_power * total_scaling;
 
+							if constexpr (T::has_total_attack_power)
+								if (attack_power_type._to_integral() <= AttackPowerType::HOLY)
+									result.total_attack_power += res;
+
 							if constexpr (T::has_attack_power)
 							{
 								if (attack_power_type._to_integral() <= AttackPowerType::HOLY)
@@ -412,6 +420,10 @@ namespace calculator
 									att_pwr.second[1] = res - base_attack_power;
 								}
 							}
+
+							if constexpr (T::has_individual_attack_power)
+								if (attack_power_type == T::damage_type)
+									result.individual_attack_power = res;
 
 							if constexpr (T::has_status_effect)
 							{
@@ -424,13 +436,13 @@ namespace calculator
 								}
 							}
 
-							if constexpr (T::has_total_attack_power)
-								if (attack_power_type._to_integral() <= AttackPowerType::HOLY)
-									result.total_attack_power += res;
+							if constexpr (T::has_individual_status_effect)
+								if (attack_power_type == T::status_type)
+									result.individual_status_effect = res;
 						}
 
 						if constexpr (T::has_spell_scaling)
-							if (is_damage_type and (this->sorcery_tool or this->incantation_tool))
+							if (is_damage_type && is_sorcery_or_incantation_tool)
 								result.spell_scaling[attack_power_type._to_integral()] = 100. * total_scaling;
 					}
 				};
@@ -619,6 +631,7 @@ namespace calculator
 		attack_options atk_opt;
 
 		template<typename T>
+			requires requires (T t) { t.value(); }
 		optimization_context(int threads, const std::vector<Stats>& stat_variations, const std::vector<const weapon*>& filtered_weapons_, attack_options atk_opt_, std::type_identity<T>) :
 			optional_results{}, pool(threads), weapons(filtered_weapons_), atk_opt(atk_opt_)
 		{

@@ -110,32 +110,47 @@ ui::UpgradeLevelPanel::UpgradeLevelPanel(wxWindow* parent) : wxPanel(parent)
 }
 
 
+ui::TwoHandingPanel::TwoHandingPanel(wxWindow* parent) : wxPanel(parent)
+{
+    wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this);
+
+	this->two_handing_checkbox = new wxCheckBox(this, wxID_ANY, "two handing");
+	static_sizer->Add(this->two_handing_checkbox);
+
+	SetSizerAndFit(static_sizer);
+}
+
+
 ui::OptimizeForPanel::OptimizeForPanel(wxWindow* parent) : wxPanel(parent)
 {
 	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "optimize for");
 
     wxBoxSizer* total_attack_power_sizer = new wxBoxSizer(wxVERTICAL);
-    this->total_attack_power_button = new wxRadioButton(this, wxID_ANY, "total attack power");
+    this->total_attack_power_button = new wxRadioButton(this, ID_OPTIMIZE_FOR_TOTAL_ATTACK_POWER_RADIO, "total attack power");
     this->total_attack_power_button->SetValue(true);
     total_attack_power_sizer->Add(this->total_attack_power_button, 0, wxALL, 4);
     static_sizer->Add(total_attack_power_sizer);
 
     wxBoxSizer* individual_attack_power_sizer = new wxBoxSizer(wxVERTICAL);
-    this->individual_attack_power_button = new wxRadioButton(this, wxID_ANY, "individual attack power");
+    this->individual_attack_power_button = new wxRadioButton(this, ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_RADIO, "individual attack power");
     individual_attack_power_sizer->Add(this->individual_attack_power_button, 0, wxALL, 4);
     this->individual_attack_power_list = new wxListBox(this, ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_LIST, wxDefaultPosition, { 150, 110 }, damage_type_names.size(), damage_type_names.data(), wxLB_SINGLE | wxLB_NEEDED_SB);
+    this->individual_attack_power_list->SetSelection(0);
+    this->individual_attack_power_list->Disable();
     individual_attack_power_sizer->Add(this->individual_attack_power_list);
     static_sizer->Add(individual_attack_power_sizer);
 
     wxBoxSizer* status_effect_sizer = new wxBoxSizer(wxVERTICAL);
-    this->status_effect_button = new wxRadioButton(this, wxID_ANY, "status effect");
+    this->status_effect_button = new wxRadioButton(this, ID_OPTIMIZE_FOR_STATUS_EFFECT_RADIO, "status effect");
     status_effect_sizer->Add(this->status_effect_button, 0, wxALL, 4);
     this->status_effect_list = new wxListBox(this, ID_OPTIMIZE_FOR_STATUS_EFFECT_LIST, wxDefaultPosition, { 150, 110 }, status_type_names.size(), status_type_names.data(), wxLB_SINGLE | wxLB_NEEDED_SB);
+    this->status_effect_list->SetSelection(0);
+    this->status_effect_list->Disable();
     status_effect_sizer->Add(this->status_effect_list);
     static_sizer->Add(status_effect_sizer);
 
     wxBoxSizer* spell_scaling_sizer = new wxBoxSizer(wxVERTICAL);
-    this->spell_scaling_button = new wxRadioButton(this, wxID_ANY, "spell scaling");
+    this->spell_scaling_button = new wxRadioButton(this, ID_OPTIMIZE_FOR_SPELL_SCALING_RADIO, "spell scaling");
     spell_scaling_sizer->Add(this->spell_scaling_button, 0, wxALL, 4);
     static_sizer->Add(spell_scaling_sizer);
 
@@ -198,17 +213,64 @@ void ui::MainFrame::optimize()
     auto somber_upgrade_level = this->upgrade_level_panel->somber_upgrade_level_ctrl->GetValue();
 
     // two handing
-    bool two_handing = true;
+    bool two_handing = this->two_handing_panel->two_handing_checkbox->GetValue();
+
+    // set up attack options
+    calculator::attack_options atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
 
     // run optimization
-    calculator::attack_options atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
-    auto opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
+    std::unique_ptr<calculator::optimization_context> opt_context;
+
+    if (this->optimize_for_panel->total_attack_power_button->GetValue())
+        opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
+    else if (this->optimize_for_panel->individual_attack_power_button)
+    {
+        auto index = this->optimize_for_panel->individual_attack_power_list->GetSelection();
+
+        if (index == calculator::DamageType::PHYSICAL)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
+		else if (index == calculator::DamageType::MAGIC)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
+        else if (index == calculator::DamageType::FIRE)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
+        else if (index == calculator::DamageType::LIGHTNING)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
+        else if (index == calculator::DamageType::HOLY)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
+		else
+			throw std::runtime_error("unknown damage type");
+    }
+    else if (this->optimize_for_panel->status_effect_button->GetValue())
+    {
+        auto index = this->optimize_for_panel->status_effect_list->GetSelection() + calculator::StatusType::POISON;
+
+        if (index == calculator::StatusType::POISON)
+			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
+        else if (index == calculator::StatusType::SCARLET_ROT)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
+		else if (index == calculator::StatusType::BLEED)
+			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
+		else if (index == calculator::StatusType::FROST)
+			opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
+        else if (index == calculator::StatusType::SLEEP)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
+        else if (index == calculator::StatusType::MADNESS)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
+        else if (index == calculator::StatusType::DEATH_BLIGHT)
+            opt_context = std::make_unique<calculator::optimization_context>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
+        else
+            throw std::runtime_error("unknown status type");
+    }
+    else if (this->optimize_for_panel->spell_scaling_button->GetValue())
+        throw std::runtime_error("not implemented");
+    else
+        throw std::runtime_error("unknown optimization type");
     
-    // wate for result
+    // wait for result
     auto attack_rating = opt_context->wait_and_get_result();
 
-
-
+    // print stats
+    misc::printl();
     misc::print("stats: ");
     for (auto stat : attack_rating.stats)
         misc::print(stat, " ");
@@ -217,18 +279,21 @@ void ui::MainFrame::optimize()
     misc::printl(attack_rating.weapon_->full_name, ": ", attack_rating.total_attack_power);
     misc::printl();
 
+    misc::printl("attack rating:");
     for (int i = 0; i < attack_rating.attack_power.size(); i++)
         if (attack_rating.attack_power.at(i).first != 0)
             misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
                 " = ", attack_rating.attack_power.at(i).first);
     misc::printl();
 
+    misc::printl("status effects:");
     for (int i = 0; i < attack_rating.status_effect.size(); i++)
         if (attack_rating.status_effect.at(i).first != 0)
             misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
                 " = ", attack_rating.status_effect.at(i).first);
     misc::printl();
 
+    misc::printl("spell scaling:");
     for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
         if (attack_rating.spell_scaling.at(i) != 0)
             misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
@@ -407,6 +472,33 @@ void ui::MainFrame::OnButton(wxCommandEvent& event)
 		throw std::runtime_error("unknown button id");
 }
 
+void ui::MainFrame::OnRadioButton(wxCommandEvent& event)
+{
+    auto id = event.GetId();
+
+    switch (id)
+    {
+    case ID_OPTIMIZE_FOR_TOTAL_ATTACK_POWER_RADIO:
+        this->optimize_for_panel->individual_attack_power_list->Disable();
+        this->optimize_for_panel->status_effect_list->Disable();
+        break;
+    case ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_RADIO:
+        this->optimize_for_panel->individual_attack_power_list->Enable();
+        this->optimize_for_panel->status_effect_list->Disable();
+        break;
+    case ID_OPTIMIZE_FOR_STATUS_EFFECT_RADIO:
+        this->optimize_for_panel->individual_attack_power_list->Disable();
+        this->optimize_for_panel->status_effect_list->Enable();
+        break;
+    case ID_OPTIMIZE_FOR_SPELL_SCALING_RADIO:
+        this->optimize_for_panel->individual_attack_power_list->Disable();
+        this->optimize_for_panel->status_effect_list->Disable();
+        break;
+    default:
+		throw std::runtime_error("unknown radio button id");
+    }
+}
+
 void ui::MainFrame::OnLoadRegulation(wxCommandEvent& event)
 {
     auto openFileDialog = wxFileDialog(this, "choose regulation file", std::filesystem::current_path().string(), "",
@@ -476,6 +568,7 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     this->optimize_panel = new OptimizePanel(root_panel);
     this->stats_panel = new StatsPanel(root_panel);
     this->filter_panel = new FilterPanel(root_panel);
+    this->two_handing_panel = new TwoHandingPanel(root_panel);
     this->upgrade_level_panel = new UpgradeLevelPanel(root_panel);
     this->optimize_for_panel = new OptimizeForPanel(root_panel);
     this->result_panel = new ResultPanel(root_panel);
@@ -483,11 +576,17 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     auto root_sizer = new wxBoxSizer(wxVERTICAL);
     root_sizer->Add(this->stats_panel, 0, wxEXPAND);
     root_sizer->Add(this->filter_panel, 0, wxEXPAND);
-    wxBoxSizer* upgrade_level_and_optimize_sizer = new wxBoxSizer(wxHORIZONTAL);
-    upgrade_level_and_optimize_sizer->Add(this->upgrade_level_panel, 0, wxEXPAND);
-    upgrade_level_and_optimize_sizer->Add(this->optimize_for_panel, 0, wxEXPAND);
-    upgrade_level_and_optimize_sizer->Add(this->optimize_panel, 0, wxEXPAND);
-    root_sizer->Add(upgrade_level_and_optimize_sizer, 0, wxEXPAND);
+
+    wxBoxSizer* upgrade_level_and_two_handing_sizer = new wxBoxSizer(wxVERTICAL);
+    upgrade_level_and_two_handing_sizer->Add(this->upgrade_level_panel, 0, wxEXPAND);
+    upgrade_level_and_two_handing_sizer->Add(this->two_handing_panel, 0, wxEXPAND);
+
+    wxBoxSizer* upgrade_level_and_tow_handing_and_optimize_sizer = new wxBoxSizer(wxHORIZONTAL);
+    upgrade_level_and_tow_handing_and_optimize_sizer->Add(upgrade_level_and_two_handing_sizer, 0, wxEXPAND);
+    upgrade_level_and_tow_handing_and_optimize_sizer->Add(this->optimize_for_panel, 0, wxEXPAND);
+    upgrade_level_and_tow_handing_and_optimize_sizer->Add(this->optimize_panel, 0, wxEXPAND);
+    root_sizer->Add(upgrade_level_and_tow_handing_and_optimize_sizer, 0, wxEXPAND);
+
     root_sizer->Add(this->result_panel, 0, wxEXPAND);
 
     root_panel->SetSizerAndFit(root_sizer);
@@ -498,9 +597,9 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
 
     Bind(wxEVT_CHOICE, &MainFrame::OnChoiceSelected, this);
     Bind(wxEVT_SPINCTRL, &MainFrame::OnSpinCtrl, this);
-    Bind(wxEVT_LISTBOX, &MainFrame::OnListBox, this);
+    Bind(wxEVT_LISTBOX, &MainFrame::OnListBox, this); 
     Bind(wxEVT_BUTTON, &MainFrame::OnButton, this);
-
+    Bind(wxEVT_RADIOBUTTON, &MainFrame::OnRadioButton, this);
 
     this->update_variation_labels();
 }
