@@ -17,17 +17,6 @@ constexpr const char* calculator::attribute_to_json_string(Attribute at)
 	throw std::invalid_argument("invalid attribute");
 }
 
-void calculator::weapon::attack_rating::reset()
-{
-	this->total_attack_power = 0.;
-	this->attack_power.fill({});
-	this->spell_scaling.fill({});
-	this->ineffective_attributes.clear();
-	this->ineffective_attributes.reserve(Attribute::_size());
-	this->ineffective_attack_power_types.clear();
-	this->ineffective_attack_power_types.reserve(AttackPowerType::_size());
-}
-
 bool calculator::weapon::filter::operator()(const weapon& weapon) const
 {
 	auto satisfies = [](const auto& set, const auto& val) { return set.empty() or set.contains(val); };
@@ -57,13 +46,13 @@ calculator::Stats calculator::weapon::adjust_stats_for_two_handing(bool two_hand
 	return stats;
 }
 
-void calculator::weapon::get_attack_rating(const attack_options& attack_options, const Stats& stats, attack_rating& result) const
+void calculator::weapon::get_full_attack_rating(const attack_options& attack_options_, const Stats& stats, attack_rating::full& result) const
 {
-	auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options.two_handing, stats);
+	auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options_.two_handing, stats);
 
-	result.weapon = this;
+	result.weapon_ = this;
 	result.stats = stats;
-	result.upgrade_level = attack_options.upgrade_level;
+	result.upgrade_level = attack_options_.upgrade_level;
 
 	for (auto attribute : Attribute::_values())
 		if (adjusted_stats[attribute._to_integral()] < this->requirements[attribute._to_integral()])
@@ -73,9 +62,9 @@ void calculator::weapon::get_attack_rating(const attack_options& attack_options,
 	if (this->base_attack_power.size() == 1)
 		upgrade_level = 0;
 	else if (this->base_attack_power.size() == 11)
-		upgrade_level = attack_options.upgrade_level.at(1);
+		upgrade_level = attack_options_.upgrade_level.at(1);
 	else if (this->base_attack_power.size() == 26)
-		upgrade_level = attack_options.upgrade_level.at(0);
+		upgrade_level = attack_options_.upgrade_level.at(0);
 	else
 		throw std::runtime_error("invalid base attack power size");
 
@@ -97,7 +86,7 @@ void calculator::weapon::get_attack_rating(const attack_options& attack_options,
 			}
 			else
 			{
-				auto& effective_stats = (!attack_options.disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
+				auto& effective_stats = (!attack_options_.disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
 
 				for (auto&& attribute : Attribute::_values())
 				{
@@ -120,10 +109,12 @@ void calculator::weapon::get_attack_rating(const attack_options& attack_options,
 			if (base_attack_power != 0)
 			{
 				auto res = base_attack_power * total_scaling;
-				auto&& att_pwr = result.attack_power.at(attack_power_type._to_integral());
+				auto& att_pwr = attack_power_type._to_integral() <= AttackPowerType::HOLY ?
+					result.attack_power[attack_power_type._to_integral()] :
+					result.status_effect[attack_power_type._to_integral() - AttackPowerType::POISON];
 				att_pwr.first = res;
-				att_pwr.second.at(0) = base_attack_power;
-				att_pwr.second.at(1) = res - base_attack_power;
+				att_pwr.second[0] = base_attack_power;
+				att_pwr.second[1] = res - base_attack_power;
 				result.total_attack_power += res;
 			}
 
@@ -143,7 +134,7 @@ void calculator::from_json(const json& j, CalcCorrectGraphDict& c)
 void calculator::from_json(const json& j, ReinforceTypesDict& r)
 {
 	auto&& attack_json = j.at("attack");
-	for (auto dmg_type : DamageTypes::_values())
+	for (auto dmg_type : DamageType::_values())
 		r.attack.at(dmg_type._to_integral()) = attack_json.value(std::to_string(dmg_type._to_integral()), floating(0));
 
 	r.attributeScaling = j.at("attributeScaling").get<AttributeScaling>();
@@ -151,6 +142,26 @@ void calculator::from_json(const json& j, ReinforceTypesDict& r)
 	r.statusSpEffectId.at(0) = j.value("statusSpEffectId1", 0);
 	r.statusSpEffectId.at(1) = j.value("statusSpEffectId2", 0);
 	r.statusSpEffectId.at(2) = j.value("statusSpEffectId3", 0);
+}
+
+calculator::attack_rating::full calculator::optimization_context::wait_and_get_result()
+{
+	// wait for all threads to finish
+	this->pool.wait();
+
+	// loop through all optional attack ratings and get the best one
+	auto loop_lambda = [](auto& vec)
+		{
+			auto sparse_result_it = std::ranges::max_element(vec, {}, &std::remove_reference_t<decltype(vec)>::value_type::value);
+			auto index = std::distance(vec.begin(), sparse_result_it);
+			return std::pair{ index, sparse_result_it->stats };
+		};
+
+	auto [index, stats] = std::visit(loop_lambda, this->optional_results);
+
+	attack_rating::full best_attack_rating{};
+	this->weapons[index]->get_sparse_attack_rating(this->atk_opt, stats, best_attack_rating);
+	return best_attack_rating;
 }
 
 calculator::ScalingCurve calculator::weapon_container::evaluate_CalcCorrectGraph(const std::vector<CalcCorrectGraphDict>& calcCorrectGraph)
@@ -220,9 +231,9 @@ calculator::weapon_container::weapon_container(const std::filesystem::path& file
 
 		auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<map<AttackPowerType, int>>();
 		std::array<const ScalingCurve*, AttackPowerType::_size()> weaponCalcCorrectGraphs{};
-		for (auto damage_type : DamageTypes::_values())
+		for (auto damage_type : DamageType::_values())
 			weaponCalcCorrectGraphs.at(damage_type._to_integral()) = &this->calcCorrectGraphsById.at(misc::map_get(calcCorrectGraphIds, AttackPowerType::_from_integral_unchecked(damage_type), defaultDamageCalcCorrectGraphId));
-		for (auto status_type : StatusTypes::_values())
+		for (auto status_type : StatusType::_values())
 			weaponCalcCorrectGraphs.at(status_type._to_integral()) = &this->calcCorrectGraphsById.at(misc::map_get(calcCorrectGraphIds, AttackPowerType::_from_integral_unchecked(status_type), defaultStatusCalcCorrectGraphId));
 
 		auto unupgradedAttack = weapon_data.at("attack").get<std::vector<std::pair<AttackPowerType, int>>>();
@@ -312,25 +323,30 @@ calculator::weapon::all_filter_options calculator::weapon_container::get_all_fil
 	return all_filter_options;
 }
 
-void calculator::weapon_container::apply_filter(const weapon::filter& weapon_filter, filtered_weapons& filtered) const
+calculator::filtered_weapons calculator::weapon_container::apply_filter(const weapon::filter& weapon_filter) const
 {
+	filtered_weapons filtered{};
+	filtered.reserve(this->weapons.size());
+
 	for (const auto& weapon : this->weapons)
 		if (weapon_filter(weapon))
-			filtered.weapons.push_back(&weapon);
+			filtered.push_back(&weapon);
+
+	return filtered;
 }
 
 void calculator::test()
 {
-	auto&& [weap_contain, weap_contain_time] = misc::TimeFunctionExecution([&]() { return weapon_container("D:\\Paul\\Computer\\Programmieren\\C++\\elden-ring-damage-optimizer\\regulation-vanilla-v1.12.3.js"); });
+	auto&& [weap_contain, weap_contain_time] = misc::TimeFunctionExecution([&]() { return weapon_container("D:\\Paul\\Computer\\Programmieren\\C++\\elden-ring-damage-optimizer\\damage-optimizer\\regulation-vanilla-v1.12.3.js"); });
 
-	weapon::attack_options atk_options = { 161 + 79, ALL_CLASS_STATS.at(Class::VAGABOND), {24, 10}, true, false };
-	auto [stat_variations, stat_variations_time] = misc::TimeFunctionExecution([&]() { return get_stat_variations(atk_options.available_stat_points, atk_options.minimum_stats); });
+	attack_options atk_options = { 1 + 79, {25, 10}, true };
+	auto [stat_variations, stat_variations_time] = misc::TimeFunctionExecution([&]() { return get_stat_variations(atk_options.available_stat_points, ALL_CLASS_STATS.at(Class::WRETCH)); });
 
-	auto [filtered_weaps, filtered_weapons_time] = misc::TimeFunctionExecution([&]() { filtered_weapons filtered{}; weap_contain.apply_filter(weapon::filter{ { true } }, filtered); return filtered; });
+	auto [filtered_weaps, filtered_weapons_time] = misc::TimeFunctionExecution([&]() { return weap_contain.apply_filter(weapon::filter{ {}, { }, {} }); });
 	misc::printl();
 
 	auto [attack_rating, attack_rating_time] = misc::TimeFunctionExecution([&]()
-		{ return filtered_weaps.optimize_attack_rating(stat_variations, [](const weapon::attack_rating& war) { return war.total_attack_power; }, atk_options).wait_and_get_result(); });
+		{ return optimization_context(20, stat_variations, filtered_weaps, atk_options, std::type_identity<attack_rating::total>{}).wait_and_get_result(); });
 	misc::printl();
 
 	misc::print("stats: ");
@@ -338,19 +354,32 @@ void calculator::test()
 		misc::print(stat, " ");
 	misc::printl("\n");
 
-	misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
+	misc::printl(attack_rating.weapon_->full_name, ": ", attack_rating.total_attack_power);
 	misc::printl();
+
 	for (int i = 0; i < attack_rating.attack_power.size(); i++)
 		if (attack_rating.attack_power.at(i).first != 0)
-			misc::printl(AttackPowerType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
+			misc::printl(DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
 				" = ", attack_rating.attack_power.at(i).first);
 	misc::printl();
 
+	for (int i = 0; i < attack_rating.status_effect.size(); i++)
+		if (attack_rating.status_effect.at(i).first != 0)
+			misc::printl(StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
+				" = ", attack_rating.status_effect.at(i).first);
+	misc::printl();
+
+	for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
+		if (attack_rating.spell_scaling.at(i) != 0)
+			misc::printl(DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
+	misc::printl();
 
 	misc::printl("load weapon container: ", weap_contain_time);
 	misc::printl("get stat variations: ", stat_variations_time);
 	misc::printl("filter weapons: ", filtered_weapons_time);
 	misc::printl("query best stats: ", attack_rating_time);
+
+	Sleep(100000);
 }
 
 void nlohmann::adl_serializer<calculator::AttributeScaling>::from_json(const json& j, calculator::AttributeScaling& ac)

@@ -5,15 +5,33 @@
 
 namespace ui
 {
+    constexpr auto to_lower(unsigned char c)
+    {
+        if (c == '_')
+            return int(' ');
+        return std::tolower(c);
+    }
+
     enum
     {
         ID_LOAD_REGULATION = 1,
         ID_GENERATE_REGULATION,
 
-        ID_FILTER_DLC,
-        ID_FILTER_TYPES,
-        ID_FILTER_AFFINITIES,
-        ID_FILTER_BASE_NAMES,
+        ID_STAT_CLASS_CHOICE,
+        ID_STAT_SPINCTRLS,
+
+        ID_FILTER_DLC_LIST,
+        ID_FILTER_TYPES_LIST,
+        ID_FILTER_AFFINITIES_LIST,
+        ID_FILTER_BASE_NAMES_LIST,
+
+        ID_UPGRADE_LEVEL_SPINCTRLS,
+
+        ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_LIST,
+        ID_OPTIMIZE_FOR_STATUS_EFFECT_LIST,
+        ID_OPTIMIZE_FOR_SPELL_SCALING_LIST,
+
+        ID_OPTIMIZE_BUTTON,
     };
 
     class MyApp : public wxApp
@@ -22,9 +40,8 @@ namespace ui
         bool OnInit() override;
     };
 
-    class StatsPanel : public wxPanel
+    struct StatsPanel : wxPanel
     {
-        //static constexpr std::array attribute_names = { "vigor", "mind", "endurance", "strength", "dexterity", "intelligence", "faith", "arcane" };
         static constexpr std::array attribute_names = { "vig", "min", "end", "str", "dex", "int", "fai", "arc" };
         inline static const std::array<wxString, 10> starting_class_names = {"hero", "bandit", "astrologer", "warrior", "prisoner", "confessor", "wretch", "vagabond", "prophet", "samurai"};
         static constexpr std::array<std::array<int, attribute_names.size()>, starting_class_names.size()> starting_class_stats{{
@@ -40,22 +57,16 @@ namespace ui
             { 12, 11, 13, 12, 15,  9,  8,  8 },	// samurai
         } };
 
-        wxChoice* choice;
+        wxChoice* class_choice;
         std::array<wxSpinCtrl*, attribute_names.size()> attribute_ctrls;
         wxSpinCtrl* player_level_ctrl;
         wxStaticText* attribute_points_text;
         wxStaticText* stat_variations_text;
 
-        void update_stat_variations();
-
-        void OnChange(wxCommandEvent& event);
-        void OnChoiceSelected(wxCommandEvent& event);
-
-    public:
         StatsPanel(wxWindow* parent);
     };
 
-    class FilterPanel : public wxPanel
+    struct FilterPanel : wxPanel
     {
         wxListBox* dlc_weapons_list;
         wxListBox* types_list;
@@ -63,42 +74,26 @@ namespace ui
         wxListBox* base_names_list;
         wxStaticText* filtered_weapons_text;
 
-        calculator::weapon_container* weapon_container{};
-        calculator::weapon::all_filter_options all_filter_options{};
-        calculator::weapon::filter filter{};
-        calculator::filtered_weapons filtered_weapons{};
-
-        void update_filtered_weapons();
-
-        void onListBox(wxCommandEvent& event);
-
-    public:
-
         FilterPanel(wxWindow* parent);
-
-        void update_filter_options(calculator::weapon_container& weapon_container);
-
-        const calculator::weapon::filter& get_filter() const;
     };
 
-    class Upgrade_LevelPanel : public wxPanel
+    struct UpgradeLevelPanel : wxPanel
     {
         wxSpinCtrl* normal_upgrade_level_ctrl;
         wxSpinCtrl* somber_upgrade_level_ctrl;
 
-    public:
-        Upgrade_LevelPanel(wxWindow* parent);
+        UpgradeLevelPanel(wxWindow* parent);
     };
 
-    class OptimizePanel : public wxPanel
+    struct OptimizeForPanel : wxPanel
     {
-        inline static const std::array<wxString, calculator::DamageTypes::_size()> damage_type_names =
-            []() {  std::array<wxString, calculator::DamageTypes::_size()> ret{};
-            std::ranges::transform(calculator::DamageTypes::_names(), ret.begin(), [](const char* p) { return p; }); return ret; }();
+        inline static const std::array<wxString, calculator::DamageType::_size()> damage_type_names =
+            []() {  std::array<wxString, calculator::DamageType::_size()> ret{};
+            std::ranges::transform(calculator::DamageType::_names(), ret.begin(), [](std::string s) { std::ranges::transform(s, s.begin(), to_lower); return s; }); return ret; }();
 
-        inline static const std::array<wxString, calculator::StatusTypes::_size()> status_type_names =
-            []() {  std::array<wxString, calculator::StatusTypes::_size()> ret{};
-            std::ranges::transform(calculator::StatusTypes::_names(), ret.begin(), [](const char* p) { return p; }); return ret; }();
+        inline static const std::array<wxString, calculator::StatusType::_size()> status_type_names =
+            []() {  std::array<wxString, calculator::StatusType::_size()> ret{};
+            std::ranges::transform(calculator::StatusType::_names(), ret.begin(), [](std::string s) { std::ranges::transform(s, s.begin(), to_lower); return s; }); return ret; }();
 
         wxRadioButton* total_attack_power_button;
 
@@ -110,17 +105,46 @@ namespace ui
 
         wxRadioButton* spell_scaling_button;
 
-    public:
+        OptimizeForPanel(wxWindow* parent);
+    };
+
+    struct OptimizePanel : wxPanel
+    {
+        wxButton* optimize_button;
+        wxStaticText* total_variations_text;
+        wxStaticText* eta_text;
+
         OptimizePanel(wxWindow* parent);
     };
 
-    class MyFrame : public wxFrame
+    struct ResultPanel : wxPanel
     {
-        std::unique_ptr<calculator::weapon_container> weapon_container;
+        ResultPanel(wxWindow* parent);
+    };
+
+    class MainFrame : public wxFrame
+    {
+        calculator::weapon_container weapon_container;
+        calculator::weapon::all_filter_options all_filter_options{};
+        calculator::weapon::filter filter{};
+        calculator::filtered_weapons filtered_weapons{};
+
         StatsPanel* stats_panel;
         FilterPanel* filter_panel;
-        Upgrade_LevelPanel* upgrade_level_panel;
+        UpgradeLevelPanel* upgrade_level_panel;
+        OptimizeForPanel* optimize_for_panel;
         OptimizePanel* optimize_panel;
+        ResultPanel* result_panel;
+
+        void optimize();
+        void update_variation_labels();
+        void update_filtered_weapons();
+        void update_filter_options();
+
+        void OnChoiceSelected(wxCommandEvent& event);
+        void OnListBox(wxCommandEvent& event);
+        void OnSpinCtrl(wxCommandEvent& event);
+        void OnButton(wxCommandEvent& event);
 
         void OnLoadRegulation(wxCommandEvent& event);
         void OnGenerateRegulation(wxCommandEvent& event);
@@ -128,7 +152,7 @@ namespace ui
         void OnAbout(wxCommandEvent& event);
 
     public:
-        MyFrame();
+        MainFrame();
     };
 }
 
@@ -138,3 +162,11 @@ namespace ui
 // This defines the equivalent of main() for the current platform.
 //wxIMPLEMENT_APP(ui::MyApp);
 wxIMPLEMENT_APP_CONSOLE(ui::MyApp);
+
+//int main()
+//{
+//
+//    calculator::test();
+//
+//    return 0;
+//}

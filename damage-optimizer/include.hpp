@@ -9,6 +9,7 @@
 #include <array>
 #include <vector>
 #include <string>
+#include <variant>
 
 #include <nlohmann/json.hpp>
 #include <BS_thread_pool.hpp>
@@ -17,6 +18,7 @@
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
 
+#include "hhh/concepts.hpp"
 #include "hhh/misc.hpp"
 #include "hhh/math/functions.hpp"
 
