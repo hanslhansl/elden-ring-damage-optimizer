@@ -17,6 +17,17 @@ constexpr const char* calculator::attribute_to_json_string(Attribute at)
 	throw std::invalid_argument("invalid attribute");
 }
 
+calculator::Stats calculator::full_stats_to_stats(const FullStats& full_stats)
+{
+	return {
+		full_stats.at(3),
+		full_stats.at(4),
+		full_stats.at(5),
+		full_stats.at(6),
+		full_stats.at(7)
+	};
+}
+
 bool calculator::Weapon::Filter::operator()(const Weapon& weapon) const
 {
 	auto satisfies = [](const auto& set, const auto& val) { return set.empty() or set.contains(val); };
@@ -45,84 +56,6 @@ calculator::Stats calculator::Weapon::adjust_stats_for_two_handing(bool two_hand
 
 	return stats;
 }
-
-//void calculator::Weapon::get_full_attack_rating(const AttackOptions& attack_options_, const Stats& stats, attack_rating::full& result) const
-//{
-//	auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options_.two_handing, stats);
-//
-//	result.weapon_ = this;
-//	result.stats = stats;
-//	result.upgrade_level = attack_options_.upgrade_level;
-//
-//	for (auto attribute : Attribute::_values())
-//		if (adjusted_stats[attribute._to_integral()] < this->requirements[attribute._to_integral()])
-//			result.ineffective_attributes.push_back(attribute);
-//
-//	size_t upgrade_level;
-//	if (this->base_attack_power.size() == 1)
-//		upgrade_level = 0;
-//	else if (this->base_attack_power.size() == 11)
-//		upgrade_level = attack_options_.upgrade_level.at(1);
-//	else if (this->base_attack_power.size() == 26)
-//		upgrade_level = attack_options_.upgrade_level.at(0);
-//	else
-//		throw std::runtime_error("invalid base attack power size");
-//
-//	for (auto&& attack_power_type : AttackPowerType::_values())
-//	{
-//		auto base_attack_power = this->base_attack_power[upgrade_level][attack_power_type._to_integral()];
-//
-//		if (base_attack_power != 0 or this->sorcery_tool or this->incantation_tool)
-//		{
-//			auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
-//			auto&& scaling_attributes = this->attack_power_attribute_scaling.at(attack_power_type._to_integral());
-//			floating total_scaling = 1.;
-//
-//			if (std::any_of(result.ineffective_attributes.begin(), result.ineffective_attributes.end(),
-//				[&](Attribute ineffective_attribute) { return scaling_attributes[ineffective_attribute._to_integral()] != 0; }))
-//			{
-//				total_scaling = 1. - ineffective_attribute_penalty;
-//				result.ineffective_attack_power_types.push_back(attack_power_type);
-//			}
-//			else
-//			{
-//				auto& effective_stats = (!attack_options_.disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
-//
-//				for (auto&& attribute : Attribute::_values())
-//				{
-//					auto&& attribute_correct = scaling_attributes.at(attribute._to_integral());
-//					floating scaling{};
-//
-//					if (attribute_correct != 0)
-//					{
-//						if (attribute_correct == 1)
-//							scaling = this->attribute_scaling.at(upgrade_level).at(attribute._to_integral());
-//						else
-//							scaling = attribute_correct * this->attribute_scaling.at(upgrade_level).at(attribute._to_integral()) / this->attribute_scaling.at(0).at(attribute._to_integral());
-//
-//						if (scaling != 0.)
-//							total_scaling += this->attack_power_scaling_curves[attack_power_type._to_integral()]->operator[](effective_stats[attribute._to_integral()]) * scaling;
-//					}
-//				}
-//			}
-//
-//			if (base_attack_power != 0)
-//			{
-//				auto res = base_attack_power * total_scaling;
-//				auto& att_pwr = attack_power_type._to_integral() <= AttackPowerType::HOLY ?
-//					result.attack_power[attack_power_type._to_integral()] :
-//					result.status_effect[attack_power_type._to_integral() - AttackPowerType::POISON];
-//				att_pwr.first = res;
-//				att_pwr.second[0] = base_attack_power;
-//				att_pwr.second[1] = res - base_attack_power;
-//				result.total_attack_power += res;
-//			}
-//
-//			if (is_damage_type and (this->sorcery_tool or this->incantation_tool))
-//				result.spell_scaling[attack_power_type._to_integral()] = 100. * total_scaling;
-//		}
-//	}
-//}
 
 void calculator::from_json(const json& j, CalcCorrectGraphDict& c)
 {
@@ -153,14 +86,19 @@ calculator::attack_rating::full calculator::OptimizationContext::wait_and_get_re
 	auto loop_lambda = [](auto& vec)
 		{
 			auto sparse_result_it = std::ranges::max_element(vec, {}, &std::remove_reference_t<decltype(vec)>::value_type::value);
+			if (sparse_result_it == vec.end())
+				return std::pair{ -1ll, Stats{} };
 			auto index = std::distance(vec.begin(), sparse_result_it);
 			return std::pair{ index, sparse_result_it->stats };
 		};
 
 	auto [index, stats] = std::visit(loop_lambda, this->optional_results);
 
+	if (index == -1)
+		return attack_rating::full{};
+
 	attack_rating::full best_attack_rating{};
-	this->weapons[index]->get_sparse_attack_rating(this->atk_opt, stats, best_attack_rating);
+	this->weapons[index]->get_attack_rating(this->atk_opt, stats, best_attack_rating);
 	return best_attack_rating;
 }
 
@@ -350,7 +288,7 @@ void calculator::test()
 		misc::print(stat, " ");
 	misc::printl("\n");
 
-	misc::printl(attack_rating.weapon_->full_name, ": ", attack_rating.total_attack_power);
+	misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
 	misc::printl();
 
 	for (int i = 0; i < attack_rating.attack_power.size(); i++)

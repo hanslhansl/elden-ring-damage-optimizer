@@ -52,6 +52,20 @@ ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
     SetSizerAndFit(root_sizer);
 }
 
+calculator::FullStats ui::StatsPanel::get_full_stats() const
+{
+    return {
+		this->attribute_ctrls.at(0)->GetValue(),
+		this->attribute_ctrls.at(1)->GetValue(),
+		this->attribute_ctrls.at(2)->GetValue(),
+		this->attribute_ctrls.at(3)->GetValue(),
+		this->attribute_ctrls.at(4)->GetValue(),
+		this->attribute_ctrls.at(5)->GetValue(),
+		this->attribute_ctrls.at(6)->GetValue(),
+		this->attribute_ctrls.at(7)->GetValue(),
+    };
+}
+
 
 ui::FilterPanel::FilterPanel(wxWindow* parent) : wxPanel(parent)
 {
@@ -163,8 +177,13 @@ ui::OptimizePanel::OptimizePanel(wxWindow* parent) : wxPanel(parent)
 {
 	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "optimize");
 
-    this->optimize_button = new wxButton(this, ID_OPTIMIZE_BUTTON, "optimize");
-	static_sizer->Add(this->optimize_button, 0, wxEXPAND | wxALL, 4);
+    this->optimize_button = new wxButton(this, ID_OPTIMIZE_BRUTE_FORCE_BUTTON, "brute force");
+    static_sizer->Add(this->optimize_button, 0, wxALL, 4);
+
+    wxBoxSizer* threads_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "threads");
+    this->threads_ctrl = new wxSpinCtrl(this, ID_OPTIMIZE_THREADS_SPINCTRL, "0", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100);
+    threads_sizer->Add(this->threads_ctrl, 1, wxEXPAND);
+    static_sizer->Add(threads_sizer, 0, wxEXPAND);
 
     wxStaticBoxSizer* total_variations_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "variations");
 	this->total_variations_text = new wxStaticText(this, wxID_ANY, "0");
@@ -191,21 +210,14 @@ ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
 void ui::MainFrame::optimize()
 {
     // stat variations
+    auto full_stats = this->stats_panel->get_full_stats();
+    auto min_stats = calculator::full_stats_to_stats(full_stats);
     auto player_level = this->stats_panel->player_level_ctrl->GetValue();
     auto total_attribute_points = player_level + 79;
     auto available_attribute_points = total_attribute_points
-        - this->stats_panel->attribute_ctrls.at(0)->GetValue()
-        - this->stats_panel->attribute_ctrls.at(1)->GetValue()
-        - this->stats_panel->attribute_ctrls.at(2)->GetValue();
-
-    calculator::Stats min_stats = {
-        this->stats_panel->attribute_ctrls.at(3)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(4)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(5)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(6)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(7)->GetValue(),
-    };
-
+        - full_stats.at(0)
+        - full_stats.at(1)
+        - full_stats.at(2);
     auto stat_variations = calculator::get_stat_variations(available_attribute_points, min_stats);
 
     // upgrade levels
@@ -215,6 +227,9 @@ void ui::MainFrame::optimize()
     // two handing
     bool two_handing = this->two_handing_panel->two_handing_checkbox->GetValue();
 
+    // threads
+    int threads = this->optimize_panel->threads_ctrl->GetValue();
+
     // set up attack options
     calculator::AttackOptions atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
 
@@ -222,21 +237,21 @@ void ui::MainFrame::optimize()
     std::unique_ptr<calculator::OptimizationContext> opt_context;
 
     if (this->optimize_for_panel->total_attack_power_button->GetValue())
-        opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
-    else if (this->optimize_for_panel->individual_attack_power_button)
+        opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
+    else if (this->optimize_for_panel->individual_attack_power_button->GetValue())
     {
         auto index = this->optimize_for_panel->individual_attack_power_list->GetSelection();
 
         if (index == calculator::DamageType::PHYSICAL)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
 		else if (index == calculator::DamageType::MAGIC)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
         else if (index == calculator::DamageType::FIRE)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
         else if (index == calculator::DamageType::LIGHTNING)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
         else if (index == calculator::DamageType::HOLY)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
 		else
 			throw std::runtime_error("unknown damage type");
     }
@@ -245,19 +260,19 @@ void ui::MainFrame::optimize()
         auto index = this->optimize_for_panel->status_effect_list->GetSelection() + calculator::StatusType::POISON;
 
         if (index == calculator::StatusType::POISON)
-			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
         else if (index == calculator::StatusType::SCARLET_ROT)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
 		else if (index == calculator::StatusType::BLEED)
-			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
 		else if (index == calculator::StatusType::FROST)
-			opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
         else if (index == calculator::StatusType::SLEEP)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
         else if (index == calculator::StatusType::MADNESS)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
         else if (index == calculator::StatusType::DEATH_BLIGHT)
-            opt_context = std::make_unique<calculator::OptimizationContext>(20, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
         else
             throw std::runtime_error("unknown status type");
     }
@@ -276,7 +291,7 @@ void ui::MainFrame::optimize()
         misc::print(stat, " ");
     misc::printl("\n");
 
-    misc::printl(attack_rating.weapon_->full_name, ": ", attack_rating.total_attack_power);
+    misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
     misc::printl();
 
     misc::printl("attack rating:");
@@ -303,20 +318,14 @@ void ui::MainFrame::optimize()
 void ui::MainFrame::update_variation_labels()
 {
     // stat variations
+    auto full_stats = this->stats_panel->get_full_stats();
+    auto min_stats = calculator::full_stats_to_stats(full_stats);
     auto player_level = this->stats_panel->player_level_ctrl->GetValue();
     auto total_attribute_points = player_level + 79;
     auto available_attribute_points = total_attribute_points
-        - this->stats_panel->attribute_ctrls.at(0)->GetValue()
-        - this->stats_panel->attribute_ctrls.at(1)->GetValue()
-        - this->stats_panel->attribute_ctrls.at(2)->GetValue();
-
-    calculator::Stats min_stats = {
-        this->stats_panel->attribute_ctrls.at(3)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(4)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(5)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(6)->GetValue(),
-        this->stats_panel->attribute_ctrls.at(7)->GetValue(),
-    };
+        - full_stats.at(0)
+        - full_stats.at(1)
+        - full_stats.at(2);
 
     auto stat_variation_count = calculator::get_stat_variation_count(available_attribute_points, min_stats);
     this->stats_panel->attribute_points_text->SetLabel(std::to_string(total_attribute_points));
@@ -466,7 +475,7 @@ void ui::MainFrame::OnButton(wxCommandEvent& event)
 {
     auto id = event.GetId();
 
-	if (id == ID_OPTIMIZE_BUTTON)
+	if (id == ID_OPTIMIZE_BRUTE_FORCE_BUTTON)
 		this->optimize();
 	else
 		throw std::runtime_error("unknown button id");

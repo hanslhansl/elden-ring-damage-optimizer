@@ -36,7 +36,9 @@ namespace ui
         ID_OPTIMIZE_FOR_STATUS_EFFECT_LIST,
         ID_OPTIMIZE_FOR_SPELL_SCALING_LIST,
 
-        ID_OPTIMIZE_BUTTON,
+        ID_OPTIMIZE_BRUTE_FORCE_BUTTON,
+        ID_OPTIMIZE_V2_BUTTON,
+        ID_OPTIMIZE_THREADS_SPINCTRL,
     };
 
     class MyApp : public wxApp
@@ -69,6 +71,8 @@ namespace ui
         wxStaticText* stat_variations_text;
 
         StatsPanel(wxWindow* parent);
+
+        calculator::FullStats get_full_stats() const;
     };
 
     struct FilterPanel : wxPanel
@@ -122,6 +126,7 @@ namespace ui
 
     struct OptimizePanel : wxPanel
     {
+        wxSpinCtrl* threads_ctrl;
         wxButton* optimize_button;
         wxStaticText* total_variations_text;
         wxStaticText* eta_text;
