@@ -39,6 +39,8 @@ namespace ui
         ID_OPTIMIZE_BRUTE_FORCE_BUTTON,
         ID_OPTIMIZE_V2_BUTTON,
         ID_OPTIMIZE_THREADS_SPINCTRL,
+
+        ID_RESULT
     };
 
     class MyApp : public wxApp
@@ -127,9 +129,11 @@ namespace ui
     struct OptimizePanel : wxPanel
     {
         wxSpinCtrl* threads_ctrl;
-        wxButton* optimize_button;
         wxStaticText* total_variations_text;
-        wxStaticText* eta_text;
+        wxButton* brute_force_button;
+        wxStaticText* brute_force_eta_text;
+        wxButton* v2_button;
+        wxStaticText* v2_eta_text;
 
         OptimizePanel(wxWindow* parent);
     };
@@ -154,7 +158,7 @@ namespace ui
         OptimizePanel* optimize_panel;
         ResultPanel* result_panel;
 
-        void optimize();
+        void brute_force();
         void update_variation_labels();
         void update_filtered_weapons();
         void update_filter_options();

@@ -17,6 +17,9 @@
 
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
+#include <wx/activityindicator.h>
+#include <wx/animate.h>
+#include <wx/progdlg.h>
 
 #include "hhh/concepts.hpp"
 #include "hhh/misc.hpp"

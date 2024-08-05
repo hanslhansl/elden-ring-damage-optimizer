@@ -13,14 +13,13 @@ ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
 {
     wxBoxSizer* root_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "minimum stats");
+    wxStaticBoxSizer* minimum_stats_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "minimum stats");
 
     wxBoxSizer* class_sizer = new  wxBoxSizer(wxHORIZONTAL);
     class_sizer->Add(new wxStaticText(this, wxID_ANY, wxT("starting class: ")));
     this->class_choice = new wxChoice(this, ID_STAT_CLASS_CHOICE, wxDefaultPosition, wxDefaultSize, this->starting_class_names.size(), this->starting_class_names.data());
     class_sizer->Add(this->class_choice);
-    static_sizer->Add(class_sizer);
-
+    minimum_stats_sizer->Add(class_sizer);
     wxBoxSizer* inner_stats_sizer = new  wxBoxSizer(wxHORIZONTAL);
     for (auto&& [attribute_name, spin_ctrl] : std::views::zip(this->attribute_names, this->attribute_ctrls))
     {
@@ -30,23 +29,22 @@ ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
         stat_sizer->Add(spin_ctrl);
         inner_stats_sizer->Add(stat_sizer);
     }
-    static_sizer->Add(inner_stats_sizer);
+    minimum_stats_sizer->Add(inner_stats_sizer);
+    root_sizer->Add(minimum_stats_sizer);
 
     wxStaticBoxSizer* player_level_static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "character level");
     this->player_level_ctrl = new wxSpinCtrl(this, ID_STAT_SPINCTRLS, "1", wxDefaultPosition, { 80, 20 }, wxSP_ARROW_KEYS, 1, 713);
     player_level_static_sizer->Add(this->player_level_ctrl);
+    root_sizer->Add(player_level_static_sizer);
 
     wxStaticBoxSizer* attribute_points_static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "attribute points");
     this->attribute_points_text = new wxStaticText(this, wxID_ANY, "0");
     attribute_points_static_sizer->Add(this->attribute_points_text);
+    root_sizer->Add(attribute_points_static_sizer);
 
     wxStaticBoxSizer* stat_variations_static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "stat variations");
     this->stat_variations_text = new wxStaticText(this, wxID_ANY, "0");
     stat_variations_static_sizer->Add(this->stat_variations_text);
-
-    root_sizer->Add(static_sizer);
-    root_sizer->Add(player_level_static_sizer);
-    root_sizer->Add(attribute_points_static_sizer);
     root_sizer->Add(stat_variations_static_sizer);
 
     SetSizerAndFit(root_sizer);
@@ -109,15 +107,15 @@ ui::UpgradeLevelPanel::UpgradeLevelPanel(wxWindow* parent) : wxPanel(parent)
 	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "upgrade level");
 
     wxBoxSizer* normal_upgrade_level_sizer = new wxBoxSizer(wxHORIZONTAL);
-    normal_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "normal: ", wxDefaultPosition, { 50, 20 }), 0, wxALL, 2);
+    normal_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "normal: ", wxDefaultPosition, { 50, 20 }), 0, wxEXPAND | wxALL, 2);
     this->normal_upgrade_level_ctrl = new wxSpinCtrl(this, ID_UPGRADE_LEVEL_SPINCTRLS, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 25);
-    normal_upgrade_level_sizer->Add(this->normal_upgrade_level_ctrl, 0, wxALL, 2);
+    normal_upgrade_level_sizer->Add(this->normal_upgrade_level_ctrl, 0, wxEXPAND | wxALL, 2);
     static_sizer->Add(normal_upgrade_level_sizer);
 
     wxBoxSizer* somber_upgrade_level_sizer = new wxBoxSizer(wxHORIZONTAL);
-    somber_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "somber: ", wxDefaultPosition, { 50, 20 }), 0, wxALL, 2);
+    somber_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "somber: ", wxDefaultPosition, { 50, 20 }), 0, wxEXPAND | wxALL, 2);
     this->somber_upgrade_level_ctrl = new wxSpinCtrl(this, ID_UPGRADE_LEVEL_SPINCTRLS, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 10);
-    somber_upgrade_level_sizer->Add(this->somber_upgrade_level_ctrl, 0, wxALL, 2);
+    somber_upgrade_level_sizer->Add(this->somber_upgrade_level_ctrl, 0, wxEXPAND | wxALL, 2);
     static_sizer->Add(somber_upgrade_level_sizer);
 
 	SetSizerAndFit(static_sizer);
@@ -175,27 +173,45 @@ ui::OptimizeForPanel::OptimizeForPanel(wxWindow* parent) : wxPanel(parent)
 
 ui::OptimizePanel::OptimizePanel(wxWindow* parent) : wxPanel(parent)
 {
-	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "optimize");
+	wxStaticBoxSizer* root_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "optimize");
 
-    this->optimize_button = new wxButton(this, ID_OPTIMIZE_BRUTE_FORCE_BUTTON, "brute force");
-    static_sizer->Add(this->optimize_button, 0, wxALL, 4);
+    wxBoxSizer* total_variations_and_threads_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    wxStaticBoxSizer* total_variations_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "variations");
+    this->total_variations_text = new wxStaticText(this, wxID_ANY, "0");
+    total_variations_sizer->Add(this->total_variations_text, 0, wxEXPAND);
+    total_variations_and_threads_sizer->Add(total_variations_sizer, 1, wxEXPAND);
 
     wxBoxSizer* threads_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "threads");
     this->threads_ctrl = new wxSpinCtrl(this, ID_OPTIMIZE_THREADS_SPINCTRL, "0", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100);
     threads_sizer->Add(this->threads_ctrl, 1, wxEXPAND);
-    static_sizer->Add(threads_sizer, 0, wxEXPAND);
+    total_variations_and_threads_sizer->Add(threads_sizer, 1, wxEXPAND);
 
-    wxStaticBoxSizer* total_variations_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "variations");
-	this->total_variations_text = new wxStaticText(this, wxID_ANY, "0");
-    total_variations_sizer->Add(this->total_variations_text, 0, wxEXPAND);
-    static_sizer->Add(total_variations_sizer, 0, wxEXPAND);
+    root_sizer->Add(total_variations_and_threads_sizer, 0, wxEXPAND);
 
+    wxBoxSizer* start_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    wxStaticBoxSizer* brute_force_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "brute force");
+    this->brute_force_button = new wxButton(this, ID_OPTIMIZE_BRUTE_FORCE_BUTTON, "start");
+    brute_force_sizer->Add(this->brute_force_button, 0, wxEXPAND);
     wxStaticBoxSizer* eta_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "eta");
-    this->eta_text = new wxStaticText(this, wxID_ANY, "nan");
-    eta_sizer->Add(this->eta_text, 0, wxEXPAND);
-    static_sizer->Add(eta_sizer, 0, wxEXPAND);
+    this->brute_force_eta_text = new wxStaticText(this, wxID_ANY, "nan");
+    eta_sizer->Add(this->brute_force_eta_text, 0, wxEXPAND);
+    brute_force_sizer->Add(eta_sizer, 0, wxEXPAND);
+    start_sizer->Add(brute_force_sizer, 0, wxEXPAND);
 
-	SetSizerAndFit(static_sizer);
+    wxStaticBoxSizer* v2_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "v2");
+    this->v2_button = new wxButton(this, ID_OPTIMIZE_V2_BUTTON, "start");
+    v2_sizer->Add(this->v2_button, 0, wxEXPAND);
+    wxStaticBoxSizer* v2_eta_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "eta");
+    this->v2_eta_text = new wxStaticText(this, wxID_ANY, "nan");
+    v2_eta_sizer->Add(this->v2_eta_text, 0, wxEXPAND);
+    v2_sizer->Add(v2_eta_sizer, 0, wxEXPAND);
+    start_sizer->Add(v2_sizer, 0, wxEXPAND);
+
+    root_sizer->Add(start_sizer, 0, wxEXPAND);
+
+	SetSizerAndFit(root_sizer);
 }
 
 
@@ -207,8 +223,22 @@ ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
 }
 
 
-void ui::MainFrame::optimize()
+void ui::MainFrame::brute_force()
 {
+    /*auto dialog = wxDialog(this, wxID_ANY, "brute force optimization", wxDefaultPosition, { 200, 100 }, wxDEFAULT_DIALOG_STYLE);
+    auto dialog_sizer = new wxBoxSizer(wxVERTICAL);
+    dialog_sizer->Add(new wxStaticText(&dialog, wxID_ANY, "running brute force optimization"), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
+    auto activity_indicator = new wxActivityIndicator(&dialog, wxID_ANY);
+    activity_indicator->Start();
+    dialog_sizer->Add(activity_indicator, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
+    dialog_sizer->Add(new wxButton(&dialog, wxID_CANCEL, "cancel"), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
+    dialog.SetSizerAndFit(dialog_sizer);
+    dialog.ShowModal();*/
+
+
+   
+
+
     // stat variations
     auto full_stats = this->stats_panel->get_full_stats();
     auto min_stats = calculator::full_stats_to_stats(full_stats);
@@ -281,38 +311,59 @@ void ui::MainFrame::optimize()
     else
         throw std::runtime_error("unknown optimization type");
     
-    // wait for result
+
+    // show a progress bar and wait for optimization to finish
+    {
+        wxProgressDialog progressDialog("brute force", "running brute force optimization...", 100, this, wxPD_APP_MODAL | wxPD_CAN_ABORT);
+        bool purged = false;
+        while (opt_context->pool.wait_for(std::chrono::milliseconds(10)) == false)
+        {
+            auto pulse = progressDialog.Pulse();
+            if (!purged && pulse == false)
+            {
+                opt_context->pool.purge();
+                purged = true;
+            }
+
+            wxYield(); // keep the ui alive
+        }
+    }
+
+    // get result
     auto attack_rating = opt_context->wait_and_get_result();
 
     // print stats
-    misc::printl();
-    misc::print("stats: ");
-    for (auto stat : attack_rating.stats)
-        misc::print(stat, " ");
-    misc::printl("\n");
+    if (attack_rating.weapon)
+    {
+        misc::printl();
+        misc::print("stats: ");
+        for (auto stat : attack_rating.stats)
+            misc::print(stat, " ");
+        misc::printl("\n");
 
-    misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
-    misc::printl();
+        misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
+        misc::printl();
 
-    misc::printl("attack rating:");
-    for (int i = 0; i < attack_rating.attack_power.size(); i++)
-        if (attack_rating.attack_power.at(i).first != 0)
-            misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
-                " = ", attack_rating.attack_power.at(i).first);
-    misc::printl();
+        misc::printl("attack rating:");
+        for (int i = 0; i < attack_rating.attack_power.size(); i++)
+            if (attack_rating.attack_power.at(i).first != 0)
+                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
+                    " = ", attack_rating.attack_power.at(i).first);
+        misc::printl();
 
-    misc::printl("status effects:");
-    for (int i = 0; i < attack_rating.status_effect.size(); i++)
-        if (attack_rating.status_effect.at(i).first != 0)
-            misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
-                " = ", attack_rating.status_effect.at(i).first);
-    misc::printl();
+        misc::printl("status effects:");
+        for (int i = 0; i < attack_rating.status_effect.size(); i++)
+            if (attack_rating.status_effect.at(i).first != 0)
+                misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
+                    " = ", attack_rating.status_effect.at(i).first);
+        misc::printl();
 
-    misc::printl("spell scaling:");
-    for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
-        if (attack_rating.spell_scaling.at(i) != 0)
-            misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
-    misc::printl();
+        misc::printl("spell scaling:");
+        for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
+            if (attack_rating.spell_scaling.at(i) != 0)
+                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
+        misc::printl();
+    }
 }
 
 void ui::MainFrame::update_variation_labels()
@@ -476,7 +527,7 @@ void ui::MainFrame::OnButton(wxCommandEvent& event)
     auto id = event.GetId();
 
 	if (id == ID_OPTIMIZE_BRUTE_FORCE_BUTTON)
-		this->optimize();
+		this->brute_force();
 	else
 		throw std::runtime_error("unknown button id");
 }
@@ -574,27 +625,34 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
 
     auto root_panel = new wxPanel(this);
 
-    this->optimize_panel = new OptimizePanel(root_panel);
     this->stats_panel = new StatsPanel(root_panel);
     this->filter_panel = new FilterPanel(root_panel);
-    this->two_handing_panel = new TwoHandingPanel(root_panel);
-    this->upgrade_level_panel = new UpgradeLevelPanel(root_panel);
     this->optimize_for_panel = new OptimizeForPanel(root_panel);
+    this->upgrade_level_panel = new UpgradeLevelPanel(root_panel);
+    this->two_handing_panel = new TwoHandingPanel(root_panel);
+    this->optimize_panel = new OptimizePanel(root_panel);
     this->result_panel = new ResultPanel(root_panel);
 
     auto root_sizer = new wxBoxSizer(wxVERTICAL);
+
     root_sizer->Add(this->stats_panel, 0, wxEXPAND);
+
     root_sizer->Add(this->filter_panel, 0, wxEXPAND);
+
+
+    wxBoxSizer* upgrade_level_and_two_handing_and_optimize_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     wxBoxSizer* upgrade_level_and_two_handing_sizer = new wxBoxSizer(wxVERTICAL);
     upgrade_level_and_two_handing_sizer->Add(this->upgrade_level_panel, 0, wxEXPAND);
     upgrade_level_and_two_handing_sizer->Add(this->two_handing_panel, 0, wxEXPAND);
+    upgrade_level_and_two_handing_and_optimize_sizer->Add(upgrade_level_and_two_handing_sizer, 0, wxEXPAND);
 
-    wxBoxSizer* upgrade_level_and_tow_handing_and_optimize_sizer = new wxBoxSizer(wxHORIZONTAL);
-    upgrade_level_and_tow_handing_and_optimize_sizer->Add(upgrade_level_and_two_handing_sizer, 0, wxEXPAND);
-    upgrade_level_and_tow_handing_and_optimize_sizer->Add(this->optimize_for_panel, 0, wxEXPAND);
-    upgrade_level_and_tow_handing_and_optimize_sizer->Add(this->optimize_panel, 0, wxEXPAND);
-    root_sizer->Add(upgrade_level_and_tow_handing_and_optimize_sizer, 0, wxEXPAND);
+    wxBoxSizer* optimize_sizer = new wxBoxSizer(wxHORIZONTAL);
+    optimize_sizer->Add(this->optimize_for_panel, 0, wxEXPAND);
+    optimize_sizer->Add(this->optimize_panel, 0, wxEXPAND);
+    upgrade_level_and_two_handing_and_optimize_sizer->Add(optimize_sizer, 0, wxEXPAND);
+
+    root_sizer->Add(upgrade_level_and_two_handing_and_optimize_sizer, 0, wxEXPAND);
 
     root_sizer->Add(this->result_panel, 0, wxEXPAND);
 
