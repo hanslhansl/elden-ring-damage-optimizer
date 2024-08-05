@@ -17,17 +17,6 @@ constexpr const char* calculator::attribute_to_json_string(Attribute at)
 	throw std::invalid_argument("invalid attribute");
 }
 
-calculator::Stats calculator::full_stats_to_stats(const FullStats& full_stats)
-{
-	return {
-		full_stats.at(3),
-		full_stats.at(4),
-		full_stats.at(5),
-		full_stats.at(6),
-		full_stats.at(7)
-	};
-}
-
 bool calculator::Weapon::Filter::operator()(const Weapon& weapon) const
 {
 	auto satisfies = [](const auto& set, const auto& val) { return set.empty() or set.contains(val); };
@@ -77,7 +66,7 @@ void calculator::from_json(const json& j, ReinforceTypesDict& r)
 	r.statusSpEffectId.at(2) = j.value("statusSpEffectId3", 0);
 }
 
-calculator::attack_rating::full calculator::OptimizationContext::wait_and_get_result()
+calculator::AttackRating::full calculator::OptimizationContext::wait_and_get_result()
 {
 	// wait for all threads to finish
 	this->pool.wait();
@@ -95,10 +84,10 @@ calculator::attack_rating::full calculator::OptimizationContext::wait_and_get_re
 	auto [index, stats] = std::visit(loop_lambda, this->optional_results);
 
 	if (index == -1)
-		return attack_rating::full{};
+		return AttackRating::full{};
 
-	attack_rating::full best_attack_rating{};
-	this->weapons[index]->get_attack_rating(this->atk_opt, stats, best_attack_rating);
+	AttackRating::full best_attack_rating{};
+	this->weapons[index]->get_attack_rating(this->attack_options, stats, best_attack_rating);
 	return best_attack_rating;
 }
 
@@ -273,14 +262,14 @@ void calculator::test()
 {
 	auto&& [weap_contain, weap_contain_time] = misc::TimeFunctionExecution([&]() { return WeaponContainer("D:\\Paul\\Computer\\Programmieren\\C++\\elden-ring-damage-optimizer\\damage-optimizer\\regulation-vanilla-v1.12.3.js"); });
 
-	AttackOptions atk_options = { 1 + 79, {25, 10}, true };
-	auto [stat_variations, stat_variations_time] = misc::TimeFunctionExecution([&]() { return get_stat_variations(atk_options.available_stat_points, ALL_CLASS_STATS.at(Class::WRETCH)); });
+	AttackOptions atk_options = { {25, 10}, true };
+	auto [stat_variations, stat_variations_time] = misc::TimeFunctionExecution([&]() { return get_stat_variations(1 + 79, ALL_CLASS_STATS.at(Class::WRETCH)); });
 
 	auto [filtered_weaps, filtered_weapons_time] = misc::TimeFunctionExecution([&]() { return weap_contain.apply_filter(Weapon::Filter{ {}, { }, {} }); });
 	misc::printl();
 
 	auto [attack_rating, attack_rating_time] = misc::TimeFunctionExecution([&]()
-		{ return OptimizationContext(20, stat_variations, filtered_weaps, atk_options, std::type_identity<attack_rating::total>{}).wait_and_get_result(); });
+		{ return OptimizationContext(20, stat_variations, filtered_weaps, atk_options, std::type_identity<AttackRating::total>{}).wait_and_get_result(); });
 	misc::printl();
 
 	misc::print("stats: ");
@@ -288,24 +277,22 @@ void calculator::test()
 		misc::print(stat, " ");
 	misc::printl("\n");
 
-	misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
+	misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power.at(2));
 	misc::printl();
 
 	for (int i = 0; i < attack_rating.attack_power.size(); i++)
-		if (attack_rating.attack_power.at(i).first != 0)
-			misc::printl(DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
-				" = ", attack_rating.attack_power.at(i).first);
+		if (attack_rating.attack_power.at(i).at(2) != 0)
+			misc::printl(DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).at(0), " + ", attack_rating.attack_power.at(i).at(1),
+				" = ", attack_rating.attack_power.at(i).at(2));
 	misc::printl();
 
 	for (int i = 0; i < attack_rating.status_effect.size(); i++)
-		if (attack_rating.status_effect.at(i).first != 0)
-			misc::printl(StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
-				" = ", attack_rating.status_effect.at(i).first);
+		if (attack_rating.status_effect.at(i).at(2) != 0)
+			misc::printl(StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).at(0), " + ", attack_rating.status_effect.at(i).at(1),
+				" = ", attack_rating.status_effect.at(i).at(2));
 	misc::printl();
 
-	for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
-		if (attack_rating.spell_scaling.at(i) != 0)
-			misc::printl(DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
+	misc::printl("spell_scaling: ", attack_rating.spell_scaling, "%");
 	misc::printl();
 
 	misc::printl("load weapon container: ", weap_contain_time);

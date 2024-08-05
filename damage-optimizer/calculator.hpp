@@ -9,6 +9,7 @@ namespace calculator
 	using map = std::map<Key, T>;
 	using floating = double;
 	struct Weapon;
+	using UpgradeLevels = std::array<int, 3>;	// free handed, normal, somber
 
 	BETTER_ENUM(Attribute, int,
 		STRENGTH,
@@ -21,7 +22,29 @@ namespace calculator
 	constexpr auto attribute_json_string_table = better_enums::make_map(attribute_to_json_string);
 	using Stats = std::array<int, Attribute::_size()>;
 	using FullStats = std::array<int, 8>;
-	Stats full_stats_to_stats(const FullStats& full_stats);
+	constexpr Stats full_stats_to_stats(const FullStats& full_stats)
+	{
+		return {
+			full_stats.at(3),
+			full_stats.at(4),
+			full_stats.at(5),
+			full_stats.at(6),
+			full_stats.at(7)
+		};
+	}
+	constexpr FullStats merge_stats_and_full_stats(const Stats& stats, const FullStats& full_stats)
+	{
+		return {
+			full_stats.at(0),
+			full_stats.at(1),
+			full_stats.at(2),
+			stats.at(0),
+			stats.at(1),
+			stats.at(2),
+			stats.at(3),
+			stats.at(4)
+		};
+	}
 
 	BETTER_ENUM(Class, int,
 		HERO,
@@ -90,11 +113,11 @@ namespace calculator
 		HEAVY = 1,
 		KEEN = 2,
 		QUALITY = 3,
-		MAGIC = 4,
-		FIRE = 5,
-		FLAME_ART = 6,
-		LIGHTNING = 7,
-		SACRED = 8,
+		FIRE = 4,
+		FLAME_ART = 5,
+		LIGHTNING = 6,
+		SACRED = 7,
+		MAGIC = 8,
 		COLD = 9,
 		POISON = 10,
 		BLOOD = 11,
@@ -154,13 +177,12 @@ namespace calculator
 
 	struct AttackOptions
 	{
-		int available_stat_points;
-		std::array<size_t, 2> upgrade_level;	// normal, somber
+		UpgradeLevels upgrade_levels;	// free handed, normal, somber
 		bool two_handing;
 		const static bool disable_two_handing_attack_power_bonus = false;
 	};
 
-	namespace attack_rating
+	namespace AttackRating
 	{
 		namespace detail
 		{
@@ -169,6 +191,7 @@ namespace calculator
 				static constexpr bool is_total_attack_power = false;
 				static constexpr bool is_individual_attack_power = false;
 				static constexpr bool is_individual_status_effect = false;
+				static constexpr bool is_spell_scaling = false;
 				static constexpr bool is_full = false;
 
 				Stats stats{};
@@ -199,18 +222,25 @@ namespace calculator
 				floating individual_status_effect;
 				constexpr auto value() const { return individual_status_effect; }
 			};
+			struct spell_scaling : base
+			{
+				static constexpr bool is_spell_scaling = true;
+
+				floating spell_scaling;
+				constexpr auto value() const { return spell_scaling; }
+			};
 			struct full : base
 			{
 				static constexpr bool is_full = true;
 
 				const Weapon* weapon;
-				std::array<size_t, 2> upgrade_level;
+				UpgradeLevels upgrade_levels;
 				bool two_handing;
 
-				floating total_attack_power;
-				std::array<std::pair<floating, std::array<floating, 2>>, DamageType::_size()> attack_power;
-				std::array<std::pair<floating, std::array<floating, 2>>, StatusType::_size()> status_effect;
-				std::array<floating, DamageType::_size()> spell_scaling;
+				std::array<floating, 3> total_attack_power;	// a + b = c
+				std::array<std::array<floating, 3>, DamageType::_size()> attack_power;	// a + b = c
+				std::array<std::array<floating, 3>, StatusType::_size()> status_effect;	// a + b = c
+				floating spell_scaling;
 				std::vector<AttackPowerType> ineffective_attack_power_types;
 				std::vector<Attribute> ineffective_attributes;
 			};
@@ -237,6 +267,8 @@ namespace calculator
 		using sleep_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::SLEEP>>;
 		using madness_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::MADNESS>>;
 		using death_blight_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::DEATH_BLIGHT>>;
+
+		using spell_scaling = detail::sparse_attack_rating<detail::spell_scaling>;
 
 		using full = detail::sparse_attack_rating<detail::full>;
 	}
@@ -301,6 +333,13 @@ namespace calculator
 		// thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
 		const std::array<std::pair<floating, std::string>, 6>& scaling_tiers;
 
+		// the index of the upgrade level for this weapon
+		const int upgrade_level_index = [&]()
+			{if (this->base_attack_power.size() == 1)		return 0;
+			else if (this->base_attack_power.size() == 11)	return 2;
+			else if (this->base_attack_power.size() == 26)	return 1;
+			else throw std::runtime_error("invalid base attack power size"); }();
+
 		Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const;
 
 		template<typename T>
@@ -314,42 +353,35 @@ namespace calculator
 			if constexpr (T::is_full)
 			{
 				result.weapon = this;
-				result.upgrade_level = attack_options_.upgrade_level;
+				result.upgrade_levels = attack_options_.upgrade_levels;
 				result.two_handing = attack_options_.two_handing;
 
-				result.total_attack_power = 0.;
+				result.total_attack_power.fill({});
 				result.ineffective_attack_power_types.reserve(AttackPowerType::_size());
 			}
 
 			for (auto attribute : Attribute::_values())
-				if (adjusted_stats[attribute._to_index()] < this->requirements[attribute._to_index()])
+				if (adjusted_stats[attribute._to_integral()] < this->requirements[attribute._to_integral()])
 					Weapon::get_attack_rating_ineffective_attributes.push_back(attribute);
 
-			size_t upgrade_level;
-			if (this->base_attack_power.size() == 1)
-				upgrade_level = 0;
-			else if (this->base_attack_power.size() == 11)
-				upgrade_level = attack_options_.upgrade_level.at(1);
-			else if (this->base_attack_power.size() == 26)
-				upgrade_level = attack_options_.upgrade_level.at(0);
-			else
-				throw std::runtime_error("invalid base attack power size");
+			auto upgrade_level = attack_options_.upgrade_levels[upgrade_level_index];
+			auto& base_attack_power_at_upgrade_level = this->base_attack_power[upgrade_level];
 
 			bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
 			auto loop_cycle = [&](const AttackPowerType& attack_power_type)
 				{
-					auto temp_index = attack_power_type._to_index();
-					auto base_attack_power = this->base_attack_power[upgrade_level][temp_index];
+					auto temp_index = attack_power_type._to_integral();
+					auto base_attack_power = base_attack_power_at_upgrade_level[temp_index];
 
 					if (base_attack_power != 0 || is_sorcery_or_incantation_tool)
 					{
-						auto is_damage_type = attack_power_type._to_index() <= AttackPowerType::HOLY;
-						auto&& scaling_attributes = this->attack_power_attribute_scaling.at(attack_power_type._to_index());
+						auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
+						auto&& scaling_attributes = this->attack_power_attribute_scaling.at(attack_power_type._to_integral());
 						floating total_scaling = 1.;
 
 						if (std::ranges::any_of(Weapon::get_attack_rating_ineffective_attributes,
-							[&](Attribute ineffective_attribute) { return scaling_attributes[ineffective_attribute._to_index()] != 0; }))
+							[&](Attribute ineffective_attribute) { return scaling_attributes[ineffective_attribute._to_integral()] != 0; }))
 						{
 							total_scaling = 1. - ineffective_attribute_penalty;
 							if constexpr (T::is_full)
@@ -361,18 +393,18 @@ namespace calculator
 
 							for (auto&& attribute : Attribute::_values())
 							{
-								auto&& attribute_correct = scaling_attributes.at(attribute._to_index());
+								auto&& attribute_correct = scaling_attributes.at(attribute._to_integral());
 								floating scaling{};
 
 								if (attribute_correct != 0)
 								{
 									if (attribute_correct == 1)
-										scaling = this->attribute_scaling.at(upgrade_level).at(attribute._to_index());
+										scaling = this->attribute_scaling.at(upgrade_level).at(attribute._to_integral());
 									else
-										scaling = attribute_correct * this->attribute_scaling.at(upgrade_level).at(attribute._to_index()) / this->attribute_scaling.at(0).at(attribute._to_index());
+										scaling = attribute_correct * this->attribute_scaling.at(upgrade_level).at(attribute._to_integral()) / this->attribute_scaling.at(0).at(attribute._to_integral());
 
 									if (scaling != 0.)
-										total_scaling += this->attack_power_scaling_curves[attack_power_type._to_index()]->operator[](effective_stats[attribute._to_index()]) * scaling;
+										total_scaling += this->attack_power_scaling_curves[attack_power_type._to_integral()]->operator[](effective_stats[attribute._to_integral()]) * scaling;
 								}
 							}
 						}
@@ -386,48 +418,55 @@ namespace calculator
 									result.total_attack_power += res;
 
 							if constexpr (T::is_individual_attack_power)
-								//if (attack_power_type == T::attack_power_type)
-									result.individual_attack_power = res;
+								result.individual_attack_power = res;
 
 							if constexpr (T::is_individual_status_effect)
-								//if (attack_power_type == T::attack_power_type)
-									result.individual_status_effect = res;
+								result.individual_status_effect = res;
 
 							if constexpr (T::is_full)
 							{
-								if (is_damage_type)	// attack_power_type._to_index() <= AttackPowerType::HOLY
+								if (is_damage_type)	// attack_power_type._to_integral() <= AttackPowerType::HOLY
 								{
-									auto&& att_pwr = result.attack_power[attack_power_type._to_index()];
-									att_pwr.first = res;
-									att_pwr.second[0] = base_attack_power;
-									att_pwr.second[1] = res - base_attack_power;
-									result.total_attack_power += res;
+									auto&& att_pwr = result.attack_power[attack_power_type._to_integral()];
+									att_pwr[0] = base_attack_power;
+									att_pwr[1] = res - base_attack_power;
+									att_pwr[2] = res;
+									result.total_attack_power[0] += base_attack_power;
+									result.total_attack_power[1] += res - base_attack_power;
+									result.total_attack_power[2] += res;
 								}
-								else	// attack_power_type._to_index() > AttackPowerType::HOLY
+								else	// attack_power_type._to__integral() > AttackPowerType::HOLY
 								{
-									auto&& att_pwr = result.status_effect[attack_power_type._to_index() - AttackPowerType::POISON];
-									att_pwr.first = res;
-									att_pwr.second[0] = base_attack_power;
-									att_pwr.second[1] = res - base_attack_power;
+									auto&& att_pwr = result.status_effect[attack_power_type._to_integral() - AttackPowerType::POISON];
+									att_pwr[0] = base_attack_power;
+									att_pwr[1] = res - base_attack_power;
+									att_pwr[2] = res;
 								}
 							}
 						}
 
+						if constexpr (T::is_spell_scaling)
+							if (is_sorcery_or_incantation_tool)
+								result.spell_scaling = 100. * total_scaling;
+						
 						if constexpr (T::is_full)
-							if (is_damage_type && is_sorcery_or_incantation_tool)
-								result.spell_scaling[attack_power_type._to_index()] = 100. * total_scaling;
+							if (attack_power_type._to_integral() == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
+								result.spell_scaling = 100. * total_scaling;
 					}
 				};
 
 			if constexpr (T::is_total_attack_power)
 				for (auto&& attack_power_type : DamageType::_values())
-					loop_cycle(AttackPowerType::_from_integral(attack_power_type));
+					loop_cycle(AttackPowerType::_from_integral_unchecked(attack_power_type));
 
 			if constexpr (T::is_individual_attack_power)
 				loop_cycle(T::attack_power_type);
 
 			if constexpr (T::is_individual_status_effect)
 				loop_cycle(T::attack_power_type);
+
+			if constexpr (T::is_spell_scaling)
+				loop_cycle(AttackPowerType::PHYSICAL);
 
 			if constexpr (T::is_full)
 				for (auto&& attack_power_type : AttackPowerType::_values())
@@ -596,30 +635,31 @@ namespace calculator
 	struct OptimizationContext
 	{
 		using var_vec = std::variant<
-			std::vector<attack_rating::total>,
-			std::vector<attack_rating::physical>,
-			std::vector<attack_rating::magic>,
-			std::vector<attack_rating::fire>,
-			std::vector<attack_rating::lightning>,
-			std::vector<attack_rating::holy>,
-			std::vector<attack_rating::poison_status>,
-			std::vector<attack_rating::scarlet_rot_status>,
-			std::vector<attack_rating::bleed_status>,
-			std::vector<attack_rating::frost_status>,
-			std::vector<attack_rating::sleep_status>,
-			std::vector<attack_rating::madness_status>,
-			std::vector<attack_rating::death_blight_status>
+			std::vector<AttackRating::total>,
+			std::vector<AttackRating::physical>,
+			std::vector<AttackRating::magic>,
+			std::vector<AttackRating::fire>,
+			std::vector<AttackRating::lightning>,
+			std::vector<AttackRating::holy>,
+			std::vector<AttackRating::poison_status>,
+			std::vector<AttackRating::scarlet_rot_status>,
+			std::vector<AttackRating::bleed_status>,
+			std::vector<AttackRating::frost_status>,
+			std::vector<AttackRating::sleep_status>,
+			std::vector<AttackRating::madness_status>,
+			std::vector<AttackRating::death_blight_status>,
+			std::vector<AttackRating::spell_scaling>
 		>;
 
 		var_vec optional_results;
 		BS::thread_pool pool;
 		const std::vector<const Weapon*>& weapons;
-		AttackOptions atk_opt;
+		AttackOptions attack_options;
 
 		template<typename T>
 			requires requires (T t) { t.value(); }
-		OptimizationContext(int threads, const std::vector<Stats>& stat_variations, const std::vector<const Weapon*>& filtered_weapons_, AttackOptions atk_opt_, std::type_identity<T>) :
-			optional_results{}, pool(threads), weapons(filtered_weapons_), atk_opt(atk_opt_)
+		OptimizationContext(int threads, const std::vector<Stats>& stat_variations, const std::vector<const Weapon*>& filtered_weapons_, AttackOptions attack_options_, std::type_identity<T>) :
+			optional_results{}, pool(threads), weapons(filtered_weapons_), attack_options(attack_options_)
 		{
 			// create a vector of optional results for each weapon
 			auto& optional_results = this->optional_results.emplace<std::vector<T>>();
@@ -628,21 +668,19 @@ namespace calculator
 			// process one weapon
 			auto do_weapon = [&](size_t i)
 				{
-					const Weapon& weapon = *this->weapons[i];
+					auto& weapon = *this->weapons[i];
 
 					T intermediate_attack_rating{};
-					T best_attack_rating{};
+					T& best_attack_rating = optional_results[i];
 
 					// loop through all stat variations and find the one resulting in the best attack rating
 					for (auto&& stats : stat_variations)
 					{
-						weapon.get_attack_rating(this->atk_opt, stats, intermediate_attack_rating);
+						weapon.get_attack_rating(this->attack_options, stats, intermediate_attack_rating);
 
 						if (best_attack_rating.value() < intermediate_attack_rating.value())
 							best_attack_rating = std::move(intermediate_attack_rating);
 					}
-
-					optional_results[i] = std::move(best_attack_rating);
 
 					misc::print("completed " + std::to_string(i) + ": " + weapon.full_name + "\n");
 				};
@@ -651,7 +689,7 @@ namespace calculator
 			this->pool.detach_sequence(0ull, this->weapons.size(), do_weapon);
 		}
 
-		attack_rating::full wait_and_get_result();
+		AttackRating::full wait_and_get_result();
 	};
 
 	using FilteredWeapons = std::vector<const Weapon*>;

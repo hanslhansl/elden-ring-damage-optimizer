@@ -27,11 +27,12 @@ namespace ui
 
         ID_UPGRADE_LEVEL_SPINCTRLS,
 
+        ID_TWO_HANDING_CHECKBOX,
+
         ID_OPTIMIZE_FOR_TOTAL_ATTACK_POWER_RADIO,
         ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_RADIO,
         ID_OPTIMIZE_FOR_STATUS_EFFECT_RADIO,
         ID_OPTIMIZE_FOR_SPELL_SCALING_RADIO,
-
         ID_OPTIMIZE_FOR_INDIVIDUAL_ATTACK_POWER_LIST,
         ID_OPTIMIZE_FOR_STATUS_EFFECT_LIST,
         ID_OPTIMIZE_FOR_SPELL_SCALING_LIST,
@@ -40,7 +41,11 @@ namespace ui
         ID_OPTIMIZE_V2_BUTTON,
         ID_OPTIMIZE_THREADS_SPINCTRL,
 
-        ID_RESULT
+        ID_RESULT_STAT_SPINCTRLS,
+        ID_RESULT_TWO_HANDING_CHECKBOX,
+        ID_RESULT_UPGRADE_LEVEL_SPINCTRLS,
+        ID_RESULT_BASE_NAMES_LIST,
+        ID_RESULT_AFFINITIES_LIST,
     };
 
     class MyApp : public wxApp
@@ -49,11 +54,21 @@ namespace ui
         bool OnInit() override;
     };
 
-    struct StatsPanel : wxPanel
+    struct FullStatsPanel : wxPanel
     {
         static constexpr std::array attribute_names = { "vig", "min", "end", "str", "dex", "int", "fai", "arc" };
+
+        std::array<wxSpinCtrl*, attribute_names.size()> attribute_ctrls;
+
+        FullStatsPanel(wxWindow* parent, wxWindowID attribute_ctrls_id);
+
+        calculator::FullStats get_full_stats() const;
+    };
+
+    struct StatsPanel : wxPanel
+    {
         inline static const std::array<wxString, 10> starting_class_names = {"hero", "bandit", "astrologer", "warrior", "prisoner", "confessor", "wretch", "vagabond", "prophet", "samurai"};
-        static constexpr std::array<std::array<int, attribute_names.size()>, starting_class_names.size()> starting_class_stats{{
+        static constexpr std::array<std::array<int, FullStatsPanel::attribute_names.size()>, starting_class_names.size()> starting_class_stats{{
             { 14,  9, 12, 16,  9,  7,  8, 11 }, // hero
             { 10, 11, 10,  9, 13,  9,  8, 14 }, // bandit
             {  9, 15,  9,  8, 12, 16,  7,  9 },	// astrologer
@@ -67,14 +82,12 @@ namespace ui
         } };
 
         wxChoice* class_choice;
-        std::array<wxSpinCtrl*, attribute_names.size()> attribute_ctrls;
+        FullStatsPanel* full_stats_panel;
         wxSpinCtrl* player_level_ctrl;
         wxStaticText* attribute_points_text;
         wxStaticText* stat_variations_text;
 
         StatsPanel(wxWindow* parent);
-
-        calculator::FullStats get_full_stats() const;
     };
 
     struct FilterPanel : wxPanel
@@ -93,14 +106,16 @@ namespace ui
         wxSpinCtrl* normal_upgrade_level_ctrl;
         wxSpinCtrl* somber_upgrade_level_ctrl;
 
-        UpgradeLevelPanel(wxWindow* parent);
+        UpgradeLevelPanel(wxWindow* parent, wxWindowID spin_ctrls_id);
+
+        calculator::UpgradeLevels get_upgrade_levels() const;
     };
 
     struct TwoHandingPanel : wxPanel
     {
         wxCheckBox* two_handing_checkbox;
 
-        TwoHandingPanel(wxWindow* parent);
+        TwoHandingPanel(wxWindow* parent, wxWindowID checkbox_id);
     };
 
     struct OptimizeForPanel : wxPanel
@@ -140,6 +155,23 @@ namespace ui
 
     struct ResultPanel : wxPanel
     {
+        FullStatsPanel* full_stats_panel;
+        TwoHandingPanel* two_handing_panel;
+        UpgradeLevelPanel* upgrade_level_panel;
+        wxListBox* base_names_list;
+        wxListBox* affinities_list;
+
+        wxStaticText* full_name_text;
+        wxStaticText* type_text;
+        wxStaticText* dlc_text;
+
+        wxFlexGridSizer* attack_power_flex_sizer;
+        std::array<wxGenericStaticText*, 3> total_damage_texts{};
+        std::array<std::array<wxGenericStaticText*, 3>, calculator::DamageType::_size()> damage_type_texts{};
+        wxFlexGridSizer* status_effect_flex_sizer;
+        std::array<std::array<wxStaticText*, 3>, calculator::StatusType::_size()> status_effect_texts{};
+        wxStaticText* spell_scaling_text;
+
         ResultPanel(wxWindow* parent);
     };
 
@@ -158,10 +190,15 @@ namespace ui
         OptimizePanel* optimize_panel;
         ResultPanel* result_panel;
 
+        std::chrono::duration<double> time_per_million_variations_brute_force{};
+        std::chrono::duration<double> time_per_million_variations_v2{};
+
         void brute_force();
         void update_variation_labels();
         void update_filtered_weapons();
         void update_filter_options();
+        void update_result(wxCommandEvent&);
+        void set_result_attack_rating(const calculator::AttackRating::full& attack_rating, const calculator::FullStats& full_stats);
 
         void OnChoiceSelected(wxCommandEvent& event);
         void OnListBox(wxCommandEvent& event);

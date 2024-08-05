@@ -9,6 +9,37 @@ bool ui::MyApp::OnInit()
 }
 
 
+ui::FullStatsPanel::FullStatsPanel(wxWindow* parent, wxWindowID attribute_ctrls_id) : wxPanel(parent)
+{
+    wxBoxSizer* root_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    for (auto&& [attribute_name, spin_ctrl] : std::views::zip(this->attribute_names, this->attribute_ctrls))
+    {
+        wxBoxSizer* stat_sizer = new  wxBoxSizer(wxVERTICAL);
+        stat_sizer->Add(new wxStaticText(this, wxID_ANY, attribute_name));
+        spin_ctrl = new wxSpinCtrl(this, attribute_ctrls_id, "1", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 1, 99);
+        stat_sizer->Add(spin_ctrl);
+        root_sizer->Add(stat_sizer);
+    }
+
+    SetSizerAndFit(root_sizer);
+}
+
+calculator::FullStats ui::FullStatsPanel::get_full_stats() const
+{
+    return {
+        this->attribute_ctrls.at(0)->GetValue(),
+        this->attribute_ctrls.at(1)->GetValue(),
+        this->attribute_ctrls.at(2)->GetValue(),
+        this->attribute_ctrls.at(3)->GetValue(),
+        this->attribute_ctrls.at(4)->GetValue(),
+        this->attribute_ctrls.at(5)->GetValue(),
+        this->attribute_ctrls.at(6)->GetValue(),
+        this->attribute_ctrls.at(7)->GetValue(),
+    };
+}
+
+
 ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
 {
     wxBoxSizer* root_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -20,16 +51,8 @@ ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
     this->class_choice = new wxChoice(this, ID_STAT_CLASS_CHOICE, wxDefaultPosition, wxDefaultSize, this->starting_class_names.size(), this->starting_class_names.data());
     class_sizer->Add(this->class_choice);
     minimum_stats_sizer->Add(class_sizer);
-    wxBoxSizer* inner_stats_sizer = new  wxBoxSizer(wxHORIZONTAL);
-    for (auto&& [attribute_name, spin_ctrl] : std::views::zip(this->attribute_names, this->attribute_ctrls))
-    {
-        wxBoxSizer* stat_sizer = new  wxBoxSizer(wxVERTICAL);
-        stat_sizer->Add(new wxStaticText(this, wxID_ANY, attribute_name));
-        spin_ctrl = new wxSpinCtrl(this, ID_STAT_SPINCTRLS, "1", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 1, 99);
-        stat_sizer->Add(spin_ctrl);
-        inner_stats_sizer->Add(stat_sizer);
-    }
-    minimum_stats_sizer->Add(inner_stats_sizer);
+    this->full_stats_panel = new FullStatsPanel(this, ID_STAT_SPINCTRLS);
+    minimum_stats_sizer->Add(this->full_stats_panel);
     root_sizer->Add(minimum_stats_sizer);
 
     wxStaticBoxSizer* player_level_static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "character level");
@@ -48,20 +71,6 @@ ui::StatsPanel::StatsPanel(wxWindow* parent) : wxPanel(parent)
     root_sizer->Add(stat_variations_static_sizer);
 
     SetSizerAndFit(root_sizer);
-}
-
-calculator::FullStats ui::StatsPanel::get_full_stats() const
-{
-    return {
-		this->attribute_ctrls.at(0)->GetValue(),
-		this->attribute_ctrls.at(1)->GetValue(),
-		this->attribute_ctrls.at(2)->GetValue(),
-		this->attribute_ctrls.at(3)->GetValue(),
-		this->attribute_ctrls.at(4)->GetValue(),
-		this->attribute_ctrls.at(5)->GetValue(),
-		this->attribute_ctrls.at(6)->GetValue(),
-		this->attribute_ctrls.at(7)->GetValue(),
-    };
 }
 
 
@@ -102,31 +111,36 @@ ui::FilterPanel::FilterPanel(wxWindow* parent) : wxPanel(parent)
 }
 
 
-ui::UpgradeLevelPanel::UpgradeLevelPanel(wxWindow* parent) : wxPanel(parent)
+ui::UpgradeLevelPanel::UpgradeLevelPanel(wxWindow* parent, wxWindowID spin_ctrls_id) : wxPanel(parent)
 {
 	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "upgrade level");
 
     wxBoxSizer* normal_upgrade_level_sizer = new wxBoxSizer(wxHORIZONTAL);
     normal_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "normal: ", wxDefaultPosition, { 50, 20 }), 0, wxEXPAND | wxALL, 2);
-    this->normal_upgrade_level_ctrl = new wxSpinCtrl(this, ID_UPGRADE_LEVEL_SPINCTRLS, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 25);
+    this->normal_upgrade_level_ctrl = new wxSpinCtrl(this, spin_ctrls_id, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 25);
     normal_upgrade_level_sizer->Add(this->normal_upgrade_level_ctrl, 0, wxEXPAND | wxALL, 2);
     static_sizer->Add(normal_upgrade_level_sizer);
 
     wxBoxSizer* somber_upgrade_level_sizer = new wxBoxSizer(wxHORIZONTAL);
     somber_upgrade_level_sizer->Add(new wxStaticText(this, wxID_ANY, "somber: ", wxDefaultPosition, { 50, 20 }), 0, wxEXPAND | wxALL, 2);
-    this->somber_upgrade_level_ctrl = new wxSpinCtrl(this, ID_UPGRADE_LEVEL_SPINCTRLS, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 10);
+    this->somber_upgrade_level_ctrl = new wxSpinCtrl(this, spin_ctrls_id, "0", wxDefaultPosition, { 40, 20 }, wxSP_ARROW_KEYS, 0, 10);
     somber_upgrade_level_sizer->Add(this->somber_upgrade_level_ctrl, 0, wxEXPAND | wxALL, 2);
     static_sizer->Add(somber_upgrade_level_sizer);
 
 	SetSizerAndFit(static_sizer);
 }
 
+calculator::UpgradeLevels ui::UpgradeLevelPanel::get_upgrade_levels() const
+{
+    return { 0, this->normal_upgrade_level_ctrl->GetValue(), this->somber_upgrade_level_ctrl->GetValue() };
+}
 
-ui::TwoHandingPanel::TwoHandingPanel(wxWindow* parent) : wxPanel(parent)
+
+ui::TwoHandingPanel::TwoHandingPanel(wxWindow* parent, wxWindowID checkbox_id) : wxPanel(parent)
 {
     wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this);
 
-	this->two_handing_checkbox = new wxCheckBox(this, wxID_ANY, "two handing");
+	this->two_handing_checkbox = new wxCheckBox(this, checkbox_id, "two handing");
 	static_sizer->Add(this->two_handing_checkbox);
 
 	SetSizerAndFit(static_sizer);
@@ -217,30 +231,123 @@ ui::OptimizePanel::OptimizePanel(wxWindow* parent) : wxPanel(parent)
 
 ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
 {
-	wxStaticBoxSizer* static_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "result");
+	wxStaticBoxSizer* root_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "result");
 
-	SetSizerAndFit(static_sizer);
+    wxBoxSizer* left_sizer = new wxBoxSizer(wxVERTICAL);
+
+    wxBoxSizer* first_level_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxStaticBoxSizer* stats_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "stats");
+    this->full_stats_panel = new FullStatsPanel(this, ID_RESULT_STAT_SPINCTRLS);
+    stats_sizer->Add(this->full_stats_panel);
+    first_level_sizer->Add(stats_sizer);
+    wxBoxSizer* upgrade_level_and_two_hand_sizer = new wxBoxSizer(wxVERTICAL);
+    this->upgrade_level_panel = new UpgradeLevelPanel(this, ID_RESULT_UPGRADE_LEVEL_SPINCTRLS);
+    upgrade_level_and_two_hand_sizer->Add(this->upgrade_level_panel);
+    this->two_handing_panel = new TwoHandingPanel(this, ID_RESULT_TWO_HANDING_CHECKBOX);
+    upgrade_level_and_two_hand_sizer->Add(this->two_handing_panel);
+    first_level_sizer->Add(upgrade_level_and_two_hand_sizer);
+    left_sizer->Add(first_level_sizer);
+
+    wxBoxSizer* second_level_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxStaticBoxSizer* base_names_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "name");
+    this->base_names_list = new wxListBox(this, ID_RESULT_BASE_NAMES_LIST, wxDefaultPosition, { 200, 200 }, {}, wxLB_SINGLE);
+    base_names_sizer->Add(this->base_names_list);
+    second_level_sizer->Add(base_names_sizer);
+    wxStaticBoxSizer* affinities_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "affinity");
+    this->affinities_list = new wxListBox(this, ID_RESULT_AFFINITIES_LIST, wxDefaultPosition, { 200, 200 }, {}, wxLB_SINGLE);
+    affinities_sizer->Add(this->affinities_list);
+    second_level_sizer->Add(affinities_sizer);
+    left_sizer->Add(second_level_sizer);
+
+    root_sizer->Add(left_sizer);
+
+
+    wxBoxSizer* right_sizer = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* right_first_level_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    wxStaticBoxSizer* full_name_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "full name");
+    this->full_name_text = new wxStaticText(this, wxID_ANY, "");
+    full_name_sizer->Add(this->full_name_text, 0, wxEXPAND);
+    right_first_level_sizer->Add(full_name_sizer, 0, wxEXPAND);
+
+    wxStaticBoxSizer* type_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "type");
+    this->type_text = new wxStaticText(this, wxID_ANY, "");
+    type_sizer->Add(this->type_text, 0, wxEXPAND);
+    right_first_level_sizer->Add(type_sizer, 0, wxEXPAND);
+
+    wxStaticBoxSizer* dlc_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "base game/dlc");
+    this->dlc_text = new wxStaticText(this, wxID_ANY, "");
+    dlc_sizer->Add(this->dlc_text, 0, wxEXPAND);
+    right_first_level_sizer->Add(dlc_sizer, 0, wxEXPAND);
+
+    right_sizer->Add(right_first_level_sizer, 0, wxEXPAND);
+
+    int border = 2;
+
+    wxBoxSizer* right_second_level_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* attack_power_and_spell_scaling_sizer = new wxBoxSizer(wxVERTICAL);
+
+    wxStaticBoxSizer* attack_power_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "attack power");
+    this->attack_power_flex_sizer = new wxFlexGridSizer(calculator::DamageType::_size() + 1, 5, 0, 0);
+    this->attack_power_flex_sizer->SetFlexibleDirection(wxBOTH);
+    this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "total:"), 0, wxALL, border);
+    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+    this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    for (int i = 0; i < calculator::DamageType::_size(); i++)
+    {
+        std::string damage_type = calculator::DamageType::_from_integral(i)._to_string();
+        std::ranges::transform(damage_type, damage_type.begin(), to_lower);
+        auto& damage_type_text_array = this->damage_type_texts.at(i);
+
+        this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, damage_type + ":"), 0, wxALL, border);
+        this->attack_power_flex_sizer->Add(damage_type_text_array.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        this->attack_power_flex_sizer->Add(damage_type_text_array.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+        this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+        this->attack_power_flex_sizer->Add(damage_type_text_array.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    }
+    attack_power_sizer->Add(this->attack_power_flex_sizer, 0, wxEXPAND);
+    attack_power_and_spell_scaling_sizer->Add(attack_power_sizer, 0, wxEXPAND);
+
+    wxStaticBoxSizer* spell_scaling_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "spell scaling");
+    this->spell_scaling_text = new wxStaticText(this, wxID_ANY, "0");
+    spell_scaling_sizer->Add(this->spell_scaling_text, 0, wxEXPAND);
+    attack_power_and_spell_scaling_sizer->Add(spell_scaling_sizer, 0, wxEXPAND);
+
+    right_second_level_sizer->Add(attack_power_and_spell_scaling_sizer, 0, wxEXPAND);
+
+    wxStaticBoxSizer* status_effect_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "status effect");
+    this->status_effect_flex_sizer = new wxFlexGridSizer(calculator::StatusType::_size() + 1, 5, 0, 0);
+    this->status_effect_flex_sizer->SetFlexibleDirection(wxBOTH);
+    for (int i = 0; i < calculator::StatusType::_size(); i++)
+    {
+        std::string status_type = calculator::StatusType::_from_index(i)._to_string();
+        std::ranges::transform(status_type, status_type.begin(), to_lower);
+        auto& status_effect_text_array = this->status_effect_texts.at(i);
+
+        this->status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, status_type + ":"), 0, wxALL, border);
+        this->status_effect_flex_sizer->Add(status_effect_text_array.at(0) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        this->status_effect_flex_sizer->Add(status_effect_text_array.at(1) = new wxStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+        this->status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+        this->status_effect_flex_sizer->Add(status_effect_text_array.at(2) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    }
+    status_effect_sizer->Add(this->status_effect_flex_sizer, 0, wxEXPAND);
+
+    right_second_level_sizer->Add(status_effect_sizer, 0, wxEXPAND);
+
+    right_sizer->Add(right_second_level_sizer, 0, wxEXPAND);
+
+    root_sizer->Add(right_sizer, 0, wxEXPAND | wxLEFT, 10);
+
+	SetSizerAndFit(root_sizer);
 }
 
 
 void ui::MainFrame::brute_force()
 {
-    /*auto dialog = wxDialog(this, wxID_ANY, "brute force optimization", wxDefaultPosition, { 200, 100 }, wxDEFAULT_DIALOG_STYLE);
-    auto dialog_sizer = new wxBoxSizer(wxVERTICAL);
-    dialog_sizer->Add(new wxStaticText(&dialog, wxID_ANY, "running brute force optimization"), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
-    auto activity_indicator = new wxActivityIndicator(&dialog, wxID_ANY);
-    activity_indicator->Start();
-    dialog_sizer->Add(activity_indicator, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
-    dialog_sizer->Add(new wxButton(&dialog, wxID_CANCEL, "cancel"), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
-    dialog.SetSizerAndFit(dialog_sizer);
-    dialog.ShowModal();*/
-
-
-   
-
-
     // stat variations
-    auto full_stats = this->stats_panel->get_full_stats();
+    auto full_stats = this->stats_panel->full_stats_panel->get_full_stats();
     auto min_stats = calculator::full_stats_to_stats(full_stats);
     auto player_level = this->stats_panel->player_level_ctrl->GetValue();
     auto total_attribute_points = player_level + 79;
@@ -251,8 +358,7 @@ void ui::MainFrame::brute_force()
     auto stat_variations = calculator::get_stat_variations(available_attribute_points, min_stats);
 
     // upgrade levels
-    auto normal_upgrade_level = this->upgrade_level_panel->normal_upgrade_level_ctrl->GetValue();
-    auto somber_upgrade_level = this->upgrade_level_panel->somber_upgrade_level_ctrl->GetValue();
+    auto upgrade_levels = this->upgrade_level_panel->get_upgrade_levels();
 
     // two handing
     bool two_handing = this->two_handing_panel->two_handing_checkbox->GetValue();
@@ -261,27 +367,28 @@ void ui::MainFrame::brute_force()
     int threads = this->optimize_panel->threads_ctrl->GetValue();
 
     // set up attack options
-    calculator::AttackOptions atk_options = { available_attribute_points, { normal_upgrade_level, somber_upgrade_level }, two_handing };
+    calculator::AttackOptions atk_options = { upgrade_levels, two_handing };
+
+    auto weapon_count = this->filtered_weapons.size();
 
     // run optimization
     std::unique_ptr<calculator::OptimizationContext> opt_context;
-
     if (this->optimize_for_panel->total_attack_power_button->GetValue())
-        opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::total>{});
+        opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::total>{});
     else if (this->optimize_for_panel->individual_attack_power_button->GetValue())
     {
         auto index = this->optimize_for_panel->individual_attack_power_list->GetSelection();
 
         if (index == calculator::DamageType::PHYSICAL)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::physical>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::physical>{});
 		else if (index == calculator::DamageType::MAGIC)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::magic>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::magic>{});
         else if (index == calculator::DamageType::FIRE)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::fire>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::fire>{});
         else if (index == calculator::DamageType::LIGHTNING)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::lightning>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::lightning>{});
         else if (index == calculator::DamageType::HOLY)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::holy>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::holy>{});
 		else
 			throw std::runtime_error("unknown damage type");
     }
@@ -290,47 +397,67 @@ void ui::MainFrame::brute_force()
         auto index = this->optimize_for_panel->status_effect_list->GetSelection() + calculator::StatusType::POISON;
 
         if (index == calculator::StatusType::POISON)
-			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::poison_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::poison_status>{});
         else if (index == calculator::StatusType::SCARLET_ROT)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::scarlet_rot_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::scarlet_rot_status>{});
 		else if (index == calculator::StatusType::BLEED)
-			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::bleed_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::bleed_status>{});
 		else if (index == calculator::StatusType::FROST)
-			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::frost_status>{});
+			opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::frost_status>{});
         else if (index == calculator::StatusType::SLEEP)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::sleep_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::sleep_status>{});
         else if (index == calculator::StatusType::MADNESS)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::madness_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::madness_status>{});
         else if (index == calculator::StatusType::DEATH_BLIGHT)
-            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::attack_rating::death_blight_status>{});
+            opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::death_blight_status>{});
         else
             throw std::runtime_error("unknown status type");
     }
     else if (this->optimize_for_panel->spell_scaling_button->GetValue())
-        throw std::runtime_error("not implemented");
+        opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::spell_scaling>{});
     else
         throw std::runtime_error("unknown optimization type");
     
 
     // show a progress bar and wait for optimization to finish
     {
-        wxProgressDialog progressDialog("brute force", "running brute force optimization...", 100, this, wxPD_APP_MODAL | wxPD_CAN_ABORT);
-        bool purged = false;
-        while (opt_context->pool.wait_for(std::chrono::milliseconds(10)) == false)
+        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+
+        wxProgressDialog progressDialog("brute force", "running brute force optimization...", weapon_count, this, wxPD_APP_MODAL | wxPD_CAN_ABORT);
+        bool was_canceled = false;
+        while (opt_context->pool.wait_for(std::chrono::milliseconds(50)) == false)
         {
-            auto pulse = progressDialog.Pulse();
-            if (!purged && pulse == false)
+            if (was_canceled == false)
             {
-                opt_context->pool.purge();
-                purged = true;
+                auto is_canceled = !progressDialog.Update(weapon_count - opt_context->pool.get_tasks_total());
+                if (is_canceled == true)
+                {
+                    opt_context->pool.purge();
+                    was_canceled = true;
+                }
+            }
+            else
+            {
+                progressDialog.Pulse();
             }
 
             wxYield(); // keep the ui alive
+        }
+
+        std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+        if (was_canceled == false)
+        {
+            this->time_per_million_variations_brute_force = (t2 - t1) * 1'000'000 / weapon_count / stat_variations.size();
+            this->update_variation_labels();
         }
     }
 
     // get result
     auto attack_rating = opt_context->wait_and_get_result();
+
+    // show stats
+    auto new_full_stats = calculator::merge_stats_and_full_stats(attack_rating.stats, full_stats);
+    this->set_result_attack_rating(attack_rating, new_full_stats);
 
     // print stats
     if (attack_rating.weapon)
@@ -341,27 +468,24 @@ void ui::MainFrame::brute_force()
             misc::print(stat, " ");
         misc::printl("\n");
 
-        misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power);
+        misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power.at(2));
         misc::printl();
 
         misc::printl("attack rating:");
         for (int i = 0; i < attack_rating.attack_power.size(); i++)
-            if (attack_rating.attack_power.at(i).first != 0)
-                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).second.at(0), " + ", attack_rating.attack_power.at(i).second.at(1),
-                    " = ", attack_rating.attack_power.at(i).first);
+            if (attack_rating.attack_power.at(i).at(2) != 0)
+                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).at(0), " + ", attack_rating.attack_power.at(i).at(1),
+                    " = ", attack_rating.attack_power.at(i).at(2));
         misc::printl();
 
         misc::printl("status effects:");
         for (int i = 0; i < attack_rating.status_effect.size(); i++)
-            if (attack_rating.status_effect.at(i).first != 0)
-                misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).second.at(0), " + ", attack_rating.status_effect.at(i).second.at(1),
-                    " = ", attack_rating.status_effect.at(i).first);
+            if (attack_rating.status_effect.at(i).at(2) != 0)
+                misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).at(0), " + ", attack_rating.status_effect.at(i).at(1),
+                    " = ", attack_rating.status_effect.at(i).at(2));
         misc::printl();
 
-        misc::printl("spell scaling:");
-        for (int i = 0; i < attack_rating.spell_scaling.size(); i++)
-            if (attack_rating.spell_scaling.at(i) != 0)
-                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.spell_scaling.at(i), "%");
+        misc::printl("spell scaling: ", attack_rating.spell_scaling, "%");
         misc::printl();
     }
 }
@@ -369,7 +493,7 @@ void ui::MainFrame::brute_force()
 void ui::MainFrame::update_variation_labels()
 {
     // stat variations
-    auto full_stats = this->stats_panel->get_full_stats();
+    auto full_stats = this->stats_panel->full_stats_panel->get_full_stats();
     auto min_stats = calculator::full_stats_to_stats(full_stats);
     auto player_level = this->stats_panel->player_level_ctrl->GetValue();
     auto total_attribute_points = player_level + 79;
@@ -390,6 +514,24 @@ void ui::MainFrame::update_variation_labels()
     // total variations
     auto total_variations = stat_variation_count * filtered_weapon_count;
     this->optimize_panel->total_variations_text->SetLabel(std::to_string(total_variations));
+
+    // brute force eta
+    if (this->time_per_million_variations_brute_force == std::chrono::nanoseconds::zero())
+        this->optimize_panel->brute_force_eta_text->SetLabel("nan");
+    else
+    {
+        auto eta = this->time_per_million_variations_brute_force * total_variations / 1'000'000;
+        this->optimize_panel->brute_force_eta_text->SetLabel(std::to_string(std::chrono::duration_cast<std::chrono::seconds>(eta).count()) + "s");
+    }
+
+    // v2 eta
+    if (this->time_per_million_variations_v2 == std::chrono::nanoseconds::zero())
+		this->optimize_panel->v2_eta_text->SetLabel("nan");
+	else
+	{
+		auto eta = this->time_per_million_variations_v2 * total_variations / 1'000'000;
+		this->optimize_panel->v2_eta_text->SetLabel(std::to_string(std::chrono::duration_cast<std::chrono::seconds>(eta).count()) + "s");
+	}
 }
 
 void ui::MainFrame::update_filtered_weapons()
@@ -421,18 +563,138 @@ void ui::MainFrame::update_filter_options()
     }
 
     this->filter_panel->affinities_list->Clear();
+    this->result_panel->affinities_list->Clear();
     for (auto&& affinity : this->all_filter_options.affinities)
     {
         std::string affinity_str = affinity._to_string();
         std::ranges::transform(affinity_str, affinity_str.begin(), to_lower);
         this->filter_panel->affinities_list->Append(affinity_str);
+        this->result_panel->affinities_list->Append(affinity_str);
     }
 
     this->filter_panel->base_names_list->Clear();
+    this->result_panel->base_names_list->Clear();
     for (auto&& base_name : this->all_filter_options.base_names)
+    {
         this->filter_panel->base_names_list->Append(base_name);
+        this->result_panel->base_names_list->Append(base_name);
+    }
 
     this->update_filtered_weapons();
+}
+
+void ui::MainFrame::update_result(wxCommandEvent&)
+{
+    calculator::AttackRating::full attack_rating{};
+
+    calculator::AttackOptions attack_options = {
+        this->result_panel->upgrade_level_panel->get_upgrade_levels(),
+        this->result_panel->two_handing_panel->two_handing_checkbox->GetValue()
+    };
+
+    auto full_stats = this->result_panel->full_stats_panel->get_full_stats();
+    auto stats = calculator::full_stats_to_stats(full_stats);
+
+    auto full_name = this->result_panel->base_names_list->GetStringSelection();
+
+    auto base_name_index = this->result_panel->base_names_list->GetSelection();
+    auto affinity_index = this->result_panel->affinities_list->GetSelection();
+    if (base_name_index != wxNOT_FOUND && affinity_index != wxNOT_FOUND)
+    {
+        auto base_name = this->all_filter_options.base_names.at(base_name_index);
+
+        auto affinity = this->all_filter_options.affinities.at(affinity_index);
+
+        auto weapon_it = std::ranges::find_if(this->weapon_container.weapons, [&](const calculator::Weapon& w) { return w.affinity == affinity && w.base_name == base_name; });
+        if (weapon_it != this->weapon_container.weapons.end())
+            weapon_it->get_attack_rating(attack_options, stats, attack_rating);
+    }
+    
+    this->set_result_attack_rating(attack_rating, full_stats);
+}
+
+void ui::MainFrame::set_result_attack_rating(const calculator::AttackRating::full& attack_rating, const calculator::FullStats& full_stats)
+{
+    if (attack_rating.weapon == nullptr)
+    {
+        this->result_panel->full_name_text->SetLabel("");
+        this->result_panel->type_text->SetLabel("");
+        this->result_panel->dlc_text->SetLabel("");
+        this->result_panel->spell_scaling_text->SetLabel("");
+    }
+    else
+    {
+        for (auto&& [stat, ctrl] : std::views::zip(full_stats, this->result_panel->full_stats_panel->attribute_ctrls))
+            ctrl->SetValue(stat);
+        this->result_panel->upgrade_level_panel->normal_upgrade_level_ctrl->SetValue(attack_rating.upgrade_levels[1]);
+        this->result_panel->upgrade_level_panel->somber_upgrade_level_ctrl->SetValue(attack_rating.upgrade_levels[2]);
+        this->result_panel->two_handing_panel->two_handing_checkbox->SetValue(attack_rating.two_handing);
+
+        auto base_name_it = std::ranges::find(this->all_filter_options.base_names, attack_rating.weapon->base_name);
+        if (base_name_it != this->all_filter_options.base_names.end())
+			this->result_panel->base_names_list->SetSelection(std::distance(this->all_filter_options.base_names.begin(), base_name_it));
+
+        auto affinity_it = std::ranges::find(this->all_filter_options.affinities, attack_rating.weapon->affinity);
+        if (affinity_it != this->all_filter_options.affinities.end())
+            this->result_panel->affinities_list->SetSelection(std::distance(this->all_filter_options.affinities.begin(), affinity_it));
+
+        std::string full_name = attack_rating.weapon->full_name;
+        std::ranges::transform(full_name, full_name.begin(), to_lower);
+        this->result_panel->full_name_text->SetLabel(full_name);
+
+        std::string type = attack_rating.weapon->type._to_string();
+        std::ranges::transform(type, type.begin(), to_lower);
+        this->result_panel->type_text->SetLabel(type);
+
+        this->result_panel->dlc_text->SetLabel(attack_rating.weapon->dlc ? "dlc" : "base game");
+    }
+
+    bool contains = false;
+    for (auto&& [index, aps_txts] : std::views::enumerate(std::views::zip(attack_rating.attack_power, this->result_panel->damage_type_texts)))
+    {
+        auto&& [aps, txts] = aps_txts;
+        auto attack_power_type = calculator::AttackPowerType::_from_integral(index);
+
+        txts.at(0)->SetLabel(std::to_string(int(aps.at(0))));
+        if (std::ranges::contains(attack_rating.ineffective_attack_power_types, attack_power_type))
+        {
+            contains = true;
+            txts.at(1)->SetLabelMarkup(std::format("<span foreground='red'>{0:+}</span>", int(aps.at(1))));
+            txts.at(2)->SetLabelMarkup(std::format("<span foreground='red'>{0:}</span>", int(aps.at(2))));
+        }
+        else
+        {
+            txts.at(1)->SetLabel(std::format("{0:+}", int(aps.at(1))));
+            txts.at(2)->SetLabel(std::format("{0:}", int(aps.at(2))));
+        }
+    }
+
+    this->result_panel->total_damage_texts.at(0)->SetLabel(std::to_string(int(attack_rating.total_attack_power.at(0))));
+    if (contains)
+    {
+        this->result_panel->total_damage_texts.at(1)->SetLabelMarkup(std::format("<span foreground='red'>{0:+}</span>", int(attack_rating.total_attack_power.at(1))));
+        this->result_panel->total_damage_texts.at(2)->SetLabelMarkup(std::format("<span foreground='red'>{0:}</span>", + int(attack_rating.total_attack_power.at(2))));
+    }
+    else
+    {
+        this->result_panel->total_damage_texts.at(1)->SetLabel(std::format("{0:+}", int(attack_rating.total_attack_power.at(1))));
+        this->result_panel->total_damage_texts.at(2)->SetLabel(std::format("{0:}", int(attack_rating.total_attack_power.at(2))));
+    }
+
+
+    for (auto&& [ses, txts] : std::views::zip(attack_rating.status_effect, this->result_panel->status_effect_texts))
+    {
+        txts.at(0)->SetLabel(std::format("{0:}", int(ses.at(0))));
+        txts.at(1)->SetLabel(std::format("{0:+}", int(ses.at(1))));
+        txts.at(2)->SetLabel(std::format("{0:}", int(ses.at(2))));
+    }
+
+    this->result_panel->spell_scaling_text->SetLabel(std::to_string(int(attack_rating.spell_scaling)));
+
+    this->result_panel->attack_power_flex_sizer->Layout();
+    this->result_panel->status_effect_flex_sizer->Layout();
+    this->result_panel->Fit();
+    this->Fit();
 }
 
 void ui::MainFrame::OnChoiceSelected(wxCommandEvent& event)
@@ -442,7 +704,7 @@ void ui::MainFrame::OnChoiceSelected(wxCommandEvent& event)
     if (id == ID_STAT_CLASS_CHOICE)
     {
         auto selection = this->stats_panel->class_choice->GetSelection();
-        for (auto&& [spin_ctrl, attr_val] : std::views::zip(this->stats_panel->attribute_ctrls, this->stats_panel->starting_class_stats.at(selection)))
+        for (auto&& [spin_ctrl, attr_val] : std::views::zip(this->stats_panel->full_stats_panel->attribute_ctrls, this->stats_panel->starting_class_stats.at(selection)))
             spin_ctrl->SetValue(attr_val);
 
         this->update_variation_labels();
@@ -516,8 +778,14 @@ void ui::MainFrame::OnSpinCtrl(wxCommandEvent& event)
 
     if (id == ID_STAT_SPINCTRLS)
         this->update_variation_labels();
-    else if (ID_UPGRADE_LEVEL_SPINCTRLS)
+    else if (id == ID_UPGRADE_LEVEL_SPINCTRLS)
         ;
+    else if (id == ID_OPTIMIZE_THREADS_SPINCTRL)
+    {
+        this->time_per_million_variations_brute_force = std::chrono::nanoseconds::zero();
+        this->time_per_million_variations_v2 = std::chrono::nanoseconds::zero();
+        this->update_variation_labels();
+    }
     else
         throw std::runtime_error("unknown spin ctrl id");
 }
@@ -628,8 +896,8 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     this->stats_panel = new StatsPanel(root_panel);
     this->filter_panel = new FilterPanel(root_panel);
     this->optimize_for_panel = new OptimizeForPanel(root_panel);
-    this->upgrade_level_panel = new UpgradeLevelPanel(root_panel);
-    this->two_handing_panel = new TwoHandingPanel(root_panel);
+    this->upgrade_level_panel = new UpgradeLevelPanel(root_panel, ID_UPGRADE_LEVEL_SPINCTRLS);
+    this->two_handing_panel = new TwoHandingPanel(root_panel, ID_TWO_HANDING_CHECKBOX);
     this->optimize_panel = new OptimizePanel(root_panel);
     this->result_panel = new ResultPanel(root_panel);
 
@@ -654,13 +922,16 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
 
     root_sizer->Add(upgrade_level_and_two_handing_and_optimize_sizer, 0, wxEXPAND);
 
-    root_sizer->Add(this->result_panel, 0, wxEXPAND);
+    root_sizer->Add(this->result_panel, 0, wxEXPAND | wxTOP, 20);
 
     root_panel->SetSizerAndFit(root_sizer);
 
     auto root_root_sizer = new wxBoxSizer(wxVERTICAL);
     root_root_sizer->Add(root_panel, 1, wxEXPAND);
     this->SetSizerAndFit(root_root_sizer);
+
+    this->result_panel->Bind(wxEVT_SPINCTRL, &MainFrame::update_result, this);
+    this->result_panel->Bind(wxEVT_LISTBOX, &MainFrame::update_result, this);
 
     Bind(wxEVT_CHOICE, &MainFrame::OnChoiceSelected, this);
     Bind(wxEVT_SPINCTRL, &MainFrame::OnSpinCtrl, this);

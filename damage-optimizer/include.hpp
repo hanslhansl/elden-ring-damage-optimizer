@@ -20,11 +20,14 @@
 #include <wx/activityindicator.h>
 #include <wx/animate.h>
 #include <wx/progdlg.h>
+#include <wx/generic/stattextg.h>
 
 #include "hhh/concepts.hpp"
 #include "hhh/misc.hpp"
 #include "hhh/math/functions.hpp"
 
+#pragma comment(lib, "wxbase32u.lib")
+#pragma comment(lib, "wxmsw32u_core.lib")
 
 //using json = nlohmann::ordered_json;
 using json = nlohmann::json;
