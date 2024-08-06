@@ -165,10 +165,9 @@ namespace ui
         wxStaticText* type_text;
         wxStaticText* dlc_text;
 
-        wxFlexGridSizer* attack_power_flex_sizer;
+        wxBoxSizer* right_second_level_sizer; // just for resizing
         std::array<wxGenericStaticText*, 3> total_damage_texts{};
         std::array<std::array<wxGenericStaticText*, 3>, calculator::DamageType::_size()> damage_type_texts{};
-        wxFlexGridSizer* status_effect_flex_sizer;
         std::array<std::array<wxStaticText*, 3>, calculator::StatusType::_size()> status_effect_texts{};
         wxStaticText* spell_scaling_text;
 

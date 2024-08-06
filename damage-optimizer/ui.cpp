@@ -268,12 +268,12 @@ ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
     wxStaticBoxSizer* full_name_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "full name");
     this->full_name_text = new wxStaticText(this, wxID_ANY, "");
     full_name_sizer->Add(this->full_name_text, 0, wxEXPAND);
-    right_first_level_sizer->Add(full_name_sizer, 0, wxEXPAND);
+    right_first_level_sizer->Add(full_name_sizer, 0, wxEXPAND | wxRIGHT, 5);
 
     wxStaticBoxSizer* type_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "type");
     this->type_text = new wxStaticText(this, wxID_ANY, "");
     type_sizer->Add(this->type_text, 0, wxEXPAND);
-    right_first_level_sizer->Add(type_sizer, 0, wxEXPAND);
+    right_first_level_sizer->Add(type_sizer, 0, wxEXPAND | wxRIGHT, 5);
 
     wxStaticBoxSizer* dlc_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "base game/dlc");
     this->dlc_text = new wxStaticText(this, wxID_ANY, "");
@@ -284,30 +284,30 @@ ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
 
     int border = 2;
 
-    wxBoxSizer* right_second_level_sizer = new wxBoxSizer(wxHORIZONTAL);
+    this->right_second_level_sizer = new wxBoxSizer(wxHORIZONTAL);
     wxBoxSizer* attack_power_and_spell_scaling_sizer = new wxBoxSizer(wxVERTICAL);
 
     wxStaticBoxSizer* attack_power_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "attack power");
-    this->attack_power_flex_sizer = new wxFlexGridSizer(calculator::DamageType::_size() + 1, 5, 0, 0);
-    this->attack_power_flex_sizer->SetFlexibleDirection(wxBOTH);
-    this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "total:"), 0, wxALL, border);
-    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
-    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
-    this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
-    this->attack_power_flex_sizer->Add(this->total_damage_texts.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    wxFlexGridSizer* attack_power_flex_sizer = new wxFlexGridSizer(calculator::DamageType::_size() + 1, 5, 0, 0);
+    attack_power_flex_sizer->SetFlexibleDirection(wxBOTH);
+    attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "total:"), 0, wxALL, border);
+    attack_power_flex_sizer->Add(this->total_damage_texts.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+    attack_power_flex_sizer->Add(this->total_damage_texts.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+    attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+    attack_power_flex_sizer->Add(this->total_damage_texts.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
     for (int i = 0; i < calculator::DamageType::_size(); i++)
     {
         std::string damage_type = calculator::DamageType::_from_integral(i)._to_string();
         std::ranges::transform(damage_type, damage_type.begin(), to_lower);
         auto& damage_type_text_array = this->damage_type_texts.at(i);
 
-        this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, damage_type + ":"), 0, wxALL, border);
-        this->attack_power_flex_sizer->Add(damage_type_text_array.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
-        this->attack_power_flex_sizer->Add(damage_type_text_array.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
-        this->attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
-        this->attack_power_flex_sizer->Add(damage_type_text_array.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, damage_type + ":"), 0, wxALL, border);
+        attack_power_flex_sizer->Add(damage_type_text_array.at(0) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        attack_power_flex_sizer->Add(damage_type_text_array.at(1) = new wxGenericStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+        attack_power_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+        attack_power_flex_sizer->Add(damage_type_text_array.at(2) = new wxGenericStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
     }
-    attack_power_sizer->Add(this->attack_power_flex_sizer, 0, wxEXPAND);
+    attack_power_sizer->Add(attack_power_flex_sizer, 0, wxEXPAND);
     attack_power_and_spell_scaling_sizer->Add(attack_power_sizer, 0, wxEXPAND);
 
     wxStaticBoxSizer* spell_scaling_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "spell scaling");
@@ -315,28 +315,28 @@ ui::ResultPanel::ResultPanel(wxWindow* parent) : wxPanel(parent)
     spell_scaling_sizer->Add(this->spell_scaling_text, 0, wxEXPAND);
     attack_power_and_spell_scaling_sizer->Add(spell_scaling_sizer, 0, wxEXPAND);
 
-    right_second_level_sizer->Add(attack_power_and_spell_scaling_sizer, 0, wxEXPAND);
+    this->right_second_level_sizer->Add(attack_power_and_spell_scaling_sizer, 0, wxEXPAND | wxRIGHT, 5);
 
     wxStaticBoxSizer* status_effect_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, "status effect");
-    this->status_effect_flex_sizer = new wxFlexGridSizer(calculator::StatusType::_size() + 1, 5, 0, 0);
-    this->status_effect_flex_sizer->SetFlexibleDirection(wxBOTH);
+    wxFlexGridSizer* status_effect_flex_sizer = new wxFlexGridSizer(calculator::StatusType::_size() + 1, 5, 0, 0);
+    status_effect_flex_sizer->SetFlexibleDirection(wxBOTH);
     for (int i = 0; i < calculator::StatusType::_size(); i++)
     {
         std::string status_type = calculator::StatusType::_from_index(i)._to_string();
         std::ranges::transform(status_type, status_type.begin(), to_lower);
         auto& status_effect_text_array = this->status_effect_texts.at(i);
 
-        this->status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, status_type + ":"), 0, wxALL, border);
-        this->status_effect_flex_sizer->Add(status_effect_text_array.at(0) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
-        this->status_effect_flex_sizer->Add(status_effect_text_array.at(1) = new wxStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
-        this->status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
-        this->status_effect_flex_sizer->Add(status_effect_text_array.at(2) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, status_type + ":"), 0, wxALL, border);
+        status_effect_flex_sizer->Add(status_effect_text_array.at(0) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
+        status_effect_flex_sizer->Add(status_effect_text_array.at(1) = new wxStaticText(this, wxID_ANY, "+0"), 0, wxALL, border);
+        status_effect_flex_sizer->Add(new wxStaticText(this, wxID_ANY, "="), 0, wxALL, border);
+        status_effect_flex_sizer->Add(status_effect_text_array.at(2) = new wxStaticText(this, wxID_ANY, "0"), 0, wxALL, border);
     }
-    status_effect_sizer->Add(this->status_effect_flex_sizer, 0, wxEXPAND);
+    status_effect_sizer->Add(status_effect_flex_sizer, 0, wxEXPAND);
 
-    right_second_level_sizer->Add(status_effect_sizer, 0, wxEXPAND);
+    this->right_second_level_sizer->Add(status_effect_sizer, 0, wxEXPAND);
 
-    right_sizer->Add(right_second_level_sizer, 0, wxEXPAND);
+    right_sizer->Add(this->right_second_level_sizer, 0, wxEXPAND);
 
     root_sizer->Add(right_sizer, 0, wxEXPAND | wxLEFT, 10);
 
@@ -655,7 +655,7 @@ void ui::MainFrame::set_result_attack_rating(const calculator::AttackRating::ful
         auto&& [aps, txts] = aps_txts;
         auto attack_power_type = calculator::AttackPowerType::_from_integral(index);
 
-        txts.at(0)->SetLabel(std::to_string(int(aps.at(0))));
+        txts.at(0)->SetLabel(std::format("{0:}", int(aps.at(0))));
         if (std::ranges::contains(attack_rating.ineffective_attack_power_types, attack_power_type))
         {
             contains = true;
@@ -669,7 +669,7 @@ void ui::MainFrame::set_result_attack_rating(const calculator::AttackRating::ful
         }
     }
 
-    this->result_panel->total_damage_texts.at(0)->SetLabel(std::to_string(int(attack_rating.total_attack_power.at(0))));
+    this->result_panel->total_damage_texts.at(0)->SetLabel(std::format("{0:}", int(attack_rating.total_attack_power.at(0))));
     if (contains)
     {
         this->result_panel->total_damage_texts.at(1)->SetLabelMarkup(std::format("<span foreground='red'>{0:+}</span>", int(attack_rating.total_attack_power.at(1))));
@@ -691,8 +691,7 @@ void ui::MainFrame::set_result_attack_rating(const calculator::AttackRating::ful
 
     this->result_panel->spell_scaling_text->SetLabel(std::to_string(int(attack_rating.spell_scaling)));
 
-    this->result_panel->attack_power_flex_sizer->Layout();
-    this->result_panel->status_effect_flex_sizer->Layout();
+    this->result_panel->right_second_level_sizer->Layout();
     this->result_panel->Fit();
     this->Fit();
 }
@@ -862,7 +861,16 @@ void ui::MainFrame::OnExit(wxCommandEvent& event)
 
 void ui::MainFrame::OnAbout(wxCommandEvent& event)
 {
-    wxMessageBox("This is a wxWidgets Hello World example", "About Hello World", wxOK | wxICON_INFORMATION);
+    wxMessageDialog dialog(this, "created by hanslhansl", "about elden ring damage optimizer", wxOK | wxCANCEL | wxICON_NONE | wxNO_DEFAULT);
+    dialog.SetOKCancelLabels("ok", "source on github");
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        // open github
+        wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer");
+    }
+
+    //wxMessageBox("created by hanslhansl", "about elden ring damage optimizer", wxOK | wxCANCEL | wxICON_NONE);
 }
 
 ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optimizer")
@@ -874,7 +882,7 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     menuFile->Append(wxID_EXIT, "&quit", "quit this program");
 
     wxMenu* menuHelp = new wxMenu;
-    menuHelp->Append(wxID_ABOUT);
+    menuHelp->Append(wxID_ABOUT, "&about");
 
     wxMenuBar* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&file");
@@ -930,8 +938,9 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     root_root_sizer->Add(root_panel, 1, wxEXPAND);
     this->SetSizerAndFit(root_root_sizer);
 
-    this->result_panel->Bind(wxEVT_SPINCTRL, &MainFrame::update_result, this);
+    this->result_panel->Bind(wxEVT_SPINCTRL, &MainFrame::update_result, this); 
     this->result_panel->Bind(wxEVT_LISTBOX, &MainFrame::update_result, this);
+    this->result_panel->Bind(wxEVT_CHECKBOX, &MainFrame::update_result, this);
 
     Bind(wxEVT_CHOICE, &MainFrame::OnChoiceSelected, this);
     Bind(wxEVT_SPINCTRL, &MainFrame::OnSpinCtrl, this);
