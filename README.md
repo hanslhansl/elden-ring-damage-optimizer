@@ -1,5 +1,5 @@
 # elden-ring-damage-optimizer
-A tool for finding the best stat distribution for every weapon and every character level in Elden Ring.
+A tool for finding the highest possible attack rating for every weapon and every character level in Elden Ring.
 
 ## how it works
 ## the algorithm
