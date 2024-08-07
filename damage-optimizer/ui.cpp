@@ -828,8 +828,8 @@ void ui::MainFrame::OnRadioButton(wxCommandEvent& event)
 
 void ui::MainFrame::OnLoadRegulation(wxCommandEvent& event)
 {
-    auto openFileDialog = wxFileDialog(this, "choose regulation file", std::filesystem::current_path().string(), "",
-        "javascript files (*.js)|*.js|all files|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    auto openFileDialog = wxFileDialog(this, "choose regulation data file", std::filesystem::current_path().string(), "",
+        "json files (*.json)|*.json|all files|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
     if (openFileDialog.ShowModal() == wxID_CANCEL)
         return;
@@ -851,7 +851,35 @@ void ui::MainFrame::OnLoadRegulation(wxCommandEvent& event)
 
 void ui::MainFrame::OnGenerateRegulation(wxCommandEvent& event)
 {
-    wxMessageBox("not implemented", "OnGenerateRegulation", wxOK | wxICON_INFORMATION);
+    auto msg_dialog = wxMessageDialog(this,
+        "do you want to create a new regulation data file? this might be necessary if the provided file is out of date.\na more thorough explanation is provided on github.",
+        "generate regulation data file", wxYES_NO | wxHELP | wxNO_DEFAULT);
+    msg_dialog.SetYesNoLabels("yes", "no");
+    msg_dialog.SetHelpLabel("explanation on github");
+
+    auto result = msg_dialog.ShowModal();
+    if(result == wxID_NO)
+        return;
+    if (result == wxID_HELP)
+    {
+        wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer");
+        return;
+    }
+
+    auto uxm_dir_dialog = wxDirDialog(this, "choose uxm target directory", "", wxDD_DIR_MUST_EXIST);
+    if (uxm_dir_dialog.ShowModal() == wxID_CANCEL)
+        return;
+    std::filesystem::path uxm_target_directory = uxm_dir_dialog.GetPath().ToStdString();
+
+    auto witchy_exe_dialog = wxFileDialog(this, "choose WitchyBND executable", std::filesystem::current_path().string(), "",
+        "exe files (*.exe)|*.exe|all files|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (witchy_exe_dialog.ShowModal() == wxID_CANCEL)
+        return;
+    std::filesystem::path witchy_exe = witchy_exe_dialog.GetPath().ToStdString();
+
+    auto parser = calculator::Parser(witchy_exe, uxm_target_directory);
+    auto regulation_data_json = parser.get_regulation_data_json();
+    std::ofstream("new_regulation_data.json") << regulation_data_json << std::endl;
 }
 
 void ui::MainFrame::OnExit(wxCommandEvent& event)
@@ -861,14 +889,12 @@ void ui::MainFrame::OnExit(wxCommandEvent& event)
 
 void ui::MainFrame::OnAbout(wxCommandEvent& event)
 {
-    wxMessageDialog dialog(this, "created by hanslhansl", "about elden ring damage optimizer", wxOK | wxCANCEL | wxICON_NONE | wxNO_DEFAULT);
-    dialog.SetOKCancelLabels("ok", "source on github");
+    wxMessageDialog dialog(this, "created by hanslhansl", "about elden ring damage optimizer", wxOK | wxHELP | wxICON_NONE);
+    dialog.SetOKLabel("ok");
+    dialog.SetHelpLabel("source on github");
 
-    if (dialog.ShowModal() != wxID_OK)
-    {
-        // open github
+    if (dialog.ShowModal() == wxID_HELP)
         wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer");
-    }
 }
 
 ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optimizer")

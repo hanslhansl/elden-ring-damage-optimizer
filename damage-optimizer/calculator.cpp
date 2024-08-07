@@ -389,21 +389,6 @@ calculator::Weapon::Type nlohmann::adl_serializer<calculator::Weapon::Type>::fro
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-#define IS_TEST_RUN false
-
 template<typename T>
 constexpr T assert_floating_is(calculator::floating f)
 {
@@ -424,8 +409,7 @@ std::vector<std::filesystem::path> calculator::Parser::copy_elden_ring_files(con
 		std::ranges::replace(elden_ring_file_path_string, '/', '-');
 
 		auto new_file = to / elden_ring_file_path_string;
-		if (!IS_TEST_RUN)
-			std::filesystem::copy_file(elden_ring / elden_ring_file_path, new_file, std::filesystem::copy_options::overwrite_existing);
+		std::filesystem::copy_file(elden_ring / elden_ring_file_path, new_file, std::filesystem::copy_options::overwrite_existing);
 		ret.push_back(new_file);
 	}
 
@@ -446,8 +430,7 @@ void calculator::Parser::witchy(const std::filesystem::path& witchy_exe, const s
 
 std::vector<std::filesystem::path> calculator::Parser::witchy_unpack_files(const std::filesystem::path& witchy_exe, const std::vector<std::filesystem::path>& files_to_unpack)
 {
-	if (!IS_TEST_RUN)
-		witchy(witchy_exe, files_to_unpack);
+	witchy(witchy_exe, files_to_unpack);
 
 	std::vector<std::filesystem::path> ret{};
 	for (auto& unpacked_file : files_to_unpack)
@@ -461,8 +444,7 @@ std::vector<std::filesystem::path> calculator::Parser::witchy_unpack_files(const
 
 std::vector<std::filesystem::path> calculator::Parser::witchy_to_xml(const std::filesystem::path& witchy_exe, const std::vector<std::filesystem::path>& files_to_xml)
 {
-	if (!IS_TEST_RUN)
-		witchy(witchy_exe, files_to_xml);
+	witchy(witchy_exe, files_to_xml);
 
 	std::vector<std::filesystem::path> ret{};
 	for (auto& file_to_xml : files_to_xml)
@@ -498,8 +480,7 @@ std::filesystem::path calculator::Parser::copy_xml_files(const std::filesystem::
 	for (auto& xml_file : xml_files)
 	{
 		auto new_file_path = xml_directory / xml_file.filename();
-		if (!IS_TEST_RUN)
-			std::filesystem::copy_file(xml_file, new_file_path, std::filesystem::copy_options::overwrite_existing);
+		std::filesystem::copy_file(xml_file, new_file_path, std::filesystem::copy_options::overwrite_existing);
 	}
 
 	misc::printl("copy xml files to ", xml_directory.string(), "\n");
@@ -1040,7 +1021,36 @@ json calculator::Parser::get_regulation_data_json()
 		if (row.at("compareType") == 1 && id >= 100)
 			scaling_tiers_tson.push_back(json::array({ row.at("value") / 100., this->menuText.at(row.at("textId")) }));
 
+	json regulation_data_json{
+		{ "calcCorrectGraphs", calc_correct_graphs_json },
+		{ "attackElementCorrects", attack_element_corrects_json },
+		{ "reinforceTypes", reinforce_types_json },
+		{ "statusSpEffectParams", status_sp_effect_params_json },
+		{ "scalingTiers", scaling_tiers_tson },
+		{ "weapons", weapons_json }
+	};
 
+	return regulation_data_json;
+}
+
+void calculator::test2()
+{
+	misc::print(std::fixed);
+	std::cout.precision(20);
+
+	// Madding Hand & Poisoned Hand differ slightly
+
+	Parser parser(std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v2.14.0.3/WitchyBND.exe", std::filesystem::path::format::native_format),
+		std::filesystem::path("D:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format));
+	auto regulation_data_json = parser.get_regulation_data_json();
+
+	auto weapons_json = regulation_data_json["weapons"];
+	auto calc_correct_graphs_json = regulation_data_json["calcCorrectGraphs"];
+	auto attack_element_corrects_json = regulation_data_json["attackElementCorrects"];
+	auto reinforce_types_json = regulation_data_json["reinforceTypes"];
+	auto status_sp_effect_params_json = regulation_data_json["statusSpEffectParams"];
+	auto scaling_tiers_tson = regulation_data_json["scalingTiers"];
+	
 	auto regulation_data = json::parse(std::ifstream("D:/Paul/Computer/Programmieren/C++/elden-ring-damage-optimizer/damage-optimizer/regulation-vanilla-v1.12.3.js"));
 	auto weaponJson = regulation_data["weapons"];
 	auto calcCorrectGraphs = regulation_data["calcCorrectGraphs"];
@@ -1155,30 +1165,7 @@ json calculator::Parser::get_regulation_data_json()
 		misc::printl();
 	}
 
-	json regulation_data_json{
-		{ "calcCorrectGraphs", calc_correct_graphs_json },
-		{ "attackElementCorrects", attack_element_corrects_json },
-		{ "reinforceTypes", reinforce_types_json },
-		{ "statusSpEffectParams", status_sp_effect_params_json },
-		{ "scalingTiers", scaling_tiers_tson },
-		{ "weapons", weapons_json }
-	};
 
-	return regulation_data_json;
-}
-
-void calculator::test2()
-{
-	misc::print(std::fixed);
-	std::cout.precision(20);
-
-	// Madding Hand & Poisoned Hand differ slightly
-
-	Parser parser(std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v2.14.0.3/WitchyBND.exe", std::filesystem::path::format::native_format),
-		std::filesystem::path("D:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format));
-	auto regulation_data_json = parser.get_regulation_data_json();
-
-	std::ofstream("D:/Paul/Computer/Programmieren/C++/elden-ring-damage-optimizer/damage-optimizer/my_regulation-vanilla.js") << regulation_data_json.dump(4) << std::endl;;
 
 	misc::printl("\n\ndone");
 	Sleep(1000*1000);
