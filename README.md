@@ -9,7 +9,7 @@ There are around 3216 weapons in Elden Ring (including different affinity versio
 
 The solution: Don't apply the brute force algorithm to all weapons at the same time. Use the weapon filters to limit the optimization to e.g. just one weapon type or maybe even to a single weapon. The further you are away from character level 174 (be it above or below) and all minimum stats at 1 the less time it will take too.
 
-Actually, there is another solution: Another algorithm. I'm working on it.
+Actually, there is another solution: A smarter algorithm. I'm working on it.
 ## updating the regulation data
 The included [regulation data file](new_regulation_data.json) contains all the necessary raw data. If, however, this file becomes outdated (e.g. because of an Elden Ring update) or if you are playing on an old version of the game you might want to generate your own regulation data file. To do this you'll need
 - [UXM Selective Unpacker](https://github.com/Nordgaren/UXM-Selective-Unpack)
