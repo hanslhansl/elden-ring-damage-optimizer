@@ -2,6 +2,9 @@
 A tool for finding the highest possible attack rating for every weapon and every character level in Elden Ring.
 
 ## how it works
+#### setting the character stats
+#### applying weapon filters
+#### choosing the optimization target
 ## the algorithm
 The brute force algorithm is pretty simple: It tries every stat distribution satisfying the provided minimum stats and character level with every weapon (according to the weapon filter options) and returns the highest result.
 
