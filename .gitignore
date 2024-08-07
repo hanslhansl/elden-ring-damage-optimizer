@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # custom
-Directory.build.props
+/Directory.build.props
 
 # User-specific files
 *.rsuser
