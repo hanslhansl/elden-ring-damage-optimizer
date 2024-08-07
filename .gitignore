@@ -5,9 +5,9 @@
 
 # custom
 /Directory.build.props
-/elden-ring-damage-optimizer.sln
-/elden-ring-damage-optimizer.vcxproj
-/elden-ring-damage-optimizer.vcxproj.filters
+*.sln
+*.vcxproj
+*.vcxproj.filters
 
 # User-specific files
 *.rsuser
