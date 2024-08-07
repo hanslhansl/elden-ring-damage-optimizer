@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 #include <BS_thread_pool.hpp>
 #include <better-enums/enum.h>
+#include <pugixml.hpp>
 
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
@@ -26,10 +27,9 @@
 #include "hhh/misc.hpp"
 #include "hhh/math/functions.hpp"
 
-#pragma comment(lib, "wxbase32u.lib")
-#pragma comment(lib, "wxmsw32u_core.lib")
+//#pragma comment(lib, "wxbase32u.lib")
+//#pragma comment(lib, "wxmsw32u_core.lib")
 
-//using json = nlohmann::ordered_json;
 using json = nlohmann::json;
 
 using namespace hhh;

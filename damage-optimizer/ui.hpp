@@ -220,4 +220,10 @@ namespace ui
 
 // This defines the equivalent of main() for the current platform.
 //wxIMPLEMENT_APP(ui::MyApp);
-wxIMPLEMENT_APP_CONSOLE(ui::MyApp);
+//wxIMPLEMENT_APP_CONSOLE(ui::MyApp);
+
+int main()
+{
+    calculator::test2();
+	return 0;
+}

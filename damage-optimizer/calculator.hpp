@@ -481,13 +481,15 @@ namespace calculator
 		}
 	};
 
-	struct CalcCorrectGraphDict
+	struct CalcCorrectGraphEntry
 	{
 		int maxVal;
 		floating maxGrowVal, adjPt;
 
-		friend void from_json(const json& j, CalcCorrectGraphDict& c);
+		friend void from_json(const json& j, CalcCorrectGraphEntry& c);
+		friend void to_json(json& j, const CalcCorrectGraphEntry& c);
 	};
+	using CalcCorrectGraph = std::array<CalcCorrectGraphEntry, 5>;
 	struct ReinforceTypesDict
 	{
 		AttributeScaling attack;	// index: AttackPowerType (if in ALL_DAMAGE_TYPES)
@@ -702,7 +704,7 @@ namespace calculator
 		AttackElementCorrectsById attackElementCorrectsById{};
 		std::array<std::pair<floating, std::string>, 6> scalingTiers{};
 
-		static ScalingCurve evaluate_CalcCorrectGraph(const std::vector<CalcCorrectGraphDict>& calcCorrectGraph);
+		static ScalingCurve evaluate_CalcCorrectGraph(const CalcCorrectGraph& calcCorrectGraph);
 	public:
 		std::vector<Weapon> weapons{};
 
@@ -714,7 +716,89 @@ namespace calculator
 		FilteredWeapons apply_filter(const Weapon::Filter& weapon_filter) const;
 	};
 
-	void test();
+	void test1();
+	void test2();
+
+
+	class Parser
+	{
+		using ParamRow = std::map<std::string, floating>;
+
+		// msg/engus/menu.msgbnd.dcx
+		static inline const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {
+			"regulation.bin",
+			std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx",
+			std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx",
+			std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx",
+			std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx",
+			std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx",
+			std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"
+		};
+
+		static inline const std::filesystem::path attackElementCorrectFile = "AttackElementCorrectParam.param";
+		static inline const std::filesystem::path calcCorrectGraphFile = "CalcCorrectGraph.param";
+		static inline const std::filesystem::path equipParamWeaponFile = "EquipParamWeapon.param";
+		static inline const std::filesystem::path reinforceParamWeaponFile = "ReinforceParamWeapon.param";
+		static inline const std::filesystem::path spEffectFile = "SpEffectParam.param";
+		static inline const std::filesystem::path menuValueTableFile = "MenuValueTableParam.param";
+		static inline const std::filesystem::path weaponNameFmgFile = "WeaponName.fmg";
+		static inline const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_dlc01.fmg";
+		static inline const std::filesystem::path menuTextFmgFile = "GR_MenuText.fmg";
+
+		// AttackElementCorrectParam.param
+		static inline const std::set needed_unpacked_files = {
+			attackElementCorrectFile,
+			calcCorrectGraphFile,
+			equipParamWeaponFile,
+			reinforceParamWeaponFile,
+			spEffectFile,
+			menuValueTableFile,
+			weaponNameFmgFile,
+			dlcWeaponNameFmgFile,
+			menuTextFmgFile
+		};
+
+		static inline const std::map<size_t, calculator::Weapon::Type> wepTypeOverrides = {
+			{110000, calculator::Weapon::Type::FIST}
+		};
+
+		static std::vector<std::filesystem::path> copy_elden_ring_files(const std::filesystem::path& elden_ring, const std::filesystem::path& to);
+		static void witchy(const std::filesystem::path& witchy_exe, const std::vector<std::filesystem::path>& files);
+		static std::vector<std::filesystem::path> witchy_unpack_files(const std::filesystem::path& witchy_exe, const std::vector<std::filesystem::path>& files_to_unpack);
+		static std::vector<std::filesystem::path> witchy_to_xml(const std::filesystem::path& witchy_exe, const std::vector<std::filesystem::path>& files_to_xml);
+		static std::vector<std::filesystem::path> get_needed_unpacked_files(const std::vector<std::filesystem::path>& unpacked_directories);
+		static std::filesystem::path copy_xml_files(const std::filesystem::path& parent_path, const std::vector<std::filesystem::path>& xml_files);
+		static std::map<long long, ParamRow> read_param_xml(const std::filesystem::path& file_path);
+		static std::map<long long, std::string> read_fmg_xml(const std::filesystem::path& file_path);
+
+		static bool is_unique_weapon(const ParamRow& row);
+		static bool is_supported_weapon_type(size_t weapon_type);
+
+
+		std::map<long long, ParamRow> attackElementCorrectParams;
+		std::map<long long, ParamRow> calcCorrectGraphs;
+		std::map<long long, ParamRow> equipParamWeapons;
+		std::map<long long, ParamRow> reinforceParamWeapons;
+		std::map<long long, ParamRow> spEffectParams;
+		std::map<long long, ParamRow> menuValueTableParams;
+		std::map<long long, std::string> menuText;
+		std::map<long long, std::string> weaponNames;
+		std::map<long long, std::string> dlcWeaponNames;
+
+
+		std::map<calculator::AttackPowerType, floating> parse_status_sp_effect_params(long long statusSpEffectParamId) const;
+		CalcCorrectGraph parse_calc_correct_graph(const ParamRow& row) const;
+		json parse_attack_element_correct(const ParamRow& row) const;
+		json parse_reinforce_param_weapon(const ParamRow& row) const;
+
+		json parse_weapon(const ParamRow& row) const;
+
+	public:
+		Parser(const std::filesystem::path& witchy_exe_path, const std::filesystem::path& uxm_directory);
+
+		json get_regulation_data_json();
+	};
+
 }
 
 namespace nlohmann
@@ -730,6 +814,12 @@ namespace nlohmann
 
 				m[apt] = val.get<T>();
 			}
+		}
+		static void to_json(json& j, const calculator::map<calculator::AttackPowerType, T>& m)
+		{
+			j = json::object();
+			for (const auto& [apt, val] : m)
+				j[std::to_string(apt._to_integral())] = val;
 		}
 	};
 
@@ -747,16 +837,19 @@ namespace nlohmann
 	struct adl_serializer<calculator::Stats>
 	{
 		static void from_json(const json& j, calculator::Stats& s);
+		static void to_json(json& j, const calculator::Stats& s);
 	};
 	template<>
 	struct adl_serializer<calculator::Attribute>
 	{
 		static calculator::Attribute from_json(const json& j);
+		static void to_json(json& j, const calculator::Attribute& opt);
 	};
 	template<>
 	struct adl_serializer<calculator::AttackPowerType>
 	{
 		static calculator::AttackPowerType from_json(const json& j);
+		static void to_json(json& j, const calculator::AttackPowerType& opt);
 	};
 	template<>
 	struct adl_serializer<calculator::Weapon::Affinity>
@@ -769,4 +862,3 @@ namespace nlohmann
 		static calculator::Weapon::Type from_json(const json& j);
 	};
 }
-

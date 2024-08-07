@@ -869,8 +869,6 @@ void ui::MainFrame::OnAbout(wxCommandEvent& event)
         // open github
         wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer");
     }
-
-    //wxMessageBox("created by hanslhansl", "about elden ring damage optimizer", wxOK | wxCANCEL | wxICON_NONE);
 }
 
 ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optimizer")
