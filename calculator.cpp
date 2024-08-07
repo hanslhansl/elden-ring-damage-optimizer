@@ -1030,6 +1030,8 @@ json calculator::Parser::get_regulation_data_json()
 		{ "weapons", weapons_json }
 	};
 
+	misc::printl("\nsuccessfully generated regulation data file");
+
 	return regulation_data_json;
 }
 

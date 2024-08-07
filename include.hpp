@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <variant>
+#include <fstream>
 
 #include <nlohmann/json.hpp>
 #include <BS_thread_pool.hpp>

@@ -460,7 +460,7 @@ void ui::MainFrame::brute_force()
     this->set_result_attack_rating(attack_rating, new_full_stats);
 
     // print stats
-    if (attack_rating.weapon)
+    /*if (attack_rating.weapon)
     {
         misc::printl();
         misc::print("stats: ");
@@ -487,7 +487,7 @@ void ui::MainFrame::brute_force()
 
         misc::printl("spell scaling: ", attack_rating.spell_scaling, "%");
         misc::printl();
-    }
+    }*/
 }
 
 void ui::MainFrame::update_variation_labels()
@@ -879,7 +879,7 @@ void ui::MainFrame::OnGenerateRegulation(wxCommandEvent& event)
 
     auto parser = calculator::Parser(witchy_exe, uxm_target_directory);
     auto regulation_data_json = parser.get_regulation_data_json();
-    std::ofstream("new_regulation_data.json") << regulation_data_json << std::endl;
+    std::ofstream("regulation_data.json") << regulation_data_json << std::endl;
 }
 
 void ui::MainFrame::OnExit(wxCommandEvent& event)
