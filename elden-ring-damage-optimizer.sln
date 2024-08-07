@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "damage-optimizer", "damage-optimizer\damage-optimizer.vcxproj", "{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "elden-ring-damage-optimizer", "elden-ring-damage-optimizer.vcxproj", "{256E90E2-E798-479C-BC89-D766E62BDE63}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,19 +13,19 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Debug|x64.ActiveCfg = Debug|x64
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Debug|x64.Build.0 = Debug|x64
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Debug|x86.ActiveCfg = Debug|Win32
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Debug|x86.Build.0 = Debug|Win32
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Release|x64.ActiveCfg = Release|x64
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Release|x64.Build.0 = Release|x64
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Release|x86.ActiveCfg = Release|Win32
-		{4AA5D1B6-359D-4A49-B4DE-91D493093CFE}.Release|x86.Build.0 = Release|Win32
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Debug|x64.ActiveCfg = Debug|x64
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Debug|x64.Build.0 = Debug|x64
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Debug|x86.ActiveCfg = Debug|Win32
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Debug|x86.Build.0 = Debug|Win32
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Release|x64.ActiveCfg = Release|x64
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Release|x64.Build.0 = Release|x64
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Release|x86.ActiveCfg = Release|Win32
+		{256E90E2-E798-479C-BC89-D766E62BDE63}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {72D23BE3-68CE-415D-8F4E-A68F15F3B767}
+		SolutionGuid = {C5958DA9-A4C3-4D02-B845-79594D05383A}
 	EndGlobalSection
 EndGlobal
