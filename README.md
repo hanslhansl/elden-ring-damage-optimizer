@@ -68,4 +68,8 @@ The dependencies are:
 - [zeux/pugixml](https://github.com/zeux/pugixml)
 - [wxWidgets](https://github.com/wxWidgets/wxWidgets)
 
-all of which are available on [vcpkg](https://vcpkg.io/)
+all of which are available on [vcpkg](https://vcpkg.io/).
+
+The project is tested with both msvc as well as clang. Getting clang to run with vpkg requires a bit of tinkering though.
+
+The releases are built with clang because of the better code gen.
