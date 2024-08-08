@@ -3,7 +3,7 @@ A tool for finding the best stat distribution to maximize your attack rating for
 
 ## how it works
 #### loading the raw data
-
+To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. You can also [generate your own](#updating-the-regulation-data).
 #### setting the character stats
 ![character stats](images/character_stats.png)
 
