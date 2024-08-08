@@ -3,6 +3,7 @@ A tool for finding the highest possible attack rating for every weapon and every
 
 ## how it works
 #### setting the character stats
+![character stats](images/character_stats.png)
 #### applying weapon filters
 #### choosing the optimization target
 ## the algorithm
