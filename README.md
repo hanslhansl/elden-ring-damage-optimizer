@@ -40,6 +40,8 @@ The *brute force* button starts the algorithm and *eta* will give an approximati
 The *v2* algorithm isn't implemented as of yet.
 #### the result
 ![result](images/result.png)
+
+The result panel displays the result of the optimization. It also allows you to adjust the result if you aren't happy with it and immediatelly displays the updated attack rating.
 ## the algorithm
 The brute force algorithm is pretty simple: It tries every stat distribution (satisfying the provided minimum stats and character level) with every weapon (according to the weapon filter options) and returns the highest result.
 
