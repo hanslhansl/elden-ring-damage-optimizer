@@ -13,6 +13,7 @@ Note that the algorithm maximizes the attack rating by finding the best point di
 
 The *stat variations* field displays how many ways there are to spread the available attribute points across the 5 relevant attributes. This value depends on the character level and the minimum stats you provide. The higher this value, the more stat variations the algorithm has to check (per weapon) and the longer it will take (further explained under [the algorithm](#the-algorithm)). You can lower this number (and execution time) by being more specific with your minimum stats.
 ### applying weapon filters
+![weapon filters](images/weapon_filters.png)
 ### choosing the optimization target
 ## the algorithm
 The brute force algorithm is pretty simple: It tries every stat distribution (satisfying the provided minimum stats and character level) with every weapon (according to the weapon filter options) and returns the highest result.
