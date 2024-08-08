@@ -2,7 +2,9 @@
 A tool for finding the best stat distribution to maximize your attack rating for every weapon in Elden Ring.
 
 ## how it works
-### setting the character stats
+#### loading the raw data
+To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. You can also [generate your own](#updating-the-regulation-data).
+#### setting the character stats
 ![character stats](images/character_stats.png)
 
 Enter your character's level into the *character level* widget. Simple. For a PVP build this will be 150. The widget *attribute points* denotes how many attribute points you have available to spread across the 8 attributes. A character at level 150 has 229 attribute points.
@@ -12,8 +14,32 @@ The *minimum stats* panel allows you to set the minimum stats you want your char
 Note that the algorithm maximizes the attack rating by finding the best point distribution across *strength*, *dexterity*, *intelligence*, *faith* and *arcaine*. As *vigor*, *mind* and *endurance* don't affect the attack rating the optimized stat distribution will have the same number of points across these 3 attributes as the minimum stats you provide here.
 
 The *stat variations* field displays how many ways there are to spread the available attribute points across the 5 relevant attributes. This value depends on the character level and the minimum stats you provide. The higher this value, the more stat variations the algorithm has to check (per weapon) and the longer it will take (further explained under [the algorithm](#the-algorithm)). You can lower this number (and execution time) by being more specific with your minimum stats.
-### applying weapon filters
-### choosing the optimization target
+#### applying weapon filters
+![weapon filters](images/weapon_filters.png)
+
+Usually you're not interested in the highest attack rating out of all weapons. Maybe you already know that you want a *Light Greatsword* build? Or maybe even more specific, a *Milady* build? Anyhow, these widgets allow you to run the optimization only on the weapons you are interested in. Selecting none of the options equals selecting all of them.
+
+The *weapons* field displays the number of currently selected weapons. The more specific you are with your filters, the lower this number and the lower the algorithm's execution time.
+#### miscellaneous
+![misc](images/misc.png)
+
+Choose the upgrade level to optimize for and whether you plan on two-handing your weapon.
+#### choosing the optimization target
+![optimization target](images/optimization_target.png)
+
+Choose what metric to optimize for. The most important metric is of course the total attack power rating. The second option allows you to optimize for a specific attack power type. This is especially useful if you are fighting a boss vulnerable to e.g. fire damage. If you want to maximize status effect build up you can choose the third option. The fourth option is useful for magic builds.
+#### starting the optimization
+![optimization target](images/start_the_optimization.png)
+
+The *variations* field is a good indicator for how computationally expensive the optimization will be as it displays the total number of attack ratings the algorithm has to calculate and then pick the single best one.
+
+The *threads* widget allows you to choose how many threads you want to dedicate to  the algorithm. If you choose 0 it will autodetect the number of threads.
+
+The *brute force* button starts the algorithm and *eta* will give an approximation for how long it will take (in seconds). This approximation should be taken with a grain of salt. The best way to find out is to just try it.
+
+The *v2* algorithm isn't implemented as of yet.
+#### the result
+![result](images/result.png)
 ## the algorithm
 The brute force algorithm is pretty simple: It tries every stat distribution (satisfying the provided minimum stats and character level) with every weapon (according to the weapon filter options) and returns the highest result.
 
