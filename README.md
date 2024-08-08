@@ -70,6 +70,6 @@ The dependencies are:
 
 all of which are available on [vcpkg](https://vcpkg.io/).
 
-The project is tested with both msvc as well as clang. Getting clang to run with vpkg requires a bit of tinkering though.
+The project is tested with both msvc as well as clang. Getting clang to run with vcpkg requires a bit of tinkering though.
 
 The releases are built with clang because of the better code gen.
