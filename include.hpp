@@ -24,8 +24,9 @@
 #include <wx/progdlg.h>
 #include <wx/generic/stattextg.h>
 
-//#pragma comment(lib, "wxbase32u.lib")
-//#pragma comment(lib, "wxmsw32u_core.lib")
+#pragma comment(lib, "pugixml.lib")
+#pragma comment(lib, "wxbase32u.lib")
+#pragma comment(lib, "wxmsw32u_core.lib")
 
 using json = nlohmann::json;
 
