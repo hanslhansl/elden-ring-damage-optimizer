@@ -1,11 +1,19 @@
 # elden-ring-damage-optimizer
-A tool for finding the highest possible attack rating for every weapon and every character level in Elden Ring.
+A tool for finding the best stat distribution to maximize your attack rating for every weapon in Elden Ring.
 
 ## how it works
-#### setting the character stats
+### setting the character stats
 ![character stats](images/character_stats.png)
-#### applying weapon filters
-#### choosing the optimization target
+
+Enter your character's level into the *character level* widget. Simple. For a PVP build this will be 150. The widget *attribute points* denotes how many attribute points you have available to spread across the 8 attributes. A character at level 150 has 229 attribute points.
+
+The *minimum stats* panel allows you to set the minimum stats you want your character to have. Your starting class (which you can set with the drop-down menu) will be the absolute baseline for this. If, let's say, you want your character to have 40 *vigor*, 25 *endurance* and 25 *faith* (to cast *Golden Vow*) you would enter those values in the corresponding fields and set the other 5 fields according to your starting class.
+
+Note that the algorithm maximizes the attack rating by finding the best point distribution across *strength*, *dexterity*, *intelligence*, *faith* and *arcaine*. As *vigor*, *mind* and *endurance* don't affect the attack rating the optimized stat distribution will have the same number of points across these 3 attributes as the minimum stats you provide here.
+
+The *stat variations* field displays how many ways there are to spread the available attribute points across the 5 relevant attributes. This value depends on the character level and the minimum stats you provide. The higher this value, the more stat variations the algorithm has to check (per weapon) and the longer it will take (further explained under [the algorithm](#the-algorithm)). 
+### applying weapon filters
+### choosing the optimization target
 ## the algorithm
 The brute force algorithm is pretty simple: It tries every stat distribution (satisfying the provided minimum stats and character level) with every weapon (according to the weapon filter options) and returns the highest result.
 
