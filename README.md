@@ -31,7 +31,13 @@ Choose what metric to optimize for. The most important metric is of course the t
 #### starting the optimization
 ![optimization target](images/start_the_optimization.png)
 
-The *variations* field is a good indicator for how computationally expensive the optimization will be as it displays the total number of attack ratings the algorithm has to calculate and then pick the single best one. The *threads* widget allows you to choose how many threads you want to dedicate to  the algorithm. If you choose 0 it will autodetect the number of threads.
+The *variations* field is a good indicator for how computationally expensive the optimization will be as it displays the total number of attack ratings the algorithm has to calculate and then pick the single best one.
+
+The *threads* widget allows you to choose how many threads you want to dedicate to  the algorithm. If you choose 0 it will autodetect the number of threads.
+
+The *brute force* button starts the algorithm and *eta* will give an approximation for how long it will take (in seconds). This approximation should be taken with a grain of salt. The best way to find out is to just try it.
+
+The *v2* algorithm isn't implemented as of yet.
 #### the result
 
 ## the algorithm
