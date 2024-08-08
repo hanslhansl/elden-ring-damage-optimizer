@@ -60,3 +60,16 @@ The first step is to use UXM to unpack the Elden Ring game files as explained on
 Next, open the *damage-optimizer.exe* and in the top left navigate to *file->generate regulation file->yes*. You will be prompted to choose the directory you previously unpacked the game files to (the game directory). Afterwards you will be prompted to choose the WitchyBND.exe file. Once that is done the generation process will begin. A bunch of text will be printed to the console window (which isn't relevant as long as everything works). The process is complete once *successfully generated regulation data file* is printed to the console.
 
 The new *regulation_data.json* file will be created in same directory as the *damage-optimizer.exe* and can now be used via *file->open regulation file*.
+## buidling
+The dependencies are:
+- [nlohmann/json](https://github.com/nlohmann/json)
+- [bshoshany/thread-pool](https://github.com/bshoshany/thread-pool)
+- [aantron/better-enums](https://github.com/aantron/better-enums)
+- [zeux/pugixml](https://github.com/zeux/pugixml)
+- [wxWidgets](https://github.com/wxWidgets/wxWidgets)
+
+all of which are available on [vcpkg](https://vcpkg.io/).
+
+The project is tested with both msvc as well as clang. Getting clang to run with vcpkg requires a bit of tinkering though.
+
+The releases are built with clang because of the better code gen.
