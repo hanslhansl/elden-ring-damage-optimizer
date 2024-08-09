@@ -61,6 +61,8 @@ Next, open the *damage-optimizer.exe* and in the top left navigate to *file->gen
 
 The new *regulation_data.json* file will be created in same directory as the *damage-optimizer.exe* and can now be used via *file->open regulation file*.
 ## buidling
+The project requires C++23 because I am using some of the new std::ranges algorithms.
+
 The dependencies are:
 - [nlohmann/json](https://github.com/nlohmann/json)
 - [bshoshany/thread-pool](https://github.com/bshoshany/thread-pool)
@@ -69,7 +71,7 @@ The dependencies are:
 - [wxWidgets](https://github.com/wxWidgets/wxWidgets)
 
 all of which are available on [vcpkg](https://vcpkg.io/).
-
-The project is tested with both msvc as well as clang. Getting clang to run with vcpkg requires a bit of tinkering though.
+#### supported compilers
+The project is tested with msvc 19.40 and clang 18. Getting clang to run with vcpkg requires a bit of tinkering though.
 
 The releases are built with clang because of the better code gen.
