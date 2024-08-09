@@ -1,7 +1,7 @@
 # elden-ring-damage-optimizer
 A tool to find the optimal way to invest your levels into your attributes and maximize your attack rating with any weapon in Elden Ring.
 ## how it works
-In short: You enter your character level and choose a weapon (or weapons) and the app calculates the highest possible attack rating and the stat distribution you need to achieve it. It saves you from wasting levels on useless attributes and the cumbersome trial-and-error process of finding the best stats in *Rennala's* respec screen.
+In short: You enter your character level and choose a weapon (or weapons) and the app calculates the highest possible attack rating and the stat distribution you need to achieve it. It saves you from wasting runes on useless attributes and the cumbersome trial-and-error process of finding the best stats in *Rennala's* respec screen.
 #### loading the raw data
 The raw weapon stats are saved in a regulation data file. To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. Alternatively, you can also [generate your own](#updating-the-regulation-data).
 #### setting the character stats
