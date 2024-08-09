@@ -47,7 +47,7 @@ The brute force algorithm is pretty simple: It tries every stat distribution (sa
 
 There are 3216 weapons in Elden Ring (counting every affinity as a unique weapon). That in itself wouldn't be a challenge for today's cpus. The algorithm's computing time is mainly driven by the number of different stat distributions. Depending on the minimum stats and character level provided by the user the number of stat distributions can be as high as 57.538.251 (at character level 174 and all minimum stats at 1). $57.538.251 * 3216 = 185.043.015.216$ total variations to iterate over. That's a lot. Even after all the tinkering I did my PC still takes ~10 minutes for this (unrealistic) worst case scenario (with 13 allocated threads).
 
-The solution: Don't apply the brute force algorithm to all weapons at the same time. Use the weapon filters to limit the optimization to e.g. just one weapon type or maybe even to a single weapon. The further you are away from character level 174 (be it above or below) and all minimum stats at 1 the less time it will take too.
+The solution: Don't apply the brute force algorithm to all weapons at the same time. Use the weapon filters to limit the optimization to e.g. just one weapon type or maybe even to a single weapon. Also, the further away from character level 174 (be it above or below) you are and the higher the minimum stats are the less time it will take.
 
 Actually, there is another solution: A smarter algorithm. I'm working on it.
 ## updating the regulation data
