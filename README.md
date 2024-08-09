@@ -17,7 +17,7 @@ The *stat variations* field displays how many ways there are to spread the avail
 #### applying weapon filters
 ![weapon filters](images/weapon_filters.png)
 
-Usually you're not interested in the highest attack rating out of all weapons. Maybe you already know that you want a *Light Greatsword* build? Or maybe even more specific, a *Milady* build? Anyhow, these widgets allow you to run the optimization only on the weapons you are interested in. Selecting none of the options equals selecting all of them.
+Maybe you are not interested in the highest attack rating out of all weapons. Maybe you already know that you want a *Light Greatsword* build? Or maybe even more specific, a *Milady* build? Anyhow, these widgets allow you to run the optimization only on the weapons you are interested in. If you select none of the options no filter will be applied.
 
 The *weapons* field displays the number of currently selected weapons. The more specific you are with your filters, the lower this number and the lower the algorithm's execution time.
 #### miscellaneous
