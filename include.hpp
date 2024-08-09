@@ -17,6 +17,8 @@
 #include <better-enums/enum.h>
 #include <pugixml.hpp>
 
+#include <wx/setup.h>
+
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
 #include <wx/activityindicator.h>
@@ -25,8 +27,6 @@
 #include <wx/generic/stattextg.h>
 
 #pragma comment(lib, "pugixml.lib")
-#pragma comment(lib, "wxbase32u.lib")
-#pragma comment(lib, "wxmsw32u_core.lib")
 
 using json = nlohmann::json;
 
