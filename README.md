@@ -1,5 +1,5 @@
 # elden-ring-damage-optimizer
-A tool for finding the best stat distribution to maximize your attack rating for every weapon in Elden Ring.
+A tool to find the optimal stat distribution for maximizing attack rating with any weapon in Elden Ring.
 
 ## how it works
 #### loading the raw data
