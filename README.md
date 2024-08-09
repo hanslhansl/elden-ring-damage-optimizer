@@ -11,7 +11,7 @@ The *minimum stats* panel allows you to set the minimum stats you want your char
 
 Note that the algorithm maximizes the attack rating by finding the best point distribution across *strength*, *dexterity*, *intelligence*, *faith* and *arcaine*. As *vigor*, *mind* and *endurance* don't affect the attack rating the result will have the same number of points across these 3 attributes as the minimum stats you provide here.
 
-Enter your character's level into the *character level* widget. Simple. For a PVP build this will be 150. The widget *attribute points* denotes how many attribute points you have available to spread across the 8 attributes. A character at level 150 has 229 attribute points.
+Enter your character's level into the *character level* widget. Simple. For a pvp build this will be 150. The widget *attribute points* denotes how many attribute points you have available to spread across the 8 attributes. A character at level 150 has 229 attribute points.
 
 The *stat variations* field displays how many ways there are to spread the available attribute points across the 5 relevant attributes. This value depends on the character level and the minimum stats you provide. The higher this value, the more stat variations the algorithm has to check (per weapon) and the longer it will take (further explained under [the algorithm](#the-algorithm)). You can lower this number (and execution time) by being more specific with your minimum stats.
 #### applying weapon filters
