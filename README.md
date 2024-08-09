@@ -1,9 +1,9 @@
 # elden-ring-damage-optimizer
 A tool to find the optimal way to invest your levels into your attributes and maximize your attack rating with any weapon in Elden Ring.
-
 ## how it works
+In short: You enter your character level and choose a weapon (or weapons) and the app calculates the highest possible attack rating and the stat distribution you need to achieve it. It saves you from wasting levels on useless attributes and the cumbersome trial-and-error process of finding the best stats in *Rennala's* respec screen.
 #### loading the raw data
-To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. You can also [generate your own](#updating-the-regulation-data).
+The raw weapon stats are saved in a regulation data file. To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. Alternatively, you can also [generate your own](#updating-the-regulation-data).
 #### setting the character stats
 ![character stats](images/character_stats.png)
 
@@ -11,7 +11,7 @@ Enter your character's level into the *character level* widget. Simple. For a PV
 
 The *minimum stats* panel allows you to set the minimum stats you want your character to have. Your starting class (which you can set with the drop-down menu) will be the absolute baseline for this. If, let's say, you want your character to have 40 *vigor*, 25 *endurance* and 25 *faith* (to cast *Golden Vow*) you would enter those values in the corresponding fields and set the other 5 fields according to your starting class.
 
-Note that the algorithm maximizes the attack rating by finding the best point distribution across *strength*, *dexterity*, *intelligence*, *faith* and *arcaine*. As *vigor*, *mind* and *endurance* don't affect the attack rating the optimized stat distribution will have the same number of points across these 3 attributes as the minimum stats you provide here.
+Note that the algorithm maximizes the attack rating by finding the best point distribution across *strength*, *dexterity*, *intelligence*, *faith* and *arcaine*. As *vigor*, *mind* and *endurance* don't affect the attack rating the result will have the same number of points across these 3 attributes as the minimum stats you provide here.
 
 The *stat variations* field displays how many ways there are to spread the available attribute points across the 5 relevant attributes. This value depends on the character level and the minimum stats you provide. The higher this value, the more stat variations the algorithm has to check (per weapon) and the longer it will take (further explained under [the algorithm](#the-algorithm)). You can lower this number (and execution time) by being more specific with your minimum stats.
 #### applying weapon filters
