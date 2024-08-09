@@ -1,5 +1,5 @@
 # elden-ring-damage-optimizer
-A tool to find the optimal way to invest your levels into your attributes to maximize your attack rating with any weapon in Elden Ring.
+A tool to find the optimal way to invest your levels into your attributes and maximize your attack rating with any weapon in Elden Ring.
 
 ## how it works
 #### loading the raw data
