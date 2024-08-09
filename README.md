@@ -7,7 +7,7 @@ The raw weapon stats are saved in a regulation data file. To load the regulation
 #### setting the character stats
 ![character stats](images/character_stats.png)
 
-The *minimum stats* panel allows you to set the minimum stats you want your character to have. Your starting class (which you can set with the drop-down menu) will be the absolute baseline for this. If, let's say, you want your character to have 40 *vigor*, 25 *endurance* and 25 *faith* (to cast *Golden Vow*) you would enter those values in the corresponding fields and set the other 5 fields according to your starting class.
+The *minimum stats* panel allows you to set the minimum stats you want your character to have. Your starting class (which you can set with the drop-down menu) will be the absolute baseline for this. If, let's say, you want your character to have at least 40 *vigor*, 25 *endurance* and 25 *faith* (to cast *Golden Vow*) you would enter those values in the corresponding fields and set the other 5 fields according to your starting class.
 
 Enter your character's level into the *character level* widget. Simple. For a PVP build this will be 150. The widget *attribute points* denotes how many attribute points you have available to spread across the 8 attributes. A character at level 150 has 229 attribute points.
 
