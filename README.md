@@ -60,8 +60,12 @@ The first step is to use UXM to unpack the Elden Ring game files as explained on
 Next, open the *damage-optimizer.exe* and in the top left navigate to *file->generate regulation file->yes*. You will be prompted to choose the directory you previously unpacked the game files to (the game directory). Afterwards you will be prompted to choose the WitchyBND.exe file. Once that is done the generation process will begin. A bunch of text will be printed to the console window (which isn't relevant as long as everything works). The process is complete once *successfully generated regulation data file* is printed to the console.
 
 The new *regulation_data.json* file will be created in same directory as the *damage-optimizer.exe* and can now be used via *file->open regulation file*.
+## credits
+The logic for calculating a weapon's attack rating as well as for creating the regulation data file was taken from [ThomasJClark/elden-ring-weapon-calculator](https://github.com/ThomasJClark/elden-ring-weapon-calculator). This project would not have been possible without that help. Thank You.
+
+Thank you to the developers of the dependencies listed below too.
 ## buidling
-The project requires C++23 because I am using some of the new std::ranges algorithms.
+The project requires C++23 because it uses some of the new std::ranges algorithms.
 
 The dependencies are:
 - [nlohmann/json](https://github.com/nlohmann/json)
