@@ -23,6 +23,9 @@ SOFTWARE.
 ---
 
 Parts of this project are based on code from the project ThomasJClark/elden-ring-weapon-calculator (https://github.com/ThomasJClark/elden-ring-weapon-calculator), which is licensed under the MIT License.
+The following files contain the derived code:
+- calculator.hpp
+- calculator.cpp
 
 Copyright (c) 2022 Tom Clark <tom@tclark.io>
 
