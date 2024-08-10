@@ -796,7 +796,7 @@ void ui::MainFrame::OnButton(wxCommandEvent& event)
 	if (id == ID_OPTIMIZE_BRUTE_FORCE_BUTTON)
 		this->brute_force();
 	else
-		throw std::runtime_error("unknown button id");
+        wxMessageBox("This feature is not yet implemented.", "Not Implemented", wxOK | wxICON_INFORMATION);
 }
 
 void ui::MainFrame::OnRadioButton(wxCommandEvent& event)
