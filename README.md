@@ -2,6 +2,8 @@
 A tool to find the optimal way to invest your levels into your attributes and maximize your attack rating with any weapon in Elden Ring.
 ## how it works
 In short: You enter your character level and choose a weapon (or weapons) and the app calculates the highest possible attack rating and the stat distribution you need to achieve it. It saves you from wasting runes on useless attributes and the cumbersome trial-and-error process of finding the best stats in *Rennala's* respec screen.
+#### download
+Download the lates [release](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). Choose the *elden-ring-damage-optimizer-vx.x.zip* and unzip it afterwards. It contains two files: The executable file and a .json file which contains the raw data. Start the executable. Windows will tell you that this application is unrecognized and might put your pc at risk. It won't, of course, but unfortunatelly, there is nothing I can do about this pop-up. If you decide to trust me press *More info* and *Run anyway*. If you don't trust me and know how to you can [build](#building) this project by yourself.
 #### loading the raw data
 The raw weapon stats are saved in a regulation data file. To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. Alternatively, you can also [generate your own](#updating-the-regulation-data).
 #### setting the character stats
@@ -64,7 +66,7 @@ The new *regulation_data.json* file will be created in same directory as the *da
 The logic for calculating a weapon's attack rating as well as for creating the regulation data file was taken from [ThomasJClark/elden-ring-weapon-calculator](https://github.com/ThomasJClark/elden-ring-weapon-calculator). This project would not have been possible without that help. Thank You.
 
 Thank you to the developers of the dependencies listed below too.
-## buidling
+## building
 The project requires C++23 because it uses some of the new std::ranges algorithms.
 
 The dependencies are:
