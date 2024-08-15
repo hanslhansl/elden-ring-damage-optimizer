@@ -16,6 +16,7 @@ namespace ui
     {
         ID_LOAD_REGULATION = 1,
         ID_GENERATE_REGULATION,
+        ID_CHECK_FOR_UPDATES,
 
         ID_STAT_CLASS_CHOICE,
         ID_STAT_SPINCTRLS,
@@ -212,6 +213,7 @@ namespace ui
         void OnGenerateRegulation(wxCommandEvent& event);
         void OnExit(wxCommandEvent& event);
         void OnAbout(wxCommandEvent& event);
+        void OnCheckForUpdates(wxCommandEvent& event);
 
     public:
         MainFrame();

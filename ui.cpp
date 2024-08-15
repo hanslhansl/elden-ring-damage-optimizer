@@ -901,6 +901,31 @@ void ui::MainFrame::OnAbout(wxCommandEvent& event)
         wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer");
 }
 
+void ui::MainFrame::OnCheckForUpdates(wxCommandEvent& event)
+{
+    std::string user = "hanslhansl";
+    std::string repo = "elden-ring-damage-optimizer";
+    std::string url = "https://api.github.com/repos/" + user + "/" + repo + "/releases/latest";
+
+    // Perform a GET request using CPR
+    cpr::Response r = cpr::Get(cpr::Url{ url }, cpr::Header{ {"accept", "application/vnd.github+json"} });
+
+    if (r.status_code != 200)
+    {
+		wxLogError("failed to check for updates");
+		return;
+    }
+
+    auto newest_tag_name = json::parse(r.text).at("tag_name").get<std::string>();
+    
+    auto msg = "installed version: " + std::string(current_tag_name) + "\nlatest version: " + newest_tag_name + "\n\nopen download page?";
+    wxMessageDialog dialog(this, msg, "check for updates", wxOK | wxCANCEL | wxICON_NONE);
+    dialog.SetOKCancelLabels("yes", "cancel");
+
+    if (dialog.ShowModal() == wxID_OK)
+        wxLaunchDefaultBrowser("https://github.com/hanslhansl/elden-ring-damage-optimizer/releases");
+}
+
 ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optimizer")
 {
     wxMenu* menuFile = new wxMenu;
@@ -910,6 +935,7 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     menuFile->Append(wxID_EXIT, "&quit", "quit this program");
 
     wxMenu* menuHelp = new wxMenu;
+    menuHelp->Append(ID_CHECK_FOR_UPDATES, "&check for updates");
     menuHelp->Append(wxID_ABOUT, "&about");
 
     wxMenuBar* menuBar = new wxMenuBar;
@@ -923,8 +949,9 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
 
     Bind(wxEVT_MENU, &MainFrame::OnLoadRegulation, this, ID_LOAD_REGULATION);
     Bind(wxEVT_MENU, &MainFrame::OnGenerateRegulation, this, ID_GENERATE_REGULATION);
-    Bind(wxEVT_MENU, &MainFrame::OnAbout, this, wxID_ABOUT);
     Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
+    Bind(wxEVT_MENU, &MainFrame::OnCheckForUpdates, this, ID_CHECK_FOR_UPDATES);
+    Bind(wxEVT_MENU, &MainFrame::OnAbout, this, wxID_ABOUT);
 
 
     auto root_panel = new wxPanel(this);

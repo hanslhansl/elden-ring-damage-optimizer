@@ -3,6 +3,7 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
+#define NOMINMAX
 
 #include <set>
 #include <map>
@@ -16,6 +17,8 @@
 #include <BS_thread_pool.hpp>
 #include <better-enums/enum.h>
 #include <pugixml.hpp>
+#include <cpr/cpr.h>
+
 
 #include <wx/setup.h>
 
@@ -27,8 +30,15 @@
 #include <wx/generic/stattextg.h>
 
 #pragma comment(lib, "pugixml.lib")
+#pragma comment(lib, "cpr.lib")
+#pragma comment(lib, "libcurl.lib")
+#pragma comment(lib, "zlib.lib")
+#pragma comment(lib, "Crypt32.lib")
 
 using json = nlohmann::json;
+
+
+constexpr auto current_tag_name = "v2.0";
 
 namespace misc
 {

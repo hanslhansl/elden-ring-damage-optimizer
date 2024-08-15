@@ -798,7 +798,6 @@ namespace calculator
 
 		json get_regulation_data_json();
 	};
-
 }
 
 namespace nlohmann
