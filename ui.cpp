@@ -355,10 +355,18 @@ void ui::MainFrame::brute_force()
         - full_stats.at(0)
         - full_stats.at(1)
         - full_stats.at(2);
+
     auto stat_variations = calculator::get_stat_variations(available_attribute_points, min_stats);
+	auto stat_variation_count = stat_variations.size();
+
+    // weapon count
+    auto filtered_weapon_count = this->filtered_weapons.size();
 
     // upgrade levels
     auto upgrade_levels = this->upgrade_level_panel->get_upgrade_levels();
+
+    // total variations
+    auto total_variations = stat_variation_count * filtered_weapon_count;
 
     // two handing
     bool two_handing = this->two_handing_panel->two_handing_checkbox->GetValue();
@@ -369,7 +377,7 @@ void ui::MainFrame::brute_force()
     // set up attack options
     calculator::AttackOptions atk_options = { upgrade_levels, two_handing };
 
-    auto weapon_count = this->filtered_weapons.size();
+    
 
     // run optimization
     std::unique_ptr<calculator::OptimizationContext> opt_context;
@@ -417,19 +425,18 @@ void ui::MainFrame::brute_force()
         opt_context = std::make_unique<calculator::OptimizationContext>(threads, stat_variations, this->filtered_weapons, atk_options, std::type_identity<calculator::AttackRating::spell_scaling>{});
     else
         throw std::runtime_error("unknown optimization type");
-    
 
     // show a progress bar and wait for optimization to finish
     {
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
-        wxProgressDialog progressDialog("brute force", "running brute force optimization...", weapon_count, this, wxPD_APP_MODAL | wxPD_CAN_ABORT);
+        wxProgressDialog progressDialog("brute force", "running brute force optimization...", filtered_weapon_count, this, wxPD_APP_MODAL | wxPD_CAN_ABORT);
         bool was_canceled = false;
         while (opt_context->pool.wait_for(std::chrono::milliseconds(50)) == false)
         {
             if (was_canceled == false)
             {
-                auto is_canceled = !progressDialog.Update(weapon_count - opt_context->pool.get_tasks_total());
+                auto is_canceled = !progressDialog.Update(filtered_weapon_count - opt_context->pool.get_tasks_total());
                 if (is_canceled == true)
                 {
                     opt_context->pool.purge();
@@ -445,9 +452,19 @@ void ui::MainFrame::brute_force()
         }
 
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+
         if (was_canceled == false)
         {
-            this->time_per_million_variations_brute_force = (t2 - t1) * 1'000'000 / weapon_count / stat_variations.size();
+            size_t thread_count;
+            if (threads > 0)
+                thread_count = threads;
+            else if (std::thread::hardware_concurrency() > 0)
+                thread_count = std::thread::hardware_concurrency();
+            else
+                thread_count = 1;
+            auto active_thread_count = std::min(thread_count, filtered_weapon_count);
+
+			this->variations_per_second_per_thread_brute_force = total_variations / active_thread_count / std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count();
             this->update_variation_labels();
         }
     }
@@ -515,22 +532,33 @@ void ui::MainFrame::update_variation_labels()
     auto total_variations = stat_variation_count * filtered_weapon_count;
     this->optimize_panel->total_variations_text->SetLabel(std::to_string(total_variations));
 
+    // thread count
+	size_t thread_count = this->optimize_panel->threads_ctrl->GetValue();
+    if (thread_count == 0)
+    {
+        if (std::thread::hardware_concurrency() > 0)
+            thread_count = std::thread::hardware_concurrency();
+        else
+            thread_count = 1;
+    }
+    auto active_thread_count = std::min(thread_count, filtered_weapon_count);
+
     // brute force eta
-    if (this->time_per_million_variations_brute_force == std::chrono::nanoseconds::zero())
+    if (this->variations_per_second_per_thread_brute_force == 0)
         this->optimize_panel->brute_force_eta_text->SetLabel("nan");
     else
     {
-        auto eta = this->time_per_million_variations_brute_force * total_variations / 1'000'000;
-        this->optimize_panel->brute_force_eta_text->SetLabel(std::to_string(std::chrono::duration_cast<std::chrono::seconds>(eta).count()) + "s");
+        auto eta = total_variations / this->variations_per_second_per_thread_brute_force / active_thread_count;
+        this->optimize_panel->brute_force_eta_text->SetLabel(std::to_string(eta) + "s");
     }
 
     // v2 eta
-    if (this->time_per_million_variations_v2 == std::chrono::nanoseconds::zero())
+    if (this->variations_per_second_per_thread_v2 == 0)
 		this->optimize_panel->v2_eta_text->SetLabel("nan");
 	else
 	{
-		auto eta = this->time_per_million_variations_v2 * total_variations / 1'000'000;
-		this->optimize_panel->v2_eta_text->SetLabel(std::to_string(std::chrono::duration_cast<std::chrono::seconds>(eta).count()) + "s");
+		auto eta = total_variations / this->variations_per_second_per_thread_v2 / active_thread_count;
+		this->optimize_panel->v2_eta_text->SetLabel(std::to_string(eta) + "s");
 	}
 }
 
@@ -780,11 +808,7 @@ void ui::MainFrame::OnSpinCtrl(wxCommandEvent& event)
     else if (id == ID_UPGRADE_LEVEL_SPINCTRLS)
         ;
     else if (id == ID_OPTIMIZE_THREADS_SPINCTRL)
-    {
-        this->time_per_million_variations_brute_force = std::chrono::nanoseconds::zero();
-        this->time_per_million_variations_v2 = std::chrono::nanoseconds::zero();
         this->update_variation_labels();
-    }
     else
         throw std::runtime_error("unknown spin ctrl id");
 }

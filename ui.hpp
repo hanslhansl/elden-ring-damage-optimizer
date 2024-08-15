@@ -189,8 +189,11 @@ namespace ui
         OptimizePanel* optimize_panel;
         ResultPanel* result_panel;
 
-        std::chrono::duration<double> time_per_million_variations_brute_force{};
-        std::chrono::duration<double> time_per_million_variations_v2{};
+		size_t variations_per_second_per_thread_brute_force = 0;
+		size_t variations_per_second_per_thread_v2 = 0;
+
+        //std::chrono::duration<double> time_per_million_variations_per_thread_brute_force{};
+        //std::chrono::duration<double> time_per_million_variations_per_thread_v2{};
 
         void brute_force();
         void update_variation_labels();
