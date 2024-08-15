@@ -836,19 +836,21 @@ void ui::MainFrame::OnLoadRegulation(wxCommandEvent& event)
     if (openFileDialog.ShowModal() == wxID_CANCEL)
         return;
 
-    auto path = openFileDialog.GetPath();
-
-    try
+    std::filesystem::path path = openFileDialog.GetPath().ToStdString();
+    if (std::filesystem::exists(path))
     {
-        this->weapon_container = calculator::WeaponContainer(path.ToStdString());
-    }
-    catch (const std::exception& e)
-    {
-        wxLogError(e.what());
-        return;
-    }
+        try
+        {
+            this->weapon_container = calculator::WeaponContainer(path);
+        }
+        catch (const std::exception& e)
+        {
+            wxLogError(e.what());
+            return;
+        }
 
-    this->update_filter_options();
+        this->update_filter_options();
+    }
 }
 
 void ui::MainFrame::OnGenerateRegulation(wxCommandEvent& event)
@@ -974,6 +976,22 @@ ui::MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "elden ring damage optim
     Bind(wxEVT_BUTTON, &MainFrame::OnButton, this);
     Bind(wxEVT_RADIOBUTTON, &MainFrame::OnRadioButton, this);
 
+    auto path = std::filesystem::path("regulation_data.json");
+    if (std::filesystem::exists(path))
+    {
+        try
+        {
+            this->weapon_container = calculator::WeaponContainer(path);
+        }
+        catch (const std::exception& e)
+        {
+            wxLogError(e.what());
+            return;
+        }
+
+        this->update_filter_options();
+    }
+    
     this->update_variation_labels();
 }
 
