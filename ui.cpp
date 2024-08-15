@@ -377,7 +377,11 @@ void ui::MainFrame::brute_force()
     // set up attack options
     calculator::AttackOptions atk_options = { upgrade_levels, two_handing };
 
-    
+    if (total_variations == 0)
+    {
+        wxMessageBox("number of total variations is 0, no optimization possible!", "no optimization possible", wxOK | wxICON_INFORMATION);
+        return;
+    }
 
     // run optimization
     std::unique_ptr<calculator::OptimizationContext> opt_context;
@@ -464,8 +468,12 @@ void ui::MainFrame::brute_force()
                 thread_count = 1;
             auto active_thread_count = std::min(thread_count, filtered_weapon_count);
 
-			this->variations_per_second_per_thread_brute_force = total_variations / active_thread_count / std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count();
-            this->update_variation_labels();
+			auto seconds = std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count();
+            if (active_thread_count != 0 && seconds != 0)
+            {
+                this->variations_per_second_per_thread_brute_force = total_variations / active_thread_count / seconds;
+                this->update_variation_labels();
+            }
         }
     }
 
@@ -475,36 +483,6 @@ void ui::MainFrame::brute_force()
     // show stats
     auto new_full_stats = calculator::merge_stats_and_full_stats(attack_rating.stats, full_stats);
     this->set_result_attack_rating(attack_rating, new_full_stats);
-
-    // print stats
-    /*if (attack_rating.weapon)
-    {
-        misc::printl();
-        misc::print("stats: ");
-        for (auto stat : attack_rating.stats)
-            misc::print(stat, " ");
-        misc::printl("\n");
-
-        misc::printl(attack_rating.weapon->full_name, ": ", attack_rating.total_attack_power.at(2));
-        misc::printl();
-
-        misc::printl("attack rating:");
-        for (int i = 0; i < attack_rating.attack_power.size(); i++)
-            if (attack_rating.attack_power.at(i).at(2) != 0)
-                misc::printl(calculator::DamageType::_from_integral(i)._to_string(), ": ", attack_rating.attack_power.at(i).at(0), " + ", attack_rating.attack_power.at(i).at(1),
-                    " = ", attack_rating.attack_power.at(i).at(2));
-        misc::printl();
-
-        misc::printl("status effects:");
-        for (int i = 0; i < attack_rating.status_effect.size(); i++)
-            if (attack_rating.status_effect.at(i).at(2) != 0)
-                misc::printl(calculator::StatusType::_from_index(i)._to_string(), ": ", attack_rating.status_effect.at(i).at(0), " + ", attack_rating.status_effect.at(i).at(1),
-                    " = ", attack_rating.status_effect.at(i).at(2));
-        misc::printl();
-
-        misc::printl("spell scaling: ", attack_rating.spell_scaling, "%");
-        misc::printl();
-    }*/
 }
 
 void ui::MainFrame::update_variation_labels()

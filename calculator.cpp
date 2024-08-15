@@ -78,6 +78,8 @@ calculator::AttackRating::full calculator::OptimizationContext::wait_and_get_res
 	// wait for all threads to finish
 	this->pool.wait();
 
+	misc::printl();
+
 	// loop through all optional attack ratings and get the best one
 	auto loop_lambda = [](auto& vec)
 		{
