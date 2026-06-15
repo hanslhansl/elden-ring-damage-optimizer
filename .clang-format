@@ -1,0 +1,5 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+ColumnLimit: 0

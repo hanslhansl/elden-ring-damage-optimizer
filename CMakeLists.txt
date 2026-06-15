@@ -1,0 +1,82 @@
+﻿cmake_minimum_required(VERSION 4.4.0 FATAL_ERROR)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# enable C++23 modules support
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
+set(CMAKE_CXX_MODULE_STD 1)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+
+# create project
+project(elden-ring-damage-optimizer LANGUAGES CXX)
+
+# download CPM.cmake
+file(
+  DOWNLOAD
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.8/CPM.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+  EXPECTED_HASH SHA256=78ba32abdf798bc616bab7c73aac32a17bbd7b06ad9e26a6add69de8f3ae4791
+)
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
+
+# add nlohmann json
+add_compile_definitions(JSON_USE_IMPLICIT_CONVERSIONS=0)
+CPMAddPackage(
+    NAME nlohmann_json
+    GITHUB_REPOSITORY nlohmann/json
+    GIT_TAG develop
+)
+
+# add thread pool
+add_compile_definitions(BS_THREAD_POOL_IMPORT_STD)
+CPMAddPackage(
+    NAME BS_thread_pool
+    GITHUB_REPOSITORY bshoshany/thread-pool
+    VERSION 5.1.0
+    EXCLUDE_FROM_ALL
+    SYSTEM
+)
+add_library(BS_thread_pool)
+target_sources(BS_thread_pool PUBLIC FILE_SET CXX_MODULES FILES ${BS_thread_pool_SOURCE_DIR}/modules/BS.thread_pool.cppm)
+target_include_directories(BS_thread_pool PRIVATE ${BS_thread_pool_SOURCE_DIR}/include)
+
+# add better-enums
+CPMAddPackage(
+    NAME better_enums
+    GITHUB_REPOSITORY aantron/better-enums
+    GIT_TAG master
+)
+add_library(better_enums INTERFACE)
+target_include_directories(better_enums INTERFACE ${better_enums_SOURCE_DIR})
+
+# add pugixml
+add_compile_definitions(PUGIXML_HEADER_ONLY)
+CPMAddPackage(
+    NAME pugixml
+    GITHUB_REPOSITORY zeux/pugixml
+    VERSION 1.15
+)
+
+# set up source files
+set(SRC_DIR "src")
+add_executable(elden-ring-damage-optimizer)
+target_sources(elden-ring-damage-optimizer 
+    PUBLIC FILE_SET CXX_MODULES
+        BASE_DIRS ${SRC_DIR}
+        FILES
+        ${SRC_DIR}/calculator.ixx
+        # ${SRC_DIR}/ui.ixx
+)
+
+target_link_libraries(elden-ring-damage-optimizer PRIVATE
+    # nlohmann_json_modules
+    nlohmann_json::nlohmann_json
+    BS_thread_pool
+    better_enums
+    pugixml::pugixml
+)
+
+# find_package(wxWidgets CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE wx::core wx::base)
