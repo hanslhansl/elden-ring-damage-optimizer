@@ -1,11 +1,11 @@
-﻿cmake_minimum_required(VERSION 4.4.0 FATAL_ERROR)
+﻿cmake_minimum_required(VERSION 4.3.0 FATAL_ERROR)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 26)
 
 # enable C++23 modules support
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
 set(CMAKE_CXX_MODULE_STD 1)
-set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
@@ -14,10 +14,10 @@ project(elden-ring-damage-optimizer LANGUAGES CXX)
 
 # download CPM.cmake
 file(
-  DOWNLOAD
-  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.8/CPM.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
-  EXPECTED_HASH SHA256=78ba32abdf798bc616bab7c73aac32a17bbd7b06ad9e26a6add69de8f3ae4791
+    DOWNLOAD
+    https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.8/CPM.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+    EXPECTED_HASH SHA256=78ba32abdf798bc616bab7c73aac32a17bbd7b06ad9e26a6add69de8f3ae4791
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
@@ -69,6 +69,7 @@ target_sources(elden-ring-damage-optimizer
         ${SRC_DIR}/calculator.ixx
         # ${SRC_DIR}/ui.ixx
 )
+target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
 
 target_link_libraries(elden-ring-damage-optimizer PRIVATE
     # nlohmann_json_modules

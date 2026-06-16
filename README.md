@@ -3,7 +3,7 @@ A tool to find the optimal way to invest your levels into your attributes and ma
 ## how it works
 In short: You enter your character level and choose a weapon (or weapons) and the app calculates the highest possible attack rating and the stat distribution you need to achieve it. It saves you from wasting runes on useless attributes and the cumbersome trial-and-error process of finding the best stats in *Rennala's* respec screen.
 #### download
-Download the latest [release](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). Choose the *elden-ring-damage-optimizer-vx.x.zip* and unzip it afterwards. It contains two files: The executable file and a .json file which contains the raw data. Start the executable. Windows will tell you that this application is unrecognized and might put your pc at risk. It won't, of course, but unfortunatelly, there is nothing I can do about this pop-up. If you decide to trust me press *More info* and *Run anyway*. If you don't trust me and know how to you can [build](#building) this project by yourself.
+Download the latest [release](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). Choose the *elden-ring-damage-optimizer-vx.x.zip* and unzip it afterwards. It contains two files: The executable file and a .json file which contains the raw data. Start the executable. Windows will tell you that this application is unrecognized and might put your pc at risk. It won't, of course, but unfortunatelly, there is nothing I can do about this pop-up. If you decide to trust me press *More info* and *Run anyway*. You can also [build](#building) this project by yourself.
 #### loading the raw data
 The raw weapon stats are saved in a regulation data file. To load the regulation data file choose *file->open reulation file* and load the *regulation_data.json* that comes with with this tool. Alternatively, you can also [generate your own](#updating-the-regulation-data).
 #### setting the character stats
@@ -53,11 +53,15 @@ The solution: Don't apply the brute force algorithm to all weapons at the same t
 
 Actually, there is another solution: A smarter algorithm. I'm working on it.
 ## updating the regulation data
-The included [regulation data file](new_regulation_data.json) contains all the necessary raw data. If, however, this file becomes outdated (e.g. because of an Elden Ring update) or if you are playing on an old version of the game you might want to generate your own regulation data file. To do this you'll need
-- [UXM Selective Unpacker](https://github.com/Nordgaren/UXM-Selective-Unpack)
+The included [regulation data file](new_regulation_data.json) contains the necessary raw data. If, however, this file becomes outdated (e.g. because of an Elden Ring update) or if you are playing on an old version of the game you might want to generate your own regulation data file. To do this you'll need
 - [WitchyBND](https://github.com/ividyon/WitchyBND)
+- a FromSoftware gamedata unpacker
 
-The first step is to use UXM to unpack the Elden Ring game files as explained on their Github page. AFAIK they are always unpacked directly into the game directory.
+It's best to follow the instructions provided by WitchyBND and your gamedata unpacker of choice but the general workflow will be like this:
+1. use the gamedata unpacker to unpack the Elden Ring game files (either directly in the Elden Ring game directory or a seperate directory)
+2. 
+
+
 
 Next, open the *damage-optimizer.exe* and in the top left navigate to *file->generate regulation file->yes*. You will be prompted to choose the directory you previously unpacked the game files to (the game directory). Afterwards you will be prompted to choose the WitchyBND.exe file. Once that is done the generation process will begin. A bunch of text will be printed to the console window (which isn't relevant as long as everything works). The process is complete once *successfully generated regulation data file* is printed to the console.
 

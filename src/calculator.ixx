@@ -1,4 +1,5 @@
 module;
+#include <meta>
 #include <enum.h>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -46,7 +47,8 @@ struct std::formatter<nlohmann::json, char> : std::formatter<std::string_view, c
 };
 
 template <>
-struct std::formatter<std::filesystem::path> : std::formatter<std::string> {
+struct std::formatter<std::filesystem::path> : std::formatter<std::string>
+{
 
     // parse format specs (reuse string formatter behavior)
     constexpr auto parse(std::format_parse_context& ctx) {
@@ -59,6 +61,34 @@ struct std::formatter<std::filesystem::path> : std::formatter<std::string> {
         return std::formatter<std::string>::format(p.string(), ctx);
     }
 };
+
+template<typename E, typename D = std::nullopt_t>
+    requires (std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
+constexpr std::string_view enum_to_string(E value, D default_ = std::nullopt)
+{
+    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E)))
+        if (value == [:e:])
+            return std::meta::identifier_of(e);
+
+    if constexpr (std::same_as<D, std::nullopt_t>)
+        throw std::invalid_argument("Value is not a valid enumerator of the enum type.");
+    else
+        return default_;
+}
+
+template<typename E, typename D = std::nullopt_t>
+    requires (std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::same_as<D, E>))
+constexpr E string_to_enum(std::string_view str, D default_ = std::nullopt)
+{
+    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E)))
+        if (str == std::meta::identifier_of(e))
+            return [:e:];
+
+    if constexpr (std::same_as<D, std::nullopt_t>)
+        throw std::invalid_argument("String does not correspond to any enumerator of the enum type.");
+    else
+        return default_;
+}
 
 namespace calculator
 {
@@ -1068,7 +1098,15 @@ namespace calculator
         using ParamRow = std::map<std::string, floating>;
 
         // msg/engus/menu.msgbnd.dcx
-        static inline const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {"regulation.bin", std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"};
+        static inline const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {
+            "regulation.bin",
+            std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx",
+            std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx",
+            std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx",
+            std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx",
+            std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx",
+            std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"
+        };
 
         static inline const std::filesystem::path attackElementCorrectFile = "AttackElementCorrectParam.param";
         static inline const std::filesystem::path calcCorrectGraphFile = "CalcCorrectGraph.param";
@@ -1081,7 +1119,17 @@ namespace calculator
         static inline const std::filesystem::path menuTextFmgFile = "GR_MenuText.fmg";
 
         // AttackElementCorrectParam.param
-        static inline const std::set needed_unpacked_files = {attackElementCorrectFile, calcCorrectGraphFile, equipParamWeaponFile, reinforceParamWeaponFile, spEffectFile, menuValueTableFile, weaponNameFmgFile, dlcWeaponNameFmgFile, menuTextFmgFile};
+        static inline const std::set needed_unpacked_files ={
+            attackElementCorrectFile,
+            calcCorrectGraphFile,
+            equipParamWeaponFile,
+            reinforceParamWeaponFile,
+            spEffectFile,
+            menuValueTableFile,
+            weaponNameFmgFile,
+            dlcWeaponNameFmgFile,
+            menuTextFmgFile
+        };
 
         static inline const std::map<size_t, calculator::Weapon::Type> wepTypeOverrides = {{110000, calculator::Weapon::Type::FIST}};
 
@@ -1096,6 +1144,7 @@ namespace calculator
                 std::ranges::replace(elden_ring_file_path_string, '/', '-');
 
                 auto new_file = to / elden_ring_file_path_string;
+                std::println("copy {} to {}", elden_ring / elden_ring_file_path, new_file);
                 std::filesystem::copy_file(elden_ring / elden_ring_file_path, new_file, std::filesystem::copy_options::overwrite_existing);
                 ret.push_back(new_file);
             }
@@ -1633,6 +1682,9 @@ namespace calculator
             return regulation_data_json;
         }
     };
+
+
+
 } // namespace calculator
 
 void test1()
@@ -1685,8 +1737,9 @@ void test2()
     // Madding Hand & Poisoned Hand differ slightly
 
     auto parser = calculator::Parser(
-        std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v2.14.0.3/WitchyBND.exe"),
-        std::filesystem::path("D:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format)
+        std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe"),
+        std::filesystem::path("F:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format)
+        // std::filesystem::path("C:/Users/Paul/Desktop/Neuer Ordner") //
     );
     auto regulation_data_json = parser.get_regulation_data_json();
 
@@ -1697,8 +1750,8 @@ void test2()
     auto status_sp_effect_params_json = regulation_data_json["statusSpEffectParams"];
     auto scaling_tiers_tson = regulation_data_json["scalingTiers"];
 
-    auto regulation_data = json::parse(std::ifstream("D:/Paul/Computer/Programmieren/C++/elden-ring-damage-optimizer/"
-                                                     "damage-optimizer/regulation-vanilla-v1.12.3.js"));
+    auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data.json";
+    auto regulation_data = json::parse(std::ifstream(regulation_file));
     auto weaponJson = regulation_data["weapons"];
     auto calcCorrectGraphs = regulation_data["calcCorrectGraphs"];
     auto attackElementCorrects = regulation_data["attackElementCorrects"];
@@ -1816,11 +1869,8 @@ void test2()
     std::this_thread::sleep_for(std::chrono::milliseconds(1000 * 1000));
 }
 
-export int main()
+extern "C++" int main()
 {
-    std::println("running tests...");
-    std::println("2");
-
-    test1();
+    test2();
     return 1;
 }
