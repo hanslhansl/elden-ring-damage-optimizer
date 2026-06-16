@@ -1,7 +1,5 @@
 module;
 #include <meta>
-#include <enum.h>
-#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <pugixml.hpp>
 export module calculator;
@@ -49,45 +47,89 @@ struct std::formatter<nlohmann::json, char> : std::formatter<std::string_view, c
 template <>
 struct std::formatter<std::filesystem::path> : std::formatter<std::string>
 {
-
     // parse format specs (reuse string formatter behavior)
-    constexpr auto parse(std::format_parse_context& ctx) {
+    constexpr auto parse(std::format_parse_context &ctx)
+    {
         return std::formatter<std::string>::parse(ctx);
     }
 
     // format the path
-    auto format(const std::filesystem::path& p,
-                std::format_context& ctx) const {
+    auto format(const std::filesystem::path &p, std::format_context &ctx) const
+    {
         return std::formatter<std::string>::format(p.string(), ctx);
     }
 };
 
-template<typename E, typename D = std::nullopt_t>
-    requires (std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
+template <typename E>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E))
+consteval auto enumerators_of()
+{
+    std::array<E, std::meta::enumerators_of(^^E).size()> r{};
+    std::size_t i = 0;
+    template for (constexpr auto info : std::define_static_array(std::meta::enumerators_of(^^E))) r[i++] = [:info:];
+    return r;
+}
+
+template <typename E, typename D = std::nullopt_t>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
 constexpr std::string_view enum_to_string(E value, D default_ = std::nullopt)
 {
-    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E)))
-        if (value == [:e:])
-            return std::meta::identifier_of(e);
+    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) if (value == [:e:]) return std::meta::identifier_of(e);
 
     if constexpr (std::same_as<D, std::nullopt_t>)
-        throw std::invalid_argument("Value is not a valid enumerator of the enum type.");
+        throw std::invalid_argument(std::format("'{}' is not a valid enumerator of enum {}", std::to_underlying(value), std::meta::display_string_of(^^E)));
     else
         return default_;
 }
 
-template<typename E, typename D = std::nullopt_t>
-    requires (std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::same_as<D, E>))
+template <typename E, typename D = std::nullopt_t>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::same_as<D, E>))
 constexpr E string_to_enum(std::string_view str, D default_ = std::nullopt)
 {
-    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E)))
-        if (str == std::meta::identifier_of(e))
-            return [:e:];
+    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) if (str == std::meta::identifier_of(e)) return [:e:];
 
     if constexpr (std::same_as<D, std::nullopt_t>)
-        throw std::invalid_argument("String does not correspond to any enumerator of the enum type.");
+        throw std::invalid_argument(std::format("string '{}' does not correspond to any enumerator of enum {}", str, std::meta::display_string_of(^^E)));
     else
         return default_;
+}
+
+template <typename E, typename D = std::nullopt_t>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::same_as<D, E>))
+constexpr E index_to_enum(std::size_t index, D default_ = std::nullopt)
+{
+    constexpr auto enumerators = enumerators_of<E>();
+
+    if (index < enumerators.size())
+        return enumerators[index];
+
+    if constexpr (std::same_as<D, std::nullopt_t>)
+        throw std::invalid_argument(std::format("index {} is out of range for enum {}", index, std::meta::display_string_of(^^E)));
+    else
+        return default_;
+}
+
+template <typename E, typename D = std::nullopt_t>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::same_as<D, E>))
+constexpr E integral_to_enum(std::underlying_type_t<E> integral, D default_ = std::nullopt)
+{
+    for (auto [i, enumerator] : enumerators_of<E>() | std::views::enumerate)
+        if (integral == std::to_underlying(enumerator))
+            return enumerator;
+
+    if constexpr (std::same_as<D, std::nullopt_t>)
+        throw std::invalid_argument(std::format("integral {} does not correspond to any enumerator of enum {}", integral, std::meta::display_string_of(^^E)));
+    else
+        return default_;
+}
+
+template <typename E>
+    requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E))
+constexpr bool is_valid_enum_integral(std::underlying_type_t<E> integral)
+{
+    template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) if (integral == std::to_underlying([:e:])) return true;
+
+    return false;
 }
 
 namespace calculator
@@ -107,27 +149,35 @@ namespace calculator
     }
     constexpr bool isVanilla = true;
 
-    BETTER_ENUM(Attribute, int, STRENGTH, DEXTERITY, INTELLIGENCE, FAITH, ARCAINE);
-    constexpr const char *attribute_to_json_string(Attribute at)
+    enum class Attribute
     {
-        switch (at)
-        {
-        case Attribute::STRENGTH:
-            return "str";
-        case Attribute::DEXTERITY:
-            return "dex";
-        case Attribute::INTELLIGENCE:
-            return "int";
-        case Attribute::FAITH:
-            return "fai";
-        case Attribute::ARCAINE:
-            return "arc";
-        }
+        STRENGTH,
+        DEXTERITY,
+        INTELLIGENCE,
+        FAITH,
+        ARCAINE
+    };
 
-        throw std::invalid_argument("invalid attribute");
+    constexpr std::string_view attribute_to_json_string(Attribute at)
+    {
+        return enum_to_string(at);
+        // switch (at)
+        // {
+        // case Attribute::STRENGTH:
+        //     return "str";
+        // case Attribute::DEXTERITY:
+        //     return "dex";
+        // case Attribute::INTELLIGENCE:
+        //     return "int";
+        // case Attribute::FAITH:
+        //     return "fai";
+        // case Attribute::ARCAINE:
+        //     return "arc";
+        // }
+
+        // throw std::invalid_argument("invalid attribute");
     }
-    constexpr auto attribute_json_string_table = better_enums::make_map(attribute_to_json_string);
-    using Stats = std::array<int, Attribute::_size()>;
+    using Stats = std::array<int, std::meta::enumerators_of(^^Attribute).size()>;
     using FullStats = std::array<int, 8>;
     constexpr Stats full_stats_to_stats(const FullStats &full_stats)
     {
@@ -138,22 +188,127 @@ namespace calculator
         return {full_stats.at(0), full_stats.at(1), full_stats.at(2), stats.at(0), stats.at(1), stats.at(2), stats.at(3), stats.at(4)};
     }
 
-    BETTER_ENUM(Class, int, HERO, BANDIT, ASTROLOGER, WARRIOR, PRISONER, CONFESSOR, WRETCH, VAGABOND, PROPHET, SAMURAI);
+    enum class Class
+    {
+        HERO,
+        BANDIT,
+        ASTROLOGER,
+        WARRIOR,
+        PRISONER,
+        CONFESSOR,
+        WRETCH,
+        VAGABOND,
+        PROPHET,
+        SAMURAI,
+    };
     const map<Class, Stats> ALL_CLASS_STATS{{Class::HERO, {16, 9, 7, 8, 11}}, {Class::BANDIT, {9, 13, 9, 8, 14}}, {Class::ASTROLOGER, {8, 12, 16, 7, 9}}, {Class::WARRIOR, {10, 16, 10, 8, 9}}, {Class::PRISONER, {11, 14, 14, 6, 9}}, {Class::CONFESSOR, {12, 12, 9, 14, 9}}, {Class::WRETCH, {10, 10, 10, 10, 10}}, {Class::VAGABOND, {14, 13, 9, 9, 7}}, {Class::PROPHET, {11, 10, 7, 16, 10}}, {Class::SAMURAI, {12, 15, 9, 8, 8}}};
 
-    BETTER_ENUM(AttackPowerType, int, PHYSICAL, MAGIC, FIRE, LIGHTNING, HOLY, POISON, SCARLET_ROT, BLEED, FROST, SLEEP, MADNESS, DEATH_BLIGHT);
+    enum class AttackPowerType
+    {
+        PHYSICAL = 0,
+        MAGIC = 1,
+        FIRE = 2,
+        LIGHTNING = 3,
+        HOLY = 4,
+        POISON = 5,
+        SCARLET_ROT = 6,
+        BLEED = 7,
+        FROST = 8,
+        SLEEP = 9,
+        MADNESS = 10,
+        DEATH_BLIGHT = 11
+    };
 
-    BETTER_ENUM(DamageType, int, PHYSICAL = AttackPowerType::PHYSICAL, MAGIC = AttackPowerType::MAGIC, FIRE = AttackPowerType::FIRE, LIGHTNING = AttackPowerType::LIGHTNING, HOLY = AttackPowerType::HOLY);
-    BETTER_ENUM(StatusType, int, POISON = AttackPowerType::POISON, SCARLET_ROT = AttackPowerType::SCARLET_ROT, BLEED = AttackPowerType::BLEED, FROST = AttackPowerType::FROST, SLEEP = AttackPowerType::SLEEP, MADNESS = AttackPowerType::MADNESS, DEATH_BLIGHT = AttackPowerType::DEATH_BLIGHT);
+    enum class DamageType
+    {
+        PHYSICAL = std::to_underlying(AttackPowerType::PHYSICAL),
+        MAGIC = std::to_underlying(AttackPowerType::MAGIC),
+        FIRE = std::to_underlying(AttackPowerType::FIRE),
+        LIGHTNING = std::to_underlying(AttackPowerType::LIGHTNING),
+        HOLY = std::to_underlying(AttackPowerType::HOLY)
+    };
+
+    enum class StatusType
+    {
+        POISON = std::to_underlying(AttackPowerType::POISON),
+        SCARLET_ROT = std::to_underlying(AttackPowerType::SCARLET_ROT),
+        BLEED = std::to_underlying(AttackPowerType::BLEED),
+        FROST = std::to_underlying(AttackPowerType::FROST),
+        SLEEP = std::to_underlying(AttackPowerType::SLEEP),
+        MADNESS = std::to_underlying(AttackPowerType::MADNESS),
+        DEATH_BLIGHT = std::to_underlying(AttackPowerType::DEATH_BLIGHT)
+    };
 
     using ScalingCurve = std::array<floating, 149>;
 
-    using AttributeScaling = std::array<floating, Attribute::_size()>;
-    using AttackElementCorrects = std::array<AttributeScaling, AttackPowerType::_size()>;
+    using AttributeScaling = std::array<floating, std::meta::enumerators_of(^^Attribute).size()>;
+    using AttackElementCorrects = std::array<AttributeScaling, std::meta::enumerators_of(^^AttackPowerType).size()>;
     using AttackElementCorrectsById = map<int, AttackElementCorrects>;
 
-    BETTER_ENUM(Affinity_, int, STANDARD = 0, HEAVY = 1, KEEN = 2, QUALITY = 3, FIRE = 4, FLAME_ART = 5, LIGHTNING = 6, SACRED = 7, MAGIC = 8, COLD = 9, POISON = 10, BLOOD = 11, OCCULT = 12, UNIQUE = -1);
-    BETTER_ENUM(Type_, int, DAGGER = 1, STRAIGHT_SWORD = 3, GREATSWORD = 5, COLOSSAL_SWORD = 7, CURVED_SWORD = 9, CURVED_GREATSWORD = 11, KATANA = 13, TWINBLADE = 14, THRUSTING_SWORD = 15, HEAVY_THRUSTING_SWORD = 16, AXE = 17, GREATAXE = 19, HAMMER = 21, GREAT_HAMMER = 23, FLAIL = 24, SPEAR = 25, GREAT_SPEAR = 28, HALBERD = 29, REAPER = 31, FIST = 35, CLAW = 37, WHIP = 39, COLOSSAL_WEAPON = 41, LIGHT_BOW = 50, BOW = 51, GREATBOW = 53, CROSSBOW = 55, BALLISTA = 56, GLINTSTONE_STAFF = 57, DUAL_CATALYST = 59, SACRED_SEAL = 61, SMALL_SHIELD = 65, MEDIUM_SHIELD = 67, GREATSHIELD = 69, TORCH = 87, HAND_TO_HAND = 88, PERFUME_BOTTLE = 89, THRUSTING_SHIELD = 90, THROWING_BLADE = 91, BACKHAND_BLADE = 92, LIGHT_GREATSWORD = 93, GREAT_KATANA = 94, BEAST_CLAW = 95);
+    enum class Affinity_
+    {
+        STANDARD = 0,
+        HEAVY = 1,
+        KEEN = 2,
+        QUALITY = 3,
+        FIRE = 4,
+        FLAME_ART = 5,
+        LIGHTNING = 6,
+        SACRED = 7,
+        MAGIC = 8,
+        COLD = 9,
+        POISON = 10,
+        BLOOD = 11,
+        OCCULT = 12,
+        UNIQUE = -1
+    };
+
+    enum class Type_
+    {
+        DAGGER = 1,
+        STRAIGHT_SWORD = 3,
+        GREATSWORD = 5,
+        COLOSSAL_SWORD = 7,
+        CURVED_SWORD = 9,
+        CURVED_GREATSWORD = 11,
+        KATANA = 13,
+        TWINBLADE = 14,
+        THRUSTING_SWORD = 15,
+        HEAVY_THRUSTING_SWORD = 16,
+        AXE = 17,
+        GREATAXE = 19,
+        HAMMER = 21,
+        GREAT_HAMMER = 23,
+        FLAIL = 24,
+        SPEAR = 25,
+        GREAT_SPEAR = 28,
+        HALBERD = 29,
+        REAPER = 31,
+        FIST = 35,
+        CLAW = 37,
+        WHIP = 39,
+        COLOSSAL_WEAPON = 41,
+        LIGHT_BOW = 50,
+        BOW = 51,
+        GREATBOW = 53,
+        CROSSBOW = 55,
+        BALLISTA = 56,
+        GLINTSTONE_STAFF = 57,
+        DUAL_CATALYST = 59,
+        SACRED_SEAL = 61,
+        SMALL_SHIELD = 65,
+        MEDIUM_SHIELD = 67,
+        GREATSHIELD = 69,
+        TORCH = 87,
+        HAND_TO_HAND = 88,
+        PERFUME_BOTTLE = 89,
+        THRUSTING_SHIELD = 90,
+        THROWING_BLADE = 91,
+        BACKHAND_BLADE = 92,
+        LIGHT_GREATSWORD = 93,
+        GREAT_KATANA = 94,
+        BEAST_CLAW = 95
+    };
 
 } // namespace calculator
 
@@ -164,11 +319,11 @@ namespace nlohmann
     {
         static calculator::Attribute from_json(const json &j)
         {
-            return calculator::attribute_json_string_table.to_enum(j.get<std::string>().c_str());
+            return string_to_enum<calculator::Attribute>(j.get<std::string_view>());
         }
-        static void to_json(json &j, const calculator::Attribute &opt)
+        static void to_json(json &j, calculator::Attribute opt)
         {
-            j = calculator::attribute_json_string_table.from_enum(opt);
+            j = enum_to_string(opt);
         }
     };
 
@@ -179,8 +334,8 @@ namespace nlohmann
         {
             for (const auto &[attr_str, val] : j.items())
             {
-                auto attr = calculator::attribute_json_string_table.to_enum(attr_str.c_str());
-                s[attr._to_integral()] = val.get<int>();
+                auto attr = string_to_enum<calculator::Attribute>(attr_str);
+                s[std::to_underlying(attr)] = val.get<int>();
             }
         }
         static void to_json(json &j, const calculator::Stats &s)
@@ -190,7 +345,7 @@ namespace nlohmann
             {
                 if (val != 0)
                 {
-                    auto attr_str = calculator::attribute_json_string_table.from_enum(calculator::Attribute::_from_integral(attr_index));
+                    auto attr_str = enum_to_string(integral_to_enum<calculator::Attribute>(attr_index));
                     j[attr_str] = val;
                 }
             }
@@ -202,11 +357,11 @@ namespace nlohmann
     {
         static calculator::AttackPowerType from_json(const json &j)
         {
-            return calculator::AttackPowerType::_from_integral(j.get<int>());
+            return integral_to_enum<calculator::AttackPowerType>(j.get<int>());
         }
-        static void to_json(json &j, const calculator::AttackPowerType &opt)
+        static void to_json(json &j, calculator::AttackPowerType opt)
         {
-            j = opt._to_integral();
+            j = std::to_underlying(opt);
         }
     };
 
@@ -217,7 +372,7 @@ namespace nlohmann
         {
             for (const auto &[apt_str, val] : j.items())
             {
-                auto apt = calculator::AttackPowerType::_from_integral(std::stoi(apt_str));
+                auto apt = integral_to_enum<calculator::AttackPowerType>(std::stoi(apt_str));
 
                 m[apt] = val.get<T>();
             }
@@ -226,7 +381,7 @@ namespace nlohmann
         {
             j = json::object();
             for (const auto &[apt, val] : m)
-                j[std::to_string(apt._to_integral())] = val;
+                j[std::to_string((std::to_underlying(apt)))] = val;
         }
     };
 
@@ -237,14 +392,15 @@ namespace nlohmann
         {
             for (auto &&[attr_str, val] : j.items())
             {
-                auto attr = calculator::attribute_json_string_table.to_enum(attr_str.c_str());
+                auto attr = string_to_enum<calculator::Attribute>(attr_str);
 
                 if (val.is_boolean())
-                    ac[attr._to_integral()] = val.get<bool>();
+                    ac[std::to_underlying(attr)] = val.get<bool>();
                 else if (val.is_number())
-                    ac[attr._to_integral()] = val.get<calculator::floating>();
+                    ac[std::to_underlying(attr)] = val.get<calculator::floating>();
                 else
-                    throw std::invalid_argument(std::string("invalid json type") + val.type_name());
+                    throw std::invalid_argument(std::string("invalid json "
+                                                            "type") + val.type_name());
             }
         }
     };
@@ -257,7 +413,7 @@ namespace nlohmann
             for (auto &&[apt_str, ac_j] : j.items())
             {
                 auto apt_int = std::stoi(apt_str);
-                auto apt = calculator::AttackPowerType::_from_integral(apt_int);
+                auto apt = integral_to_enum<calculator::AttackPowerType>(apt_int);
 
                 aec[apt_int] = ac_j.get<calculator::AttributeScaling>();
             }
@@ -269,7 +425,7 @@ namespace nlohmann
     {
         static calculator::Affinity_ from_json(const json &j)
         {
-            return calculator::Affinity_::_from_integral(j.get<int>());
+            return integral_to_enum<calculator::Affinity_>(j.get<int>());
         }
     };
 
@@ -278,7 +434,7 @@ namespace nlohmann
     {
         static calculator::Type_ from_json(const json &j)
         {
-            return calculator::Type_::_from_integral(j.get<int>());
+            return integral_to_enum<calculator::Type_>(j.get<int>());
         }
     };
 } // namespace nlohmann
@@ -294,7 +450,7 @@ namespace calculator
     {
         UpgradeLevels upgrade_levels; // free handed, normal, somber
         bool two_handing;
-        const static bool disable_two_handing_attack_power_bonus = false;
+        static const bool disable_two_handing_attack_power_bonus = false;
     };
 
     namespace AttackRating
@@ -317,7 +473,10 @@ namespace calculator
                 static constexpr bool is_total_attack_power = true;
 
                 floating total_attack_power;
-                constexpr auto value() const { return total_attack_power; }
+                constexpr auto value() const
+                {
+                    return total_attack_power;
+                }
             };
             template <AttackPowerType I>
             struct individual_attack_power : base
@@ -326,7 +485,10 @@ namespace calculator
                 static constexpr AttackPowerType attack_power_type = I;
 
                 floating individual_attack_power;
-                constexpr auto value() const { return individual_attack_power; }
+                constexpr auto value() const
+                {
+                    return individual_attack_power;
+                }
             };
             template <AttackPowerType I>
             struct individual_status_effect : base
@@ -335,14 +497,20 @@ namespace calculator
                 static constexpr AttackPowerType attack_power_type = I;
 
                 floating individual_status_effect;
-                constexpr auto value() const { return individual_status_effect; }
+                constexpr auto value() const
+                {
+                    return individual_status_effect;
+                }
             };
             struct spell_scaling : base
             {
                 static constexpr bool is_spell_scaling = true;
 
                 floating spell_scaling;
-                constexpr auto value() const { return spell_scaling; }
+                constexpr auto value() const
+                {
+                    return spell_scaling;
+                }
             };
             struct full : base
             {
@@ -352,9 +520,9 @@ namespace calculator
                 UpgradeLevels upgrade_levels;
                 bool two_handing;
 
-                std::array<floating, 3> total_attack_power;                             // a + b = c
-                std::array<std::array<floating, 3>, DamageType::_size()> attack_power;  // a + b = c
-                std::array<std::array<floating, 3>, StatusType::_size()> status_effect; // a + b = c
+                std::array<floating, 3> total_attack_power;                                                        // a + b = c
+                std::array<std::array<floating, 3>, std::meta::enumerators_of(^^DamageType).size()> attack_power;  // a + b = c
+                std::array<std::array<floating, 3>, std::meta::enumerators_of(^^StatusType).size()> status_effect; // a + b = c
                 floating spell_scaling;
                 std::vector<AttackPowerType> ineffective_attack_power_types;
                 std::vector<Attribute> ineffective_attributes;
@@ -392,7 +560,8 @@ namespace calculator
       private:
         inline static thread_local std::vector<Attribute> get_attack_rating_ineffective_attributes = []() {
             std::vector<Attribute> v{};
-            v.reserve(Attribute::_size());
+            constexpr auto size = std::meta::enumerators_of(^^Attribute).size();
+            v.reserve(size);
             return v; }();
 
       public:
@@ -450,12 +619,12 @@ namespace calculator
         // attribute (e.g. Attribute.STRENGTH)
         const std::vector<AttributeScaling> attribute_scaling;
         // base attack power at each upgrade level for each attack power type
-        const std::vector<std::array<floating, AttackPowerType::_size()>> base_attack_power;
+        const std::vector<std::array<floating, std::meta::enumerators_of(^^AttackPowerType).size()>> base_attack_power;
         // map indicating which attack power types scale with which player
         // attributes
         const AttackElementCorrectsById::mapped_type &attack_power_attribute_scaling;
         // map indicating which scaling curve is used for each attack power type
-        const std::array<const ScalingCurve *, AttackPowerType::_size()> attack_power_scaling_curves;
+        const std::array<const ScalingCurve *, std::meta::enumerators_of(^^AttackPowerType).size()> attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this
         // weapon. This isn't hardcoded for all weapons because it can be
         // changed by mods.
@@ -479,12 +648,12 @@ namespace calculator
                 two_handing = false;
 
             // Bows and ballistae can only be two handed
-            constexpr std::array<Weapon::Type, 4> bow_types = { Weapon::Type::LIGHT_BOW, Weapon::Type::BOW, Weapon::Type::GREATBOW, Weapon::Type::BALLISTA };
+            constexpr std::array<Weapon::Type, 4> bow_types = {Weapon::Type::LIGHT_BOW, Weapon::Type::BOW, Weapon::Type::GREATBOW, Weapon::Type::BALLISTA};
             if (std::ranges::contains(bow_types, this->type))
                 two_handing = true;
 
             if (two_handing)
-                stats.at(Attribute::STRENGTH) = stats.at(Attribute::STRENGTH) * 1.5;
+                stats.at(std::to_underlying(Attribute::STRENGTH)) *= 1.5;
 
             return stats;
         }
@@ -504,35 +673,35 @@ namespace calculator
                 result.two_handing = attack_options_.two_handing;
 
                 result.total_attack_power.fill({});
-                result.ineffective_attack_power_types.reserve(AttackPowerType::_size());
+                constexpr auto size = std::meta::enumerators_of(^^AttackPowerType).size();
+                result.ineffective_attack_power_types.reserve(size);
             }
 
-            for (auto attribute : Attribute::_values())
-                if (adjusted_stats[attribute._to_integral()] < this->requirements[attribute._to_integral()])
+            for (auto attribute : enumerators_of<Attribute>())
+                if (adjusted_stats[std::to_underlying(attribute)] < this->requirements[std::to_underlying(attribute)])
                     Weapon::get_attack_rating_ineffective_attributes.push_back(attribute);
 
-            auto upgrade_level = attack_options_.upgrade_levels[upgrade_level_index];
-            auto &base_attack_power_at_upgrade_level = this->base_attack_power[upgrade_level];
+            auto upgrade_level = attack_options_.upgrade_levels.at(upgrade_level_index);
+            auto &base_attack_power_at_upgrade_level = this->base_attack_power.at(upgrade_level);
 
             bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
             auto loop_cycle = [&](const AttackPowerType &attack_power_type) {
-                auto temp_index = attack_power_type._to_integral();
+                auto temp_index = std::to_underlying(attack_power_type);
                 auto base_attack_power = base_attack_power_at_upgrade_level[temp_index];
 
                 if (base_attack_power != 0 || is_sorcery_or_incantation_tool)
                 {
-                    auto is_damage_type = attack_power_type._to_integral() <= AttackPowerType::HOLY;
+                    auto is_damage_type = std::to_underlying(attack_power_type) <= std::to_underlying(AttackPowerType::HOLY);
                     auto &&scaling_attributes =
-                        this->attack_power_attribute_scaling.at(attack_power_type._to_integral());
+                        this->attack_power_attribute_scaling.at(std::to_underlying(attack_power_type));
                     floating total_scaling = 1.;
 
                     if (std::ranges::any_of(
                             Weapon::get_attack_rating_ineffective_attributes,
                             [&](Attribute ineffective_attribute)
                             {
-                                return scaling_attributes[ineffective_attribute._to_integral()] !=
-                                       0;
+                                return scaling_attributes[std::to_underlying(ineffective_attribute)] != 0;
                             }))
                     {
                         total_scaling = 1. - ineffective_attribute_penalty;
@@ -547,30 +716,29 @@ namespace calculator
                                 ? adjusted_stats
                                 : stats;
 
-                        for (auto &&attribute : Attribute::_values())
+                        for (auto &&attribute : enumerators_of<Attribute>())
                         {
                             auto &&attribute_correct =
-                                scaling_attributes.at(attribute._to_integral());
+                                scaling_attributes.at(std::to_underlying(attribute));
                             floating scaling{};
 
                             if (attribute_correct != 0)
                             {
                                 if (attribute_correct == 1)
                                     scaling = this->attribute_scaling.at(upgrade_level)
-                                                  .at(attribute._to_integral());
+                                                  .at(std::to_underlying(attribute));
                                 else
                                     scaling =
                                         attribute_correct *
                                         this->attribute_scaling.at(upgrade_level)
-                                            .at(attribute._to_integral()) /
-                                        this->attribute_scaling.at(0).at(attribute._to_integral());
+                                            .at(std::to_underlying(attribute)) /
+                                        this->attribute_scaling.at(0).at(std::to_underlying(attribute));
 
                                 if (scaling != 0.)
                                     total_scaling +=
-                                        this->attack_power_scaling_curves[attack_power_type
-                                                                              ._to_integral()]
+                                        this->attack_power_scaling_curves[std::to_underlying(attack_power_type)]
                                             ->operator[](
-                                                effective_stats[attribute._to_integral()]) *
+                                                effective_stats[std::to_underlying(attribute)]) *
                                         scaling;
                             }
                         }
@@ -596,7 +764,7 @@ namespace calculator
                                                 // <= AttackPowerType::HOLY
                             {
                                 auto &&att_pwr =
-                                    result.attack_power[attack_power_type._to_integral()];
+                                    result.attack_power[std::to_underlying(attack_power_type)];
                                 att_pwr[0] = base_attack_power;
                                 att_pwr[1] = res - base_attack_power;
                                 att_pwr[2] = res;
@@ -608,8 +776,7 @@ namespace calculator
                                  // AttackPowerType::HOLY
                             {
                                 auto &&att_pwr =
-                                    result.status_effect[attack_power_type._to_integral() -
-                                                         AttackPowerType::POISON];
+                                    result.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON)];
                                 att_pwr[0] = base_attack_power;
                                 att_pwr[1] = res - base_attack_power;
                                 att_pwr[2] = res;
@@ -622,14 +789,13 @@ namespace calculator
                             result.spell_scaling = 100. * total_scaling;
 
                     if constexpr (T::is_full)
-                        if (attack_power_type._to_integral() == AttackPowerType::PHYSICAL &&
-                            is_sorcery_or_incantation_tool)
+                        if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
                             result.spell_scaling = 100. * total_scaling;
                 } };
 
             if constexpr (T::is_total_attack_power)
-                for (auto &&attack_power_type : DamageType::_values())
-                    loop_cycle(AttackPowerType::_from_integral_unchecked(attack_power_type));
+                for (auto &&attack_power_type : enumerators_of<DamageType>())
+                    loop_cycle(integral_to_enum<AttackPowerType>(std::to_underlying(attack_power_type)));
 
             if constexpr (T::is_individual_attack_power)
                 loop_cycle(T::attack_power_type);
@@ -641,13 +807,14 @@ namespace calculator
                 loop_cycle(AttackPowerType::PHYSICAL);
 
             if constexpr (T::is_full)
-                for (auto &&attack_power_type : AttackPowerType::_values())
+                for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
                     loop_cycle(attack_power_type);
 
             if constexpr (T::is_full)
             {
                 result.ineffective_attributes = std::move(Weapon::get_attack_rating_ineffective_attributes);
-                Weapon::get_attack_rating_ineffective_attributes.reserve(Attribute::_size());
+                constexpr auto size = std::meta::enumerators_of(^^Attribute).size();
+                Weapon::get_attack_rating_ineffective_attributes.reserve(size);
             }
             Weapon::get_attack_rating_ineffective_attributes.clear();
         }
@@ -674,14 +841,15 @@ namespace calculator
     {
         AttributeScaling attack;             // index: AttackPowerType (if in ALL_DAMAGE_TYPES)
         AttributeScaling attributeScaling;   // index: Attribute
-        std::array<int, 3> statusSpEffectId; // statusSpEffectId1, statusSpEffectId2,/*  */
+        std::array<int, 3> statusSpEffectId; // statusSpEffectId1,
+                                             // statusSpEffectId2,/*  */
                                              // statusSpEffectId3
 
         friend void from_json(const json &j, ReinforceTypesDict &r)
         {
             auto &&attack_json = j.at("attack");
-            for (auto dmg_type : DamageType::_values())
-                r.attack.at(dmg_type._to_integral()) = attack_json.value(std::to_string(dmg_type._to_integral()), floating(0));
+            for (auto dmg_type : enumerators_of<DamageType>())
+                r.attack.at(std::to_underlying(dmg_type)) = attack_json.value(std::to_string(std::to_underlying(dmg_type)), floating(0));
 
             r.attributeScaling = j.at("attributeScaling").get<AttributeScaling>();
 
@@ -704,7 +872,8 @@ namespace calculator
         // std::to_string(UPPER) + " * " + std::to_string(N));
 
         if (std::ranges::any_of(min_stats, [](int v) { return v > UPPER; }))
-            throw std::invalid_argument("min_stats must be <= " + std::to_string(UPPER));
+            throw std::invalid_argument("min_stats must be "
+                                        "<= " + std::to_string(UPPER));
 
         for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
         {
@@ -830,14 +999,14 @@ namespace calculator
         using var_vec = std::variant<std::vector<AttackRating::total>, std::vector<AttackRating::physical>, std::vector<AttackRating::magic>, std::vector<AttackRating::fire>, std::vector<AttackRating::lightning>, std::vector<AttackRating::holy>, std::vector<AttackRating::poison_status>, std::vector<AttackRating::scarlet_rot_status>, std::vector<AttackRating::bleed_status>, std::vector<AttackRating::frost_status>, std::vector<AttackRating::sleep_status>, std::vector<AttackRating::madness_status>, std::vector<AttackRating::death_blight_status>, std::vector<AttackRating::spell_scaling>>;
 
         var_vec optional_results;
-        BS::thread_pool<> pool;
+        // BS::thread_pool<> pool;
         const std::vector<const Weapon *> &weapons;
         AttackOptions attack_options;
 
         template <typename T>
             requires requires(T t) { t.value(); }
         OptimizationContext(int threads, const std::vector<Stats> &stat_variations, const std::vector<const Weapon *> &filtered_weapons_, AttackOptions attack_options_, std::type_identity<T>)
-            : optional_results{}, pool(threads), weapons(filtered_weapons_), attack_options(attack_options_)
+            : optional_results{}, /*pool(threads),*/ weapons(filtered_weapons_), attack_options(attack_options_)
         {
             // create a vector of optional results for each weapon
             auto &optional_results = this->optional_results.emplace<std::vector<T>>();
@@ -845,7 +1014,7 @@ namespace calculator
 
             // process one weapon
             auto do_weapon = [&](size_t i) {
-                auto &weapon = *this->weapons[i];
+                auto &weapon = *this->weapons.at(i);
 
                 T intermediate_attack_rating{};
                 T &best_attack_rating = optional_results[i];
@@ -854,8 +1023,7 @@ namespace calculator
                 // in the best attack rating
                 for (auto &&stats : stat_variations)
                 {
-                    weapon.get_attack_rating(this->attack_options, stats,
-                                             intermediate_attack_rating);
+                    weapon.get_attack_rating(this->attack_options, stats, intermediate_attack_rating);
 
                     if (best_attack_rating.value() < intermediate_attack_rating.value())
                         best_attack_rating = std::move(intermediate_attack_rating);
@@ -865,13 +1033,15 @@ namespace calculator
 
             // loop through all weapons and get the best attack rating each
             // asynchronously
-            this->pool.detach_sequence(0ull, this->weapons.size(), do_weapon);
+            for (size_t i = 0; i < this->weapons.size(); i++)
+                do_weapon(i);
+            // this->pool.detach_sequence(0ull, this->weapons.size(), do_weapon);
         }
 
         AttackRating::full wait_and_get_result()
         {
             // wait for all threads to finish
-            this->pool.wait();
+            // this->pool.wait();
 
             std::println();
 
@@ -953,10 +1123,10 @@ namespace calculator
             {
                 auto &&[inserted, success] = this->attackElementCorrectsById.emplace(std::stoi(id), attackElementCorrect);
                 constexpr auto default_ = AttributeScaling{false, false, false, false, true}; // default value
-                inserted->second[AttackPowerType::POISON] = default_;
-                inserted->second[AttackPowerType::BLEED] = default_;
-                inserted->second[AttackPowerType::MADNESS] = default_;
-                inserted->second[AttackPowerType::SLEEP] = default_;
+                inserted->second[std::to_underlying(AttackPowerType::POISON)] = default_;
+                inserted->second[std::to_underlying(AttackPowerType::BLEED)] = default_;
+                inserted->second[std::to_underlying(AttackPowerType::MADNESS)] = default_;
+                inserted->second[std::to_underlying(AttackPowerType::SLEEP)] = default_;
             }
 
             map<int, std::vector<ReinforceTypesDict>> reinforceTypes{};
@@ -970,48 +1140,40 @@ namespace calculator
             this->scalingTiers = data.at("scalingTiers").get<decltype(this->scalingTiers)>();
 
             auto create_weapon = [&](const json &weapon_data) {
-                auto &&attackElementCorrect = this->attackElementCorrectsById.at(
-                    weapon_data.at("attackElementCorrectId").get<int>());
+                auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_data.at("attackElementCorrectId").get<int>());
 
-                const auto &reinforceParams =
-                    reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
+                const auto &reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
 
                 auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<map<AttackPowerType, int>>();
-                std::array<const ScalingCurve *, AttackPowerType::_size()> weaponCalcCorrectGraphs{};
-                for (auto damage_type : DamageType::_values())
-                    weaponCalcCorrectGraphs.at(damage_type._to_integral()) = &this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
-                        AttackPowerType::_from_integral_unchecked(damage_type),
+                std::array<const ScalingCurve *, std::meta::enumerators_of(^^AttackPowerType).size()> weaponCalcCorrectGraphs{};
+                for (auto damage_type : enumerators_of<DamageType>())
+                    weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = &this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
+                        integral_to_enum<AttackPowerType>(std::to_underlying(damage_type)),
                         defaultDamageCalcCorrectGraphId)
                     );
-                for (auto status_type : StatusType::_values())
-                    weaponCalcCorrectGraphs.at(status_type._to_integral()) =
-                        &this->calcCorrectGraphsById.at(
-                            map_get(calcCorrectGraphIds,
-                                          AttackPowerType::_from_integral_unchecked(status_type),
-                                          defaultStatusCalcCorrectGraphId));
+                for (auto status_type : enumerators_of<StatusType>())
+                    weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = &this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
+                        integral_to_enum<AttackPowerType>(std::to_underlying(status_type)),
+                        defaultStatusCalcCorrectGraphId)
+                    );
 
-                auto unupgradedAttack =
-                    weapon_data.at("attack").get<std::vector<std::pair<AttackPowerType, int>>>();
-                auto statusSpEffectParamIds =
-                    weapon_data.value("statusSpEffectParamIds", std::array<int, 3>{});
-                std::vector<std::array<floating, AttackPowerType::_size()>> attack{};
+                auto unupgradedAttack = weapon_data.at("attack").get<std::vector<std::pair<AttackPowerType, int>>>();
+                auto statusSpEffectParamIds = weapon_data.value("statusSpEffectParamIds", std::array<int, 3>{});
+                std::vector<std::array<floating, std::meta::enumerators_of(^^AttackPowerType).size()>> attack{};
                 for (const auto &reinforceParam : reinforceParams)
                 {
                     auto &attack_at_upgrade_level = attack.emplace_back();
                     for (const auto &[attackPowerType, unupgradedAttackPower] : unupgradedAttack)
-                        attack_at_upgrade_level.at(attackPowerType._to_integral()) =
-                            unupgradedAttackPower *
-                            reinforceParam.attack.at(attackPowerType._to_integral());
+                        attack_at_upgrade_level.at(std::to_underlying(attackPowerType)) = unupgradedAttackPower * reinforceParam.attack.at(std::to_underlying(attackPowerType));
 
                     int i = 0;
                     for (const auto &spEffectParamId : statusSpEffectParamIds)
                     {
                         if (spEffectParamId)
                         {
-                            const auto &statusSpEffectParam = statusSpEffectParams.at(
-                                spEffectParamId + reinforceParam.statusSpEffectId.at(i));
+                            const auto &statusSpEffectParam = statusSpEffectParams.at(spEffectParamId + reinforceParam.statusSpEffectId.at(i));
                             for (const auto &[apt, val] : statusSpEffectParam)
-                                attack_at_upgrade_level.at(apt._to_integral()) = val;
+                                attack_at_upgrade_level.at(std::to_underlying(apt)) = val;
                         }
                         i++;
                     }
@@ -1025,9 +1187,9 @@ namespace calculator
                 {
                     auto &foo = attributeScaling.emplace_back();
                     for (const auto &[attribute, unupgradedScaling] : unupgradedAttributeScaling)
-                        foo.at(attribute._to_integral()) =
+                        foo.at(std::to_underlying(attribute)) =
                             unupgradedScaling *
-                            reinforceParam.attributeScaling.at(attribute._to_integral());
+                            reinforceParam.attributeScaling.at(std::to_underlying(attribute));
                 }
 
                 std::string weaponName = weapon_data.at("weaponName").get<std::string>();
@@ -1035,26 +1197,29 @@ namespace calculator
                 std::ranges::replace(url_part, ' ', '_');
 
                 return Weapon{
-                    weapon_data.at("name").get<std::string>(),
-                    std::move(weaponName),
-                    weapon_data.value("url", "https://eldenring.fandom.com/wiki/" + url_part),
-                    weapon_data.at("dlc").get<bool>(),
-                    weapon_data.value("paired", false),
-                    weapon_data.value("sorceryTool", false),
-                    weapon_data.value("incantationTool", false),
-                    weapon_data.at("weaponType").get<Weapon::Type>(),
-                    weapon_data.at("affinityId").get<Weapon::Affinity>(),
-                    weapon_data.at("requirements").get<Stats>(),
-                    std::move(attributeScaling),
-                    std::move(attack),
-                    std::move(attackElementCorrect),
-                    std::move(weaponCalcCorrectGraphs),
-                    this->scalingTiers}; };
+                    .full_name = weapon_data.at("name").get<std::string>(),
+                    .base_name = std::move(weaponName),
+                    .url = weapon_data.value("url", "https://eldenring.fandom.com/wiki/" + url_part),
+                    .dlc = weapon_data.at("dlc").get<bool>(),
+                    .paired = weapon_data.value("paired", false),
+                    .sorcery_tool = weapon_data.value("sorceryTool", false),
+                    .incantation_tool = weapon_data.value("incantationTool", false),
+                    .type = weapon_data.at("weaponType").get<Weapon::Type>(),
+                    .affinity = weapon_data.at("affinityId").get<Weapon::Affinity>(),
+                    .requirements = weapon_data.at("requirements").get<Stats>(),
+                    .attribute_scaling = std::move(attributeScaling),
+                    .base_attack_power = std::move(attack),
+                    .attack_power_attribute_scaling = std::move(attackElementCorrect),
+                    .attack_power_scaling_curves = std::move(weaponCalcCorrectGraphs),
+                    .scaling_tiers = this->scalingTiers};
+                };
 
             const auto &weapons_data = data.at("weapons");
             this->weapons.reserve(weapons_data.size());
             for (auto &&weapon_data : weapons_data)
+            {
                 this->weapons.emplace_back(create_weapon(weapon_data));
+            }
 
             std::println("{} weapons\n", this->weapons.size());
         }
@@ -1098,40 +1263,38 @@ namespace calculator
         using ParamRow = std::map<std::string, floating>;
 
         // msg/engus/menu.msgbnd.dcx
-        static inline const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {
-            "regulation.bin",
-            std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx",
-            std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx",
-            std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx",
-            std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx",
-            std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx",
-            std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"
-        };
+        inline static const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {"regulation.bin", std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"};
 
-        static inline const std::filesystem::path attackElementCorrectFile = "AttackElementCorrectParam.param";
-        static inline const std::filesystem::path calcCorrectGraphFile = "CalcCorrectGraph.param";
-        static inline const std::filesystem::path equipParamWeaponFile = "EquipParamWeapon.param";
-        static inline const std::filesystem::path reinforceParamWeaponFile = "ReinforceParamWeapon.param";
-        static inline const std::filesystem::path spEffectFile = "SpEffectParam.param";
-        static inline const std::filesystem::path menuValueTableFile = "MenuValueTableParam.param";
-        static inline const std::filesystem::path weaponNameFmgFile = "WeaponName.fmg";
-        static inline const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_dlc01.fmg";
-        static inline const std::filesystem::path menuTextFmgFile = "GR_MenuText.fmg";
+        inline static const std::filesystem::path attackElementCorrectFile = "AttackE"
+                                                                             "lementC"
+                                                                             "orrectP"
+                                                                             "aram."
+                                                                             "param";
+        inline static const std::filesystem::path calcCorrectGraphFile = "CalcCorrect"
+                                                                         "Graph."
+                                                                         "param";
+        inline static const std::filesystem::path equipParamWeaponFile = "EquipParamW"
+                                                                         "eapon."
+                                                                         "param";
+        inline static const std::filesystem::path reinforceParamWeaponFile = "Reinfor"
+                                                                             "ceParam"
+                                                                             "Weapon."
+                                                                             "param";
+        inline static const std::filesystem::path spEffectFile = "SpEffectParam."
+                                                                 "param";
+        inline static const std::filesystem::path menuValueTableFile = "MenuValueTabl"
+                                                                       "eParam.param";
+        inline static const std::filesystem::path weaponNameFmgFile = "WeaponName."
+                                                                      "fmg";
+        inline static const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_"
+                                                                         "dlc01.fmg";
+        inline static const std::filesystem::path menuTextFmgFile = "GR_MenuText."
+                                                                    "fmg";
 
         // AttackElementCorrectParam.param
-        static inline const std::set needed_unpacked_files ={
-            attackElementCorrectFile,
-            calcCorrectGraphFile,
-            equipParamWeaponFile,
-            reinforceParamWeaponFile,
-            spEffectFile,
-            menuValueTableFile,
-            weaponNameFmgFile,
-            dlcWeaponNameFmgFile,
-            menuTextFmgFile
-        };
+        inline static const std::set needed_unpacked_files = {attackElementCorrectFile, calcCorrectGraphFile, equipParamWeaponFile, reinforceParamWeaponFile, spEffectFile, menuValueTableFile, weaponNameFmgFile, dlcWeaponNameFmgFile, menuTextFmgFile};
 
-        static inline const std::map<size_t, calculator::Weapon::Type> wepTypeOverrides = {{110000, calculator::Weapon::Type::FIST}};
+        inline static const std::map<size_t, calculator::Weapon::Type> wepTypeOverrides = {{110000, calculator::Weapon::Type::FIST}};
 
         static std::vector<std::filesystem::path> copy_elden_ring_files(const std::filesystem::path &elden_ring, const std::filesystem::path &to)
         {
@@ -1224,9 +1387,12 @@ namespace calculator
             pugi::xml_document data;
             auto result = data.load_file(actual_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
             if (!result)
-                throw std::runtime_error("could not load xml file: " + std::string(result.description()));
+                throw std::runtime_error("could not load xml "
+                                         "file: " + std::string(result.description()));
 
-            auto field_nodes = data.child("param").child("fields").children("field");
+            auto field_nodes = data.child("param").child("fields").children("fie"
+                                                                            "l"
+                                                                            "d");
 
             ParamRow default_values{};
             for (auto &&field_node : field_nodes)
@@ -1264,9 +1430,11 @@ namespace calculator
             pugi::xml_document data;
             auto result = data.load_file(actual_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
             if (!result)
-                throw std::runtime_error("could not load xml file: " + std::string(result.description()));
+                throw std::runtime_error("could not load xml "
+                                         "file: " + std::string(result.description()));
 
-            auto text_nodes = data.child("fmg").child("entries").children("text");
+            auto text_nodes = data.child("fmg").child("entries").children("tex"
+                                                                          "t");
 
             std::map<long long, std::string> ret{};
             for (auto &&text_node : text_nodes)
@@ -1282,10 +1450,6 @@ namespace calculator
         static bool is_unique_weapon(const ParamRow &row)
         {
             return row.at("gemMountType") == 0 || row.at("disableGemAttr") == 1;
-        }
-        static bool is_supported_weapon_type(size_t weapon_type)
-        {
-            return calculator::Weapon::Type::_from_integral_nothrow(weapon_type);
         }
 
         std::map<long long, ParamRow> attackElementCorrectParams;
@@ -1304,7 +1468,19 @@ namespace calculator
                 return {};
             auto &&spEffectRow = this->spEffectParams.at(statusSpEffectParamId);
 
-            std::map<calculator::AttackPowerType, floating> statuses = {{AttackPowerType::POISON, spEffectRow.at("poizonAttackPower")}, {AttackPowerType::SCARLET_ROT, spEffectRow.at("diseaseAttackPower")}, {AttackPowerType::BLEED, spEffectRow.at("bloodAttackPower")}, {AttackPowerType::FROST, spEffectRow.at("freezeAttackPower")}, {AttackPowerType::SLEEP, spEffectRow.at("sleepAttackPower")}, {AttackPowerType::MADNESS, spEffectRow.at("madnessAttackPower")}, {AttackPowerType::DEATH_BLIGHT, spEffectRow.at("curseAttackPower")}};
+            std::map<calculator::AttackPowerType, floating> statuses = {{AttackPowerType::POISON, spEffectRow.at("poizonAttackPowe"
+                                                                                                                 "r")},
+                                                                        {AttackPowerType::SCARLET_ROT, spEffectRow.at("diseaseAttackPowe"
+                                                                                                                      "r")},
+                                                                        {AttackPowerType::BLEED, spEffectRow.at("bloodAttackPowe"
+                                                                                                                "r")},
+                                                                        {AttackPowerType::FROST, spEffectRow.at("freezeAttackPowe"
+                                                                                                                "r")},
+                                                                        {AttackPowerType::SLEEP, spEffectRow.at("sleepAttackPowe"
+                                                                                                                "r")},
+                                                                        {AttackPowerType::MADNESS, spEffectRow.at("madnessAttackPowe"
+                                                                                                                  "r")},
+                                                                        {AttackPowerType::DEATH_BLIGHT, spEffectRow.at("curseAttackPower")}};
 
             if (std::ranges::any_of(statuses, [](auto &&v) { return v.second != 0; }))
                 return statuses;
@@ -1332,16 +1508,14 @@ namespace calculator
                     {
                         if (overwriteCorrect == -1)
                             entries.emplace(
-                                calculator::attribute_json_string_table.from_enum(attribute), true);
+                                enum_to_string(attribute), true);
                         else
-                            entries.emplace(
-                                calculator::attribute_json_string_table.from_enum(attribute),
-                                overwriteCorrect / 100.);
+                            entries.emplace(enum_to_string(attribute), overwriteCorrect / 100.);
                     }
                 }
                 return entries; };
 
-            return json{{std::to_string(AttackPowerType::PHYSICAL), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byPhysics"), row.at("overwriteStrengthCorrectRate_byPhysics")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byPhysics"), row.at("overwriteDexterityCorrectRate_byPhysics")}, {Attribute::FAITH, row.at("isFaithCorrect_byPhysics"), row.at("overwriteFaithCorrectRate_byPhysics")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byPhysics"), row.at("overwriteMagicCorrectRate_byPhysics")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byPhysics"), row.at("overwriteLuckCorrectRate_byPhysics")}})}, {std::to_string(AttackPowerType::MAGIC), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byMagic"), row.at("overwriteStrengthCorrectRate_byMagic")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byMagic"), row.at("overwriteDexterityCorrectRate_byMagic")}, {Attribute::FAITH, row.at("isFaithCorrect_byMagic"), row.at("overwriteFaithCorrectRate_byMagic")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byMagic"), row.at("overwriteMagicCorrectRate_byMagic")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byMagic"), row.at("overwriteLuckCorrectRate_byMagic")}})}, {std::to_string(AttackPowerType::FIRE), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byFire"), row.at("overwriteStrengthCorrectRate_byFire")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byFire"), row.at("overwriteDexterityCorrectRate_byFire")}, {Attribute::FAITH, row.at("isFaithCorrect_byFire"), row.at("overwriteFaithCorrectRate_byFire")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byFire"), row.at("overwriteMagicCorrectRate_byFire")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byFire"), row.at("overwriteLuckCorrectRate_byFire")}})}, {std::to_string(AttackPowerType::LIGHTNING), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byThunder"), row.at("overwriteStrengthCorrectRate_byThunder")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byThunder"), row.at("overwriteDexterityCorrectRate_byThunder")}, {Attribute::FAITH, row.at("isFaithCorrect_byThunder"), row.at("overwriteFaithCorrectRate_byThunder")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byThunder"), row.at("overwriteMagicCorrectRate_byThunder")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byThunder"), row.at("overwriteLuckCorrectRate_byThunder")}})}, {std::to_string(AttackPowerType::HOLY), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byDark"), row.at("overwriteStrengthCorrectRate_byDark")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byDark"), row.at("overwriteDexterityCorrectRate_byDark")}, {Attribute::FAITH, row.at("isFaithCorrect_byDark"), row.at("overwriteFaithCorrectRate_byDark")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byDark"), row.at("overwriteMagicCorrectRate_byDark")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byDark"), row.at("overwriteLuckCorrectRate_byDark")}})}};
+            return json{{std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byPhysics"), row.at("overwriteStrengthCorrectRate_byPhysics")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byPhysics"), row.at("overwriteDexterityCorrectRate_byPhysics")}, {Attribute::FAITH, row.at("isFaithCorrect_byPhysics"), row.at("overwriteFaithCorrectRate_byPhysics")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byPhysics"), row.at("overwriteMagicCorrectRate_byPhysics")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byPhysics"), row.at("overwriteLuckCorrectRate_byPhysics")}})}, {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byMagic"), row.at("overwriteStrengthCorrectRate_byMagic")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byMagic"), row.at("overwriteDexterityCorrectRate_byMagic")}, {Attribute::FAITH, row.at("isFaithCorrect_byMagic"), row.at("overwriteFaithCorrectRate_byMagic")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byMagic"), row.at("overwriteMagicCorrectRate_byMagic")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byMagic"), row.at("overwriteLuckCorrectRate_byMagic")}})}, {std::to_string(std::to_underlying(AttackPowerType::FIRE)), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byFire"), row.at("overwriteStrengthCorrectRate_byFire")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byFire"), row.at("overwriteDexterityCorrectRate_byFire")}, {Attribute::FAITH, row.at("isFaithCorrect_byFire"), row.at("overwriteFaithCorrectRate_byFire")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byFire"), row.at("overwriteMagicCorrectRate_byFire")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byFire"), row.at("overwriteLuckCorrectRate_byFire")}})}, {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byThunder"), row.at("overwriteStrengthCorrectRate_byThunder")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byThunder"), row.at("overwriteDexterityCorrectRate_byThunder")}, {Attribute::FAITH, row.at("isFaithCorrect_byThunder"), row.at("overwriteFaithCorrectRate_byThunder")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byThunder"), row.at("overwriteMagicCorrectRate_byThunder")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byThunder"), row.at("overwriteLuckCorrectRate_byThunder")}})}, {std::to_string(std::to_underlying(AttackPowerType::HOLY)), buildAttackElementCorrect({{Attribute::STRENGTH, row.at("isStrengthCorrect_byDark"), row.at("overwriteStrengthCorrectRate_byDark")}, {Attribute::DEXTERITY, row.at("isDexterityCorrect_byDark"), row.at("overwriteDexterityCorrectRate_byDark")}, {Attribute::FAITH, row.at("isFaithCorrect_byDark"), row.at("overwriteFaithCorrectRate_byDark")}, {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byDark"), row.at("overwriteMagicCorrectRate_byDark")}, {Attribute::ARCAINE, row.at("isLuckCorrect_byDark"), row.at("overwriteLuckCorrectRate_byDark")}})}};
         }
         json parse_reinforce_param_weapon(const ParamRow &row) const
         {
@@ -1350,7 +1524,7 @@ namespace calculator
                     return (long long)f;
                 return f; };
 
-            json ret = {{"attack", {{std::to_string(AttackPowerType::PHYSICAL), cut_dec(row.at("physicsAtkRate"))}, {std::to_string(AttackPowerType::MAGIC), cut_dec(row.at("magicAtkRate"))}, {std::to_string(AttackPowerType::FIRE), cut_dec(row.at("fireAtkRate"))}, {std::to_string(AttackPowerType::LIGHTNING), cut_dec(row.at("thunderAtkRate"))}, {std::to_string(AttackPowerType::HOLY), cut_dec(row.at("darkAtkRate"))}}}, {"attributeScaling", {{calculator::attribute_json_string_table.from_enum(Attribute::STRENGTH), row.at("correctStrengthRate")}, {calculator::attribute_json_string_table.from_enum(Attribute::DEXTERITY), row.at("correctAgilityRate")}, {calculator::attribute_json_string_table.from_enum(Attribute::INTELLIGENCE), row.at("correctMagicRate")}, {calculator::attribute_json_string_table.from_enum(Attribute::FAITH), row.at("correctFaithRate")}, {calculator::attribute_json_string_table.from_enum(Attribute::ARCAINE), row.at("correctLuckRate")}}}};
+            json ret = {{"attack", {{std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), cut_dec(row.at("physicsAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), cut_dec(row.at("magicAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::FIRE)), cut_dec(row.at("fireAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), cut_dec(row.at("thunderAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::HOLY)), cut_dec(row.at("darkAtkRate"))}}}, {"attributeScaling", {{calculator::attribute_to_json_string(Attribute::STRENGTH), row.at("correctStrengthRate")}, {calculator::attribute_to_json_string(Attribute::DEXTERITY), row.at("correctAgilityRate")}, {calculator::attribute_to_json_string(Attribute::INTELLIGENCE), row.at("correctMagicRate")}, {calculator::attribute_to_json_string(Attribute::FAITH), row.at("correctFaithRate")}, {calculator::attribute_to_json_string(Attribute::ARCAINE), row.at("correctLuckRate")}}}};
 
             if (row.contains("spEffectId1"))
                 if (row.at("spEffectId1") != 0)
@@ -1384,14 +1558,15 @@ namespace calculator
                 return {};
             }
 
-            if (name.find("[ERROR]") != std::string::npos || name.find("%null%") != std::string::npos)
+            if (name.find("[ERROR]") != std::string::npos || name.find("%null"
+                                                                       "%") != std::string::npos)
             {
                 std::println("ignoring: weapon name: {}, id: {}", name, row_id);
                 return {};
             }
 
-            const auto weaponType = wepTypeOverrides.contains(row_id) ? wepTypeOverrides.at(row_id) : assert_floating_is<long long>(row.at("wepType"));
-            if (!is_supported_weapon_type(weaponType))
+            const auto weaponType = wepTypeOverrides.contains(row_id) ? std::to_underlying(wepTypeOverrides.at(row_id)) : assert_floating_is<long long>(row.at("wepType"));
+            if (!is_valid_enum_integral<calculator::Weapon::Type>(weaponType))
             {
                 if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
                     std::println("ignoring: weapon {} because no real weapon", name);
@@ -1407,7 +1582,8 @@ namespace calculator
                 throw std::runtime_error("could not find reinforce param weapon for "
                                          "reinforceTypeId: " + std::to_string(row.at("reinforceTypeId")));
 
-            if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrectId")))
+            if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrect"
+                                                                  "Id")))
                 throw std::runtime_error("could not find attack element correct param for "
                                          "attackElementCorrectId: " + std::to_string(row.at("attackElementCorrectId")));
 
@@ -1415,7 +1591,8 @@ namespace calculator
 
             const auto equipParamWeaponsId = row_id - 100 * affinityId;
             if (!this->equipParamWeapons.contains(equipParamWeaponsId))
-                throw std::runtime_error("could not find equip param weapon for id: " + std::to_string(equipParamWeaponsId));
+                throw std::runtime_error("could not find equip param weapon for "
+                                         "id: " + std::to_string(equipParamWeaponsId));
             const auto &uninfusedWeapon = this->equipParamWeapons.at(equipParamWeaponsId);
 
             if (affinityId != 0 && is_unique_weapon(uninfusedWeapon))
@@ -1460,69 +1637,86 @@ namespace calculator
             }
 
             if (row.at("enableMagic") || row.at("enableMiracle"))
-                for (auto &&damageType : DamageType::_values())
-                    attackPowerTypes.insert(AttackPowerType::_from_integral(damageType._to_integral()));
+                for (auto &&damageType : enumerators_of<DamageType>())
+                    attackPowerTypes.insert(integral_to_enum<AttackPowerType>(std::to_underlying(damageType)));
 
             std::map<AttackPowerType, long long> calcCorrectGraphIds{};
             if (attackPowerTypes.contains(AttackPowerType::PHYSICAL))
                 if (row.contains("correctType_Physics"))
-                    if (row.at("correctType_Physics") != defaultDamageCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Physics") != defaultDamageCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::PHYSICAL] = assert_floating_is<long long>(row.at("correctType_Physics"));
             if (attackPowerTypes.contains(AttackPowerType::MAGIC))
                 if (row.contains("correctType_Magic"))
-                    if (row.at("correctType_Magic") != defaultDamageCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Magic") != defaultDamageCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::MAGIC] = assert_floating_is<long long>(row.at("correctType_Magic"));
             if (attackPowerTypes.contains(AttackPowerType::FIRE))
                 if (row.contains("correctType_Fire"))
-                    if (row.at("correctType_Fire") != defaultDamageCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Fire") != defaultDamageCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::FIRE] = assert_floating_is<long long>(row.at("correctType_Fire"));
             if (attackPowerTypes.contains(AttackPowerType::LIGHTNING))
                 if (row.contains("correctType_Thunder"))
-                    if (row.at("correctType_Thunder") != defaultDamageCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Thunder") != defaultDamageCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::LIGHTNING] = assert_floating_is<long long>(row.at("correctType_Thunder"));
             if (attackPowerTypes.contains(AttackPowerType::HOLY))
                 if (row.contains("correctType_Dark"))
-                    if (row.at("correctType_Dark") != defaultDamageCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Dark") != defaultDamageCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::HOLY] = assert_floating_is<long long>(row.at("correctType_Dark"));
 
             if (attackPowerTypes.contains(AttackPowerType::POISON))
                 if (row.contains("correctType_Poison"))
-                    if (row.at("correctType_Poison") != defaultStatusCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Poison") != defaultStatusCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::POISON] = assert_floating_is<long long>(row.at("correctType_Poison"));
             if (attackPowerTypes.contains(AttackPowerType::BLEED))
                 if (row.contains("correctType_Bleed"))
-                    if (row.at("correctType_Bleed") != defaultStatusCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Bleed") != defaultStatusCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::BLEED] = assert_floating_is<long long>(row.at("correctType_Bleed"));
             if (attackPowerTypes.contains(AttackPowerType::SLEEP))
                 if (row.contains("correctType_Sleep"))
-                    if (row.at("correctType_Sleep") != defaultStatusCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Sleep") != defaultStatusCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::SLEEP] = assert_floating_is<long long>(row.at("correctType_Sleep"));
             if (attackPowerTypes.contains(AttackPowerType::MADNESS))
                 if (row.contains("correctType_Madness"))
-                    if (row.at("correctType_Madness") != defaultStatusCalcCorrectGraphId)
+                    if (row.at("correctType_"
+                               "Madness") != defaultStatusCalcCorrectGraphId)
                         calcCorrectGraphIds[AttackPowerType::MADNESS] = assert_floating_is<long long>(row.at("correctType_Madness"));
 
             for (auto &&[apt, calcCorrectGraphId] : calcCorrectGraphIds)
             {
-                if (DamageType::_from_integral_nothrow(apt))
+                if (is_valid_enum_integral<DamageType>(std::to_underlying(apt)))
                     if (calcCorrectGraphId != defaultDamageCalcCorrectGraphId && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
-                if (StatusType::_from_integral_nothrow(apt))
+                        throw std::runtime_error("could not find calc correct graph for "
+                                                 "id: " + std::to_string(calcCorrectGraphId));
+                if (is_valid_enum_integral<StatusType>(std::to_underlying(apt)))
                     if (calcCorrectGraphId != defaultStatusCalcCorrectGraphId && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
+                        throw std::runtime_error("could not find calc correct graph for "
+                                                 "id: " + std::to_string(calcCorrectGraphId));
             }
 
             std::vector<std::pair<Attribute, floating>> attributeScaling{};
             if (row.at("correctStrength"))
-                attributeScaling.emplace_back(Attribute::STRENGTH, row.at("correctStrength") / 100.);
+                attributeScaling.emplace_back(Attribute::STRENGTH, row.at("correctStrengt"
+                                                                          "h") / 100.);
             if (row.at("correctAgility"))
-                attributeScaling.emplace_back(Attribute::DEXTERITY, row.at("correctAgility") / 100.);
+                attributeScaling.emplace_back(Attribute::DEXTERITY, row.at("correctAgilit"
+                                                                           "y") / 100.);
             if (row.at("correctMagic"))
-                attributeScaling.emplace_back(Attribute::INTELLIGENCE, row.at("correctMagic") / 100.);
+                attributeScaling.emplace_back(Attribute::INTELLIGENCE, row.at("correctMag"
+                                                                              "i"
+                                                                              "c") / 100.);
             if (row.at("correctFaith"))
-                attributeScaling.emplace_back(Attribute::FAITH, row.at("correctFaith") / 100.);
+                attributeScaling.emplace_back(Attribute::FAITH, row.at("correctFait"
+                                                                       "h") / 100.);
             if (row.at("correctLuck"))
-                attributeScaling.emplace_back(Attribute::ARCAINE, row.at("correctLuck") / 100.);
+                attributeScaling.emplace_back(Attribute::ARCAINE, row.at("correctLuc"
+                                                                         "k") / 100.);
 
             json ret{};
             ret["name"] = name;
@@ -1541,8 +1735,13 @@ namespace calculator
             ret["attributeScaling"] = attributeScaling;
             if (!statusSpEffectParamIds.empty())
                 ret["statusSpEffectParamIds"] = statusSpEffectParamIds;
-            ret["reinforceTypeId"] = assert_floating_is<long long>(row.at("reinforceTypeId"));
-            ret["attackElementCorrectId"] = assert_floating_is<long long>(row.at("attackElementCorrectId"));
+            ret["reinforceTypeId"] = assert_floating_is<long long>(row.at("reinforceTyp"
+                                                                          "eId"));
+            ret["attackElementCorrectId"] = assert_floating_is<long long>(row.at("attac"
+                                                                                 "kElem"
+                                                                                 "entCo"
+                                                                                 "rrect"
+                                                                                 "Id"));
             ret["calcCorrectGraphIds"] = calcCorrectGraphIds;
             if (row.at("isDualBlade") == 1)
                 ret["paired"] = true;
@@ -1552,7 +1751,7 @@ namespace calculator
                 ret["incantationTool"] = true;
             ret["dlc"] = dlc;
 
-            std::println("weapon: {}, type: {}", name, Weapon::Type::_from_integral(weaponType)._to_string());
+            std::println("weapon: {}, type: {}", name, enum_to_string(integral_to_enum<Weapon::Type>(weaponType)));
             return ret;
         }
 
@@ -1560,7 +1759,8 @@ namespace calculator
         Parser(const std::filesystem::path &witchy_exe_path, const std::filesystem::path &uxm_target_directory)
         {
             // D:\Paul\Computer\Programmieren\C++\Haupt-Projektmappe\ConsoleApplication\elden_ring_files
-            auto copy_files_to_path = std::filesystem::current_path() / "elden_ring_files";
+            auto copy_files_to_path = std::filesystem::current_path() / "elden_ring_"
+                                                                        "files";
 
             // D:\Paul\Computer\Programmieren\C++\Haupt-Projektmappe\ConsoleApplication\elden_ring_files\regulation.bin
             auto files_to_unpack = this->copy_elden_ring_files(uxm_target_directory, copy_files_to_path);
@@ -1650,7 +1850,8 @@ namespace calculator
                         {
                             if (spEffectParamId)
                             {
-                                auto statusSpEffectId_string = "statusSpEffectId" + std::to_string(i);
+                                auto statusSpEffectId_string = "statusSpEffectI"
+                                                               "d" + std::to_string(i);
                                 auto offset = reinforceParamWeapon.value(statusSpEffectId_string, 0ll);
                                 statusSpEffectParamIds.insert(spEffectParamId + offset);
                             }
@@ -1683,26 +1884,20 @@ namespace calculator
         }
     };
 
-
-
 } // namespace calculator
 
 void test1()
 {
     auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data.json";
-    auto &&[weap_contain, weap_contain_time] = TimeFunctionExecution(
-        [&]() {
-            return calculator::WeaponContainer(regulation_file);
-        }
-    );
+    auto &&[weap_contain, weap_contain_time] = TimeFunctionExecution([&]() { return calculator::WeaponContainer(regulation_file); });
 
-    calculator::AttackOptions atk_options = {{25, 10}, true};
+    calculator::AttackOptions atk_options = {{0, 25, 10}, true};
     auto [stat_variations, stat_variations_time] = TimeFunctionExecution([&]() { return calculator::get_stat_variations(1 + 79, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)); });
 
     auto [filtered_weaps, filtered_weapons_time] = TimeFunctionExecution([&]() { return weap_contain.apply_filter(calculator::Weapon::Filter{{}, {}, {}}); });
     std::println();
 
-    auto [attack_rating, attack_rating_time] = TimeFunctionExecution([&]() { return calculator::OptimizationContext(20, stat_variations, filtered_weaps, atk_options, std::type_identity<calculator::AttackRating::total>{}).wait_and_get_result(); });
+    auto [attack_rating, attack_rating_time] = TimeFunctionExecution([&]() { return calculator::OptimizationContext(1, stat_variations, filtered_weaps, atk_options, std::type_identity<calculator::AttackRating::total>{}).wait_and_get_result(); });
     std::println();
 
     std::print("stats: ");
@@ -1714,12 +1909,12 @@ void test1()
 
     for (int i = 0; i < attack_rating.attack_power.size(); i++)
         if (attack_rating.attack_power.at(i).at(2) != 0)
-            std::println("{}: {} + {} = {}", calculator::DamageType::_from_integral(i)._to_string(), attack_rating.attack_power.at(i).at(0), attack_rating.attack_power.at(i).at(1), attack_rating.attack_power.at(i).at(2));
+            std::println("{}: {} + {} = {}", enum_to_string(integral_to_enum<calculator::DamageType>(i)), attack_rating.attack_power.at(i).at(0), attack_rating.attack_power.at(i).at(1), attack_rating.attack_power.at(i).at(2));
     std::println();
 
     for (int i = 0; i < attack_rating.status_effect.size(); i++)
         if (attack_rating.status_effect.at(i).at(2) != 0)
-            std::println("{}: {} + {} = {}", calculator::StatusType::_from_index(i)._to_string(), attack_rating.status_effect.at(i).at(0), attack_rating.status_effect.at(i).at(1), attack_rating.status_effect.at(i).at(2));
+            std::println("{}: {} + {} = {}", enum_to_string(index_to_enum<calculator::StatusType>(i)), attack_rating.status_effect.at(i).at(0), attack_rating.status_effect.at(i).at(1), attack_rating.status_effect.at(i).at(2));
     std::println();
 
     std::println("spell_scaling: {}%\n", attack_rating.spell_scaling);
@@ -1736,18 +1931,18 @@ void test2()
 {
     // Madding Hand & Poisoned Hand differ slightly
 
-    auto parser = calculator::Parser(
-        std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe"),
-        std::filesystem::path("F:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format)
-        // std::filesystem::path("C:/Users/Paul/Desktop/Neuer Ordner") //
+    auto parser = calculator::Parser(std::filesystem::path("C:/Users/Paul/Downloads/WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe"), std::filesystem::path("F:/Programme/Steam/steamapps/common/ELDEN RING/Game", std::filesystem::path::format::native_format)
+                                     // std::filesystem::path("C:/Users/Paul/Desktop/Neuer Ordner") //
     );
     auto regulation_data_json = parser.get_regulation_data_json();
 
     auto weapons_json = regulation_data_json["weapons"];
     auto calc_correct_graphs_json = regulation_data_json["calcCorrectGraphs"];
-    auto attack_element_corrects_json = regulation_data_json["attackElementCorrects"];
+    auto attack_element_corrects_json = regulation_data_json["attackElementCorrec"
+                                                             "ts"];
     auto reinforce_types_json = regulation_data_json["reinforceTypes"];
-    auto status_sp_effect_params_json = regulation_data_json["statusSpEffectParams"];
+    auto status_sp_effect_params_json = regulation_data_json["statusSpEffectParam"
+                                                             "s"];
     auto scaling_tiers_tson = regulation_data_json["scalingTiers"];
 
     auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data.json";
@@ -1871,6 +2066,6 @@ void test2()
 
 extern "C++" int main()
 {
-    test2();
+    test1();
     return 1;
 }

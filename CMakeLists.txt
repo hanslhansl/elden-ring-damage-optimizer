@@ -42,15 +42,6 @@ add_library(BS_thread_pool)
 target_sources(BS_thread_pool PUBLIC FILE_SET CXX_MODULES FILES ${BS_thread_pool_SOURCE_DIR}/modules/BS.thread_pool.cppm)
 target_include_directories(BS_thread_pool PRIVATE ${BS_thread_pool_SOURCE_DIR}/include)
 
-# add better-enums
-CPMAddPackage(
-    NAME better_enums
-    GITHUB_REPOSITORY aantron/better-enums
-    GIT_TAG master
-)
-add_library(better_enums INTERFACE)
-target_include_directories(better_enums INTERFACE ${better_enums_SOURCE_DIR})
-
 # add pugixml
 add_compile_definitions(PUGIXML_HEADER_ONLY)
 CPMAddPackage(
@@ -75,9 +66,12 @@ target_link_libraries(elden-ring-damage-optimizer PRIVATE
     # nlohmann_json_modules
     nlohmann_json::nlohmann_json
     BS_thread_pool
-    better_enums
     pugixml::pugixml
 )
+
+if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+    target_link_libraries(elden-ring-damage-optimizer PRIVATE stdc++exp) # std:: print, println, ...
+endif()
 
 # find_package(wxWidgets CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE wx::core wx::base)

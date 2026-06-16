@@ -10,18 +10,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/elden-ring-damage-optimizer.exe",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}/build"
         },
-
-        // {
-        //     "name": "debug (clang - lldb)",
-        //     "type": "cppdbg",
-        //     "request": "launch",
-        //     "program": "${workspaceFolder}/build/elden-ring-damage-optimizer.exe",
-        //     "MIMode": "lldb",
-        //     // "miDebuggerPath": "",
-        //     "cwd": "${workspaceFolder}",
-        // },
         {
             "name": "debug (gcc - gdb)",
             "type": "cppdbg",
@@ -29,14 +19,20 @@
             "program": "${command:cmake.launchTargetPath}",
             "MIMode": "gdb",
             "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
+            "environment": [
+                {
+                "name": "PATH",
+                "value": "C:\\msys64\\ucrt64\\bin;${env:PATH}"
+                }
+            ],
         },
         {
             "name": "debug (msvc - cppvsdbg)",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/elden-ring-damage-optimizer.exe",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
         }
     ]
 }
