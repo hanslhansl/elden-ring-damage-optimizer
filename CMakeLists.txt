@@ -58,6 +58,7 @@ target_sources(elden-ring-damage-optimizer
         BASE_DIRS ${SRC_DIR}
         FILES
         ${SRC_DIR}/calculator.ixx
+        ${SRC_DIR}/witchy.ixx
         # ${SRC_DIR}/ui.ixx
 )
 target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)

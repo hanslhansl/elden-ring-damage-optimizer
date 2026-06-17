@@ -5,6 +5,7 @@ module;
 export module calculator;
 
 import std;
+import witchy;
 import BS.thread_pool;
 // import nlohmann.json;
 
@@ -1265,31 +1266,15 @@ namespace calculator
         // msg/engus/menu.msgbnd.dcx
         inline static const std::vector<std::filesystem::path> needed_elden_ring_file_paths = {"regulation.bin", std::filesystem::path("msg") / "engus" / "menu.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "menu_dlc02.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc01.msgbnd.dcx", std::filesystem::path("msg") / "engus" / "item_dlc02.msgbnd.dcx"};
 
-        inline static const std::filesystem::path attackElementCorrectFile = "AttackE"
-                                                                             "lementC"
-                                                                             "orrectP"
-                                                                             "aram."
-                                                                             "param";
-        inline static const std::filesystem::path calcCorrectGraphFile = "CalcCorrect"
-                                                                         "Graph."
-                                                                         "param";
-        inline static const std::filesystem::path equipParamWeaponFile = "EquipParamW"
-                                                                         "eapon."
-                                                                         "param";
-        inline static const std::filesystem::path reinforceParamWeaponFile = "Reinfor"
-                                                                             "ceParam"
-                                                                             "Weapon."
-                                                                             "param";
-        inline static const std::filesystem::path spEffectFile = "SpEffectParam."
-                                                                 "param";
-        inline static const std::filesystem::path menuValueTableFile = "MenuValueTabl"
-                                                                       "eParam.param";
-        inline static const std::filesystem::path weaponNameFmgFile = "WeaponName."
-                                                                      "fmg";
-        inline static const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_"
-                                                                         "dlc01.fmg";
-        inline static const std::filesystem::path menuTextFmgFile = "GR_MenuText."
-                                                                    "fmg";
+        inline static const std::filesystem::path attackElementCorrectFile = "AttackElementCorrectParam.param";
+        inline static const std::filesystem::path calcCorrectGraphFile = "CalcCorrectGraph.param";
+        inline static const std::filesystem::path equipParamWeaponFile = "EquipParamWeapon.param";
+        inline static const std::filesystem::path reinforceParamWeaponFile = "ReinforceParamWeapon.param";
+        inline static const std::filesystem::path spEffectFile = "SpEffectParam.param";
+        inline static const std::filesystem::path menuValueTableFile = "MenuValueTableParam.param";
+        inline static const std::filesystem::path weaponNameFmgFile = "WeaponName.fmg";
+        inline static const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_dlc01.fmg";
+        inline static const std::filesystem::path menuTextFmgFile = "GR_MenuText.fmg";
 
         // AttackElementCorrectParam.param
         inline static const std::set needed_unpacked_files = {attackElementCorrectFile, calcCorrectGraphFile, equipParamWeaponFile, reinforceParamWeaponFile, spEffectFile, menuValueTableFile, weaponNameFmgFile, dlcWeaponNameFmgFile, menuTextFmgFile};
@@ -1390,9 +1375,7 @@ namespace calculator
                 throw std::runtime_error("could not load xml "
                                          "file: " + std::string(result.description()));
 
-            auto field_nodes = data.child("param").child("fields").children("fie"
-                                                                            "l"
-                                                                            "d");
+            auto field_nodes = data.child("param").child("fields").children("field");
 
             ParamRow default_values{};
             for (auto &&field_node : field_nodes)
@@ -1433,8 +1416,7 @@ namespace calculator
                 throw std::runtime_error("could not load xml "
                                          "file: " + std::string(result.description()));
 
-            auto text_nodes = data.child("fmg").child("entries").children("tex"
-                                                                          "t");
+            auto text_nodes = data.child("fmg").child("entries").children("text");
 
             std::map<long long, std::string> ret{};
             for (auto &&text_node : text_nodes)
@@ -1759,8 +1741,7 @@ namespace calculator
         Parser(const std::filesystem::path &witchy_exe_path, const std::filesystem::path &uxm_target_directory)
         {
             // D:\Paul\Computer\Programmieren\C++\Haupt-Projektmappe\ConsoleApplication\elden_ring_files
-            auto copy_files_to_path = std::filesystem::current_path() / "elden_ring_"
-                                                                        "files";
+            auto copy_files_to_path = std::filesystem::current_path() / "elden_ring_files";
 
             // D:\Paul\Computer\Programmieren\C++\Haupt-Projektmappe\ConsoleApplication\elden_ring_files\regulation.bin
             auto files_to_unpack = this->copy_elden_ring_files(uxm_target_directory, copy_files_to_path);
@@ -2066,6 +2047,7 @@ void test2()
 
 extern "C++" int main()
 {
-    test1();
+    // test1();
+    witchy::run_witchy("F:\\Programme\\Steam\\steamapps\\common\\ELDEN RING\\Game", "C:\\Users\\Paul\\Downloads\\WitchyBND-v3.0.0.1-win-x64\\WitchyBND.exe");
     return 1;
 }
