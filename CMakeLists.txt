@@ -1,13 +1,12 @@
 ﻿cmake_minimum_required(VERSION 4.3.0 FATAL_ERROR)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 26)
 
 # enable C++23 modules support
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
 set(CMAKE_CXX_MODULE_STD 1)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 # create project
 project(elden-ring-damage-optimizer LANGUAGES CXX)
@@ -57,18 +56,20 @@ target_sources(elden-ring-damage-optimizer
     PUBLIC FILE_SET CXX_MODULES
         BASE_DIRS ${SRC_DIR}
         FILES
-        ${SRC_DIR}/calculator.ixx
+        ${SRC_DIR}/meta.ixx
         ${SRC_DIR}/witchy.ixx
+        ${SRC_DIR}/calculator.ixx
+        ${SRC_DIR}/xml.ixx
+        ${SRC_DIR}/erdo.ixx
         # ${SRC_DIR}/ui.ixx
 )
-target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
-
 target_link_libraries(elden-ring-damage-optimizer PRIVATE
     # nlohmann_json_modules
     nlohmann_json::nlohmann_json
     BS_thread_pool
     pugixml::pugixml
 )
+target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
 
 if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
     target_link_libraries(elden-ring-damage-optimizer PRIVATE stdc++exp) # std:: print, println, ...

@@ -1,6 +1,4 @@
-module;
-
-export module witchy;
+export module erdo:witchy;
 
 import std;
 
@@ -21,26 +19,28 @@ namespace witchy
         "msg/engus/item_dlc02.msgbnd.dcx"
     };
 
-    const std::filesystem::path attackElementCorrectFile = "AttackElementCorrectParam.param";
-    const std::filesystem::path calcCorrectGraphFile = "CalcCorrectGraph.param";
-    const std::filesystem::path equipParamWeaponFile = "EquipParamWeapon.param";
-    const std::filesystem::path reinforceParamWeaponFile = "ReinforceParamWeapon.param";
-    const std::filesystem::path spEffectFile = "SpEffectParam.param";
-    const std::filesystem::path menuValueTableFile = "MenuValueTableParam.param";
-    const std::filesystem::path weaponNameFmgFile = "WeaponName.fmg";
-    const std::filesystem::path dlcWeaponNameFmgFile = "WeaponName_dlc01.fmg";
-    const std::filesystem::path menuTextFmgFile = "GR_MenuText.fmg";
+    export {
+        const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param";
+        const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param";
+        const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param";
+        const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param";
+        const std::filesystem::path SpEffectParamFile = "SpEffectParam.param";
+        const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param";
+        const std::filesystem::path WeaponNameFile = "WeaponName.fmg";
+        const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg";
+        const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg";
+    }
 
     const std::set<std::filesystem::path> needed_unpacked_files = {
-        attackElementCorrectFile,
-        calcCorrectGraphFile,
-        equipParamWeaponFile,
-        reinforceParamWeaponFile,
-        spEffectFile,
-        menuValueTableFile,
-        weaponNameFmgFile,
-        dlcWeaponNameFmgFile,
-        menuTextFmgFile
+        AttackElementCorrectParamFile,
+        CalcCorrectGraphFile,
+        EquipParamWeaponFile,
+        ReinforceParamWeaponFile,
+        SpEffectParamFile,
+        MenuValueTableParamFile,
+        WeaponNameFile,
+        WeaponName_dlc01File,
+        GR_MenuTextFile
     };
 
     std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {})
@@ -57,7 +57,7 @@ namespace witchy
         );
     }
 
-    export void run_witchy(const std::filesystem::path& unpacked_uxm_files_directory, const std::filesystem::path& witchy_exe_path)
+    export void run_witchy(const std::filesystem::path& unpacked_uxm_files_directory, const std::filesystem::path& witchy_exe_path, const std::filesystem::path& save_to_directory)
     {
 
         auto temp_dir = std::filesystem::temp_directory_path() / "elden-ring-damage-optimizer";
@@ -87,7 +87,7 @@ namespace witchy
                 return std::filesystem::directory_iterator(temp_dir / filename);
             })
             | std::views::join
-            | std::views::transform(std::filesystem::directory_entry::path)
+            | std::views::transform(&std::filesystem::directory_entry::path)
             | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
             | std::ranges::to<std::set>([](const std::filesystem::path& l, const std::filesystem::path& r){ return std::less{}(l.filename(), r.filename()); });
         if (needed_unpacked_file_paths.size() != needed_unpacked_files.size())
@@ -102,7 +102,7 @@ namespace witchy
         std::println("found {} needed unpacked files in the temporary directory {}", needed_unpacked_file_paths.size(), quote_path(temp_dir));
 
         // convert to xml
-        auto xml_files_directory = temp_dir / "xml_files";
+        auto xml_files_directory = temp_dir / "xml_data";
         std::filesystem::create_directory(xml_files_directory);
         auto cmd2 = witchy_cmd(witchy_exe_path, needed_unpacked_file_paths, xml_files_directory);
         auto result2 = std::system(cmd2.c_str());
@@ -111,32 +111,13 @@ namespace witchy
         std::println("converted needed unpacked files to xml in {}", quote_path(xml_files_directory));
 
         auto xml_file_paths = needed_unpacked_file_paths
-            | std::views::transform([&](const std::filesystem::path& p){ return xml_files_directory / p.filename() + ".xml"; })
+            | std::views::transform([&](const std::filesystem::path& p){ return xml_files_directory / p.filename() += ".xml"; })
             | std::ranges::to<std::vector>();
 
-        // this->attackElementCorrectParams = read_param_xml(xml_directory / attackElementCorrectFile);
-        // this->calcCorrectGraphs = read_param_xml(xml_directory / calcCorrectGraphFile);
-        // this->equipParamWeapons = read_param_xml(xml_directory / equipParamWeaponFile);
-        // this->reinforceParamWeapons = read_param_xml(xml_directory / reinforceParamWeaponFile);
-        // this->spEffectParams = read_param_xml(xml_directory / spEffectFile);
-        // this->menuValueTableParams = read_param_xml(xml_directory / menuValueTableFile);
-        // this->menuText = read_fmg_xml(xml_directory / menuTextFmgFile);
-        // this->weaponNames = read_fmg_xml(xml_directory / weaponNameFmgFile);
-        // this->dlcWeaponNames = read_fmg_xml(xml_directory / dlcWeaponNameFmgFile);
+        std::filesystem::copy(xml_files_directory, save_to_directory, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+        std::println("copied xml files to {}", quote_path(save_to_directory));
 
-        // std::filesystem::remove_all(temp_dir);
+        std::filesystem::remove_all(temp_dir);
+        std::println("removed temporary directory {}", quote_path(temp_dir));
     }
 }
-
-
-
-// extern "C++" int main() {
-//     std::vector<std::filesystem::path> v = {"apple/foo", "banana", "cherry"};
-
-//     auto v2 = v
-//         | std::views::transform([](std::filesystem::path& p) { return "\"" + p.string() + "\""; })
-//         | std::views::join_with(std::string{" "})
-//         | std::ranges::to<std::string>();
-
-//     std::cout << v2 << '\n';
-// }
