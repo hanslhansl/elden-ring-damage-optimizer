@@ -1,5 +1,6 @@
 module;
 #include <meta>
+#include <ostream>
 #include <pugixml.hpp>
 #include <nlohmann/json.hpp>
 export module erdo:calculator;
@@ -46,21 +47,20 @@ struct std::formatter<nlohmann::json, char> : std::formatter<std::string_view, c
     }
 };
 
+export template <typename T>
+constexpr T assert_floating_is(double f)
+{
+    if (f != (T)f)
+        throw std::runtime_error("floating is not T");
+    return f;
+}
 
 namespace calculator
 {
-    template <class Key, class T>
-    using map = std::map<Key, T>;
     struct Weapon;
     using UpgradeLevels = std::array<int, 3>; // free handed, normal, somber
 
-    template <typename T>
-    constexpr T assert_floating_is(double f)
-    {
-        if (f != (T)f)
-            throw std::runtime_error("floating is not T");
-        return f;
-    }
+    
     constexpr bool isVanilla = true;
 
     enum class Attribute
@@ -115,7 +115,7 @@ namespace calculator
         PROPHET,
         SAMURAI,
     };
-    const map<Class, Stats> ALL_CLASS_STATS{{Class::HERO, {16, 9, 7, 8, 11}}, {Class::BANDIT, {9, 13, 9, 8, 14}}, {Class::ASTROLOGER, {8, 12, 16, 7, 9}}, {Class::WARRIOR, {10, 16, 10, 8, 9}}, {Class::PRISONER, {11, 14, 14, 6, 9}}, {Class::CONFESSOR, {12, 12, 9, 14, 9}}, {Class::WRETCH, {10, 10, 10, 10, 10}}, {Class::VAGABOND, {14, 13, 9, 9, 7}}, {Class::PROPHET, {11, 10, 7, 16, 10}}, {Class::SAMURAI, {12, 15, 9, 8, 8}}};
+    const std::map<Class, Stats> ALL_CLASS_STATS{{Class::HERO, {16, 9, 7, 8, 11}}, {Class::BANDIT, {9, 13, 9, 8, 14}}, {Class::ASTROLOGER, {8, 12, 16, 7, 9}}, {Class::WARRIOR, {10, 16, 10, 8, 9}}, {Class::PRISONER, {11, 14, 14, 6, 9}}, {Class::CONFESSOR, {12, 12, 9, 14, 9}}, {Class::WRETCH, {10, 10, 10, 10, 10}}, {Class::VAGABOND, {14, 13, 9, 9, 7}}, {Class::PROPHET, {11, 10, 7, 16, 10}}, {Class::SAMURAI, {12, 15, 9, 8, 8}}};
 
     enum class AttackPowerType
     {
@@ -157,7 +157,7 @@ namespace calculator
 
     using AttributeScaling = std::array<double, std::meta::enumerators_of(^^Attribute).size()>;
     using AttackElementCorrects = std::array<AttributeScaling, std::meta::enumerators_of(^^AttackPowerType).size()>;
-    using AttackElementCorrectsById = map<int, AttackElementCorrects>;
+    using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
 
     enum class Affinity_
     {
@@ -280,9 +280,9 @@ namespace nlohmann
     };
 
     template <typename T>
-    struct adl_serializer<calculator::map<calculator::AttackPowerType, T>>
+    struct adl_serializer<std::map<calculator::AttackPowerType, T>>
     {
-        static void from_json(const json &j, calculator::map<calculator::AttackPowerType, T> &m)
+        static void from_json(const json &j, std::map<calculator::AttackPowerType, T> &m)
         {
             for (const auto &[apt_str, val] : j.items())
             {
@@ -291,7 +291,7 @@ namespace nlohmann
                 m[apt] = val.get<T>();
             }
         }
-        static void to_json(json &j, const calculator::map<calculator::AttackPowerType, T> &m)
+        static void to_json(json &j, const std::map<calculator::AttackPowerType, T> &m)
         {
             j = json::object();
             for (const auto &[apt, val] : m)
@@ -313,8 +313,7 @@ namespace nlohmann
                 else if (val.is_number())
                     ac[std::to_underlying(attr)] = val.get<double>();
                 else
-                    throw std::invalid_argument(std::string("invalid json "
-                                                            "type") + val.type_name());
+                    throw std::invalid_argument(std::string("invalid json type") + val.type_name());
             }
         }
     };
@@ -536,13 +535,13 @@ namespace calculator
         const std::vector<std::array<double, std::meta::enumerators_of(^^AttackPowerType).size()>> base_attack_power;
         // map indicating which attack power types scale with which player
         // attributes
-        const AttackElementCorrectsById::mapped_type &attack_power_attribute_scaling;
+        const AttackElementCorrectsById::mapped_type attack_power_attribute_scaling;
         // map indicating which scaling curve is used for each attack power type
-        const std::array<const ScalingCurve *, std::meta::enumerators_of(^^AttackPowerType).size()> attack_power_scaling_curves;
+        const std::array<ScalingCurve, std::meta::enumerators_of(^^AttackPowerType).size()> attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this
         // weapon. This isn't hardcoded for all weapons because it can be
         // changed by mods.
-        const std::array<std::pair<double, std::string>, 6> &scaling_tiers;
+        const std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
         // the index of the upgrade level for this weapon
         const int upgrade_level_index = [&]() {
@@ -650,10 +649,7 @@ namespace calculator
 
                                 if (scaling != 0.)
                                     total_scaling +=
-                                        this->attack_power_scaling_curves[std::to_underlying(attack_power_type)]
-                                            ->operator[](
-                                                effective_stats[std::to_underlying(attribute)]) *
-                                        scaling;
+                                        this->attack_power_scaling_curves[std::to_underlying(attack_power_type)][effective_stats[std::to_underlying(attribute)]] * scaling;
                             }
                         }
                     }
@@ -732,6 +728,8 @@ namespace calculator
             }
             Weapon::get_attack_rating_ineffective_attributes.clear();
         }
+
+        bool operator==(const Weapon&) const = default;
     };
 
     struct CalcCorrectGraphEntry
@@ -983,9 +981,10 @@ namespace calculator
 
     class WeaponContainer
     {
+    protected:
         using WeaponDict = json;
 
-        map<int, ScalingCurve> calcCorrectGraphsById{};
+        std::map<int, ScalingCurve> calcCorrectGraphsById{};
         AttackElementCorrectsById attackElementCorrectsById{};
         std::array<std::pair<double, std::string>, 6> scalingTiers{};
 
@@ -1043,13 +1042,13 @@ namespace calculator
                 inserted->second[std::to_underlying(AttackPowerType::SLEEP)] = default_;
             }
 
-            map<int, std::vector<ReinforceTypesDict>> reinforceTypes{};
+            std::map<int, std::vector<ReinforceTypesDict>> reinforceTypes{};
             for (auto &&[id, reinforceType] : data.at("reinforceTypes").items())
                 reinforceTypes.emplace(std::stoi(id), reinforceType);
 
-            map<int, map<AttackPowerType, int>> statusSpEffectParams{};
+            std::map<int, std::map<AttackPowerType, int>> statusSpEffectParams{};
             for (auto &&[key, val] : data.at("statusSpEffectParams").items())
-                statusSpEffectParams.try_emplace(std::stoi(key), val.get<map<AttackPowerType, int>>());
+                statusSpEffectParams.try_emplace(std::stoi(key), val.get<std::map<AttackPowerType, int>>());
 
             this->scalingTiers = data.at("scalingTiers").get<decltype(this->scalingTiers)>();
 
@@ -1058,15 +1057,15 @@ namespace calculator
 
                 const auto &reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
 
-                auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<map<AttackPowerType, int>>();
-                std::array<const ScalingCurve *, std::meta::enumerators_of(^^AttackPowerType).size()> weaponCalcCorrectGraphs{};
+                auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<std::map<AttackPowerType, int>>();
+                std::array<ScalingCurve, std::meta::enumerators_of(^^AttackPowerType).size()> weaponCalcCorrectGraphs{};
                 for (auto damage_type : enumerators_of<DamageType>())
-                    weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = &this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
+                    weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
                         integral_to_enum<AttackPowerType>(std::to_underlying(damage_type)),
                         defaultDamageCalcCorrectGraphId)
                     );
                 for (auto status_type : enumerators_of<StatusType>())
-                    weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = &this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
+                    weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
                         integral_to_enum<AttackPowerType>(std::to_underlying(status_type)),
                         defaultStatusCalcCorrectGraphId)
                     );
@@ -1093,9 +1092,7 @@ namespace calculator
                     }
                 }
 
-                auto unupgradedAttributeScaling =
-                    weapon_data.at("attributeScaling")
-                        .get<std::vector<std::pair<Attribute, double>>>();
+                auto unupgradedAttributeScaling = weapon_data.at("attributeScaling").get<std::vector<std::pair<Attribute, double>>>();
                 std::vector<AttributeScaling> attributeScaling{};
                 for (const auto &reinforceParam : reinforceParams)
                 {
@@ -1170,6 +1167,8 @@ namespace calculator
 
             return filtered;
         }
+
+        bool operator==(const WeaponContainer&) const = default;
     };
 
     class Parser
@@ -1767,7 +1766,14 @@ namespace calculator
                 if (row.at("compareType") == 1 && id >= 100)
                     scaling_tiers_tson.push_back(json::array({row.at("value") / 100., this->menuText.at(row.at("textId"))}));
 
-            json regulation_data_json{{"calcCorrectGraphs", calc_correct_graphs_json}, {"attackElementCorrects", attack_element_corrects_json}, {"reinforceTypes", reinforce_types_json}, {"statusSpEffectParams", status_sp_effect_params_json}, {"scalingTiers", scaling_tiers_tson}, {"weapons", weapons_json}};
+            json regulation_data_json{
+                {"calcCorrectGraphs", calc_correct_graphs_json},
+                {"attackElementCorrects", attack_element_corrects_json},
+                {"reinforceTypes", reinforce_types_json},
+                {"statusSpEffectParams", status_sp_effect_params_json},
+                {"scalingTiers", scaling_tiers_tson},
+                {"weapons", weapons_json}
+            };
 
             std::println("\nsuccessfully generated regulation data file");
 
@@ -1780,8 +1786,9 @@ namespace calculator
 
 void test1()
 {
-    auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data.json";
+    auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data_current_game_current_erdo.json";
     auto &&[weap_contain, weap_contain_time] = TimeFunctionExecution([&]() { return calculator::WeaponContainer(regulation_file); });
+
 
     calculator::AttackOptions atk_options = {{0, 25, 10}, true};
     auto [stat_variations, stat_variations_time] = TimeFunctionExecution([&]() { return calculator::get_stat_variations(1 + 79, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)); });
@@ -1789,7 +1796,7 @@ void test1()
     auto [filtered_weaps, filtered_weapons_time] = TimeFunctionExecution([&]() { return weap_contain.apply_filter(calculator::Weapon::Filter{{}, {}, {}}); });
     std::println();
 
-    auto [attack_rating, attack_rating_time] = TimeFunctionExecution([&]() { return calculator::OptimizationContext(1, stat_variations, filtered_weaps, atk_options, std::type_identity<calculator::AttackRating::total>{}).wait_and_get_result(); });
+    auto [attack_rating, attack_rating_time] = TimeFunctionExecution([&]() { return calculator::OptimizationContext(10, stat_variations, filtered_weaps, atk_options, std::type_identity<calculator::AttackRating::total>{}).wait_and_get_result(); });
     std::println();
 
     std::print("stats: ");
@@ -1827,6 +1834,7 @@ void test2()
                                      // std::filesystem::path("C:/Users/Paul/Desktop/Neuer Ordner") //
     );
     auto regulation_data_json = parser.get_regulation_data_json();
+
 
     auto weapons_json = regulation_data_json["weapons"];
     auto calc_correct_graphs_json = regulation_data_json["calcCorrectGraphs"];
