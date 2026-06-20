@@ -83,12 +83,50 @@ namespace xml
         return ret;
     }
 
+    std::string attribute_to_xml_string(calculator::Attribute attr) {
+        if (attr == calculator::Attribute::STRENGTH)
+            return "Strength";
+        if (attr == calculator::Attribute::DEXTERITY)
+            return "Agility";
+        if (attr == calculator::Attribute::INTELLIGENCE)
+            return "Magic";
+        if (attr == calculator::Attribute::FAITH)
+            return "Faith";
+        if (attr == calculator::Attribute::ARCAINE)
+            return "Luck";
+
+        throw std::invalid_argument("unknown attribute");
+    }
+    std::string attack_power_type_to_xml_string(calculator::AttackPowerType apt) {
+        if (apt == calculator::AttackPowerType::PHYSICAL)
+            return "Physics";
+        if (apt == calculator::AttackPowerType::MAGIC)
+            return "Magic";
+        if (apt == calculator::AttackPowerType::FIRE)
+            return "Fire";
+        if (apt == calculator::AttackPowerType::LIGHTNING)
+            return "Thunder";
+        if (apt == calculator::AttackPowerType::HOLY)
+            return "Dark";
+
+        if (apt == calculator::AttackPowerType::POISON)
+            return "Poison";
+        if (apt == calculator::AttackPowerType::BLEED)
+            return "Bleed";
+        if (apt == calculator::AttackPowerType::SLEEP)
+            return "Sleep";
+        if (apt == calculator::AttackPowerType::MADNESS)
+            return "Madness";
+
+        throw std::invalid_argument("unknown attack power type");
+    }
+
     struct WeaponContainer : calculator::WeaponContainer
     {
         using WeaponDict = json;
 
-
-        static bool is_unique_weapon(const ParamRow &row)
+        template<typename T>
+        static bool is_unique_weapon(const std::map<std::string, T> &row)
         {
             return row.at("gemMountType") == 0 || row.at("disableGemAttr") == 1;
         }
@@ -216,7 +254,7 @@ namespace xml
             return ret;
         }
 
-        json parse_weapon(const ParamRow &row) const
+        json parse_weapon(const std::map<std::string, double> &row) const
         {
             using namespace calculator;
 
@@ -257,16 +295,16 @@ namespace xml
             }
 
             if (!this->reinforceParamWeapons.contains(row.at("reinforceTypeId")))
-                throw std::runtime_error("could not find reinforce param weapon for reinforceTypeId: " + std::to_string(row.at("reinforceTypeId")));
+                throw std::runtime_error(std::format("could not find reinforce param weapon for reinforceTypeId: {}", std::to_string(row.at("reinforceTypeId"))));
 
             if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrectId")))
-                throw std::runtime_error("could not find attack element correct param for attackElementCorrectId: " + std::to_string(row.at("attackElementCorrectId")));
+                throw std::runtime_error(std::format("could not find attack element correct param for attackElementCorrectId: {}", std::to_string(row.at("attackElementCorrectId"))));
 
             const auto affinityId = assert_floating_is<long long>((row_id % 10000) / 100.);
 
             const auto equipParamWeaponsId = row_id - 100 * affinityId;
             if (!this->equipParamWeapons.contains(equipParamWeaponsId))
-                throw std::runtime_error("could not find equip param weapon for id: " + std::to_string(equipParamWeaponsId));
+                throw std::runtime_error(std::format("could not find equip param weapon for id: {}", std::to_string(equipParamWeaponsId)));
             const auto &uninfusedWeapon = this->equipParamWeapons.at(equipParamWeaponsId);
 
             if (affinityId != 0 && is_unique_weapon(uninfusedWeapon))
@@ -274,12 +312,9 @@ namespace xml
 
             std::set<calculator::AttackPowerType> attackPowerTypes{};
             std::vector<long long> statusSpEffectParamIds{};
-            for (auto &&spEffectParamId : std::vector<long long>{
-                     assert_floating_is<long long>(row.at("spEffectBehaviorId0")),
-                     assert_floating_is<long long>(row.at("spEffectBehaviorId1")),
-                     assert_floating_is<long long>(row.at("spEffectBehaviorId2")),
-                 })
+            for (size_t i = 0; i < 3; ++i)
             {
+                auto spEffectParamId = assert_floating_is<long long>(row.at(std::format("spEffectBehaviorId{}", i)));
                 auto statusSpEffectParams = parse_status_sp_effect_params(spEffectParamId);
                 if (!statusSpEffectParams.empty())
                 {
@@ -299,14 +334,15 @@ namespace xml
                 statusSpEffectParamIds = {0, 0, 0};
 
             std::vector<std::pair<AttackPowerType, double>> attack{};
-            for (auto &&pair : std::vector<std::pair<AttackPowerType, double>>{{AttackPowerType::PHYSICAL, row.at("attackBasePhysics")}, {AttackPowerType::MAGIC, row.at("attackBaseMagic")}, {AttackPowerType::FIRE, row.at("attackBaseFire")}, {AttackPowerType::LIGHTNING, row.at("attackBaseThunder")}, {AttackPowerType::HOLY, row.at("attackBaseDark")}})
+            for (auto damage_type : enumerators_of<DamageType>())
             {
-                auto &&[attackPowerType, attackPower] = pair;
+                auto apt = integral_to_enum<AttackPowerType>(std::to_underlying(damage_type));
+                auto attack_power = row.at(std::format("attackBase{}", attack_power_type_to_xml_string(apt)));
 
-                if (attackPower != 0)
+                if (attack_power != 0)
                 {
-                    attackPowerTypes.insert(attackPowerType);
-                    attack.emplace_back(pair);
+                    attackPowerTypes.insert(apt);
+                    attack.emplace_back(apt, attack_power);
                 }
             }
 
@@ -315,74 +351,34 @@ namespace xml
                     attackPowerTypes.insert(integral_to_enum<AttackPowerType>(std::to_underlying(damageType)));
 
             std::map<AttackPowerType, long long> calcCorrectGraphIds{};
-            if (attackPowerTypes.contains(AttackPowerType::PHYSICAL))
-                if (row.contains("correctType_Physics"))
-                    if (row.at("correctType_"
-                               "Physics") != default_damage_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::PHYSICAL] = assert_floating_is<long long>(row.at("correctType_Physics"));
-            if (attackPowerTypes.contains(AttackPowerType::MAGIC))
-                if (row.contains("correctType_Magic"))
-                    if (row.at("correctType_"
-                               "Magic") != default_damage_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::MAGIC] = assert_floating_is<long long>(row.at("correctType_Magic"));
-            if (attackPowerTypes.contains(AttackPowerType::FIRE))
-                if (row.contains("correctType_Fire"))
-                    if (row.at("correctType_"
-                               "Fire") != default_damage_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::FIRE] = assert_floating_is<long long>(row.at("correctType_Fire"));
-            if (attackPowerTypes.contains(AttackPowerType::LIGHTNING))
-                if (row.contains("correctType_Thunder"))
-                    if (row.at("correctType_"
-                               "Thunder") != default_damage_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::LIGHTNING] = assert_floating_is<long long>(row.at("correctType_Thunder"));
-            if (attackPowerTypes.contains(AttackPowerType::HOLY))
-                if (row.contains("correctType_Dark"))
-                    if (row.at("correctType_"
-                               "Dark") != default_damage_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::HOLY] = assert_floating_is<long long>(row.at("correctType_Dark"));
-
-            if (attackPowerTypes.contains(AttackPowerType::POISON))
-                if (row.contains("correctType_Poison"))
-                    if (row.at("correctType_"
-                               "Poison") != default_status_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::POISON] = assert_floating_is<long long>(row.at("correctType_Poison"));
-            if (attackPowerTypes.contains(AttackPowerType::BLEED))
-                if (row.contains("correctType_Bleed"))
-                    if (row.at("correctType_"
-                               "Bleed") != default_status_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::BLEED] = assert_floating_is<long long>(row.at("correctType_Bleed"));
-            if (attackPowerTypes.contains(AttackPowerType::SLEEP))
-                if (row.contains("correctType_Sleep"))
-                    if (row.at("correctType_"
-                               "Sleep") != default_status_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::SLEEP] = assert_floating_is<long long>(row.at("correctType_Sleep"));
-            if (attackPowerTypes.contains(AttackPowerType::MADNESS))
-                if (row.contains("correctType_Madness"))
-                    if (row.at("correctType_"
-                               "Madness") != default_status_calc_correct_graph_id)
-                        calcCorrectGraphIds[AttackPowerType::MADNESS] = assert_floating_is<long long>(row.at("correctType_Madness"));
-
-            for (auto &&[apt, calcCorrectGraphId] : calcCorrectGraphIds)
+            for (auto apt : enumerators_of<AttackPowerType>())
             {
-                if (is_valid_enum_integral<DamageType>(std::to_underlying(apt)))
-                    if (calcCorrectGraphId != default_damage_calc_correct_graph_id && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
-                if (is_valid_enum_integral<StatusType>(std::to_underlying(apt)))
-                    if (calcCorrectGraphId != default_status_calc_correct_graph_id && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
+                if (attackPowerTypes.contains(apt))
+                {
+                    if (!std::set{ AttackPowerType::SCARLET_ROT, AttackPowerType::FROST, AttackPowerType::DEATH_BLIGHT }.contains(apt))
+                    {
+                        auto xml_str = std::format("correctType_{}", attack_power_type_to_xml_string(apt));
+                        auto def = is_valid_enum_integral<DamageType>(std::to_underlying(apt)) ? default_damage_calc_correct_graph_id : default_status_calc_correct_graph_id;
+                        if (row.contains(xml_str))
+                        {
+                            auto calcCorrectGraphId = assert_floating_is<long long>(row.at(xml_str));
+
+                            if (!this->calcCorrectGraphs.contains(calcCorrectGraphId))
+                                throw std::runtime_error(std::format("could not find calc correct graph for id: {}", calcCorrectGraphId));
+
+                            calcCorrectGraphIds[apt] = calcCorrectGraphId;
+                        } 
+                    }
+                }
             }
 
             std::vector<std::pair<Attribute, double>> attributeScaling{};
-            if (row.at("correctStrength"))
-                attributeScaling.emplace_back(Attribute::STRENGTH, row.at("correctStrength") / 100.);
-            if (row.at("correctAgility"))
-                attributeScaling.emplace_back(Attribute::DEXTERITY, row.at("correctAgility") / 100.);
-            if (row.at("correctMagic"))
-                attributeScaling.emplace_back(Attribute::INTELLIGENCE, row.at("correctMagic") / 100.);
-            if (row.at("correctFaith"))
-                attributeScaling.emplace_back(Attribute::FAITH, row.at("correctFaith") / 100.);
-            if (row.at("correctLuck"))
-                attributeScaling.emplace_back(Attribute::ARCAINE, row.at("correctLuck") / 100.);
+            for (auto attribute : enumerators_of<Attribute>())
+            {
+                auto xml_str = std::format("correct{}", attribute_to_xml_string(attribute));
+                if (row.at(xml_str))
+                    attributeScaling.emplace_back(attribute, row.at(xml_str) / 100.);
+            }
 
             json ret{};
             ret["name"] = name;
