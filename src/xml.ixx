@@ -461,30 +461,25 @@ namespace xml
             menuText(read_fmg_xml(xml_data_directory / witchy::GR_MenuTextFile += ".xml"))
         {
             json weapons_json = json::array();
+            std::set<long long> calc_correct_graph_ids{default_damage_calc_correct_graph_id, default_status_calc_correct_graph_id};
+            std::set<long long> reinforceTypeIds{};
+            std::set<long long> attackElementCorrectIds{};
+
             for (auto &&[k, param_row] : this->equipParamWeapons)
             {
                 auto weapon_json = this->parse_weapon(param_row);
                 if (!weapon_json.empty())
+                {
                     weapons_json.push_back(weapon_json);
+
+                    for (auto &&[apt, calcCorrectGraphId] : weapon_json.at("calcCorrectGraphIds").items())
+                        calc_correct_graph_ids.insert(calcCorrectGraphId.get<long long>());
+
+                    attackElementCorrectIds.insert(weapon_json.at("attackElementCorrectId").get<long long>());  
+                    reinforceTypeIds.insert(weapon_json.at("reinforceTypeId").get<long long>());  
+                }
             }
-
-            std::set<long long> calc_correct_graph_ids{default_damage_calc_correct_graph_id, default_status_calc_correct_graph_id};
-            for (auto &&weapon_json : weapons_json)
-                for (auto &&[apt, calcCorrectGraphId] : weapon_json.at("calcCorrectGraphIds").items())
-                    calc_correct_graph_ids.insert(calcCorrectGraphId.get<long long>());
-            json calc_correct_graphs_json{};
-            for (auto &&[id, calc_correct_graph] : this->calcCorrectGraphs)
-                if (calc_correct_graph_ids.contains(id))
-                    calc_correct_graphs_json[std::to_string(id)] = parse_calc_correct_graph(calc_correct_graph);
-
-            std::set<long long> attackElementCorrectIds{};
-            for (auto &&weapon_json : weapons_json)
-                attackElementCorrectIds.insert(weapon_json.at("attackElementCorrectId").get<long long>());
             
-
-            std::set<long long> reinforceTypeIds{};
-            for (auto &&weapon_json : weapons_json)
-                reinforceTypeIds.insert(weapon_json.at("reinforceTypeId").get<long long>());
             json reinforce_types_json{};
             for (auto &&[reinforceParamId, reinforceParamWeapon] : this->reinforceParamWeapons)
             {
@@ -531,11 +526,10 @@ namespace xml
             /*----------------------------------------*/
 
 
-            for (const auto &[id_, calcCorrectGraph] : calc_correct_graphs_json.items())
-                this->calcCorrectGraphsById.emplace(std::stoi(id_), evaluate_CalcCorrectGraph(calcCorrectGraph.get<calculator::CalcCorrectGraph>()));
-
-
-
+            for (auto &&[id, calc_correct_graph] : this->calcCorrectGraphs)
+                if (calc_correct_graph_ids.contains(id))
+                    this->calcCorrectGraphsById.emplace(id, evaluate_CalcCorrectGraph(parse_calc_correct_graph(calc_correct_graph)));
+                
             for (auto &&[id, row] : this->attackElementCorrectParams)
             {
                 if (attackElementCorrectIds.contains(id))
@@ -559,12 +553,9 @@ namespace xml
             std::map<int, std::map<calculator::AttackPowerType, long long>> statusSpEffectParams{};
             for (auto &&[spEffectParamId, _] : this->spEffectParams)
             {
-                if (statusSpEffectParamIds.contains(spEffectParamId))
-                {
-                    auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId);
-                    std::erase_if(status_sp_effect_params, [](auto &&v) { return v.second == 0; });
-                    statusSpEffectParams.try_emplace(spEffectParamId, status_sp_effect_params);
-                }
+                auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId);
+                std::erase_if(status_sp_effect_params, [](auto &&v) { return v.second == 0; });
+                statusSpEffectParams.try_emplace(spEffectParamId, status_sp_effect_params);
             }
 
             size_t  i = 0;
@@ -573,6 +564,12 @@ namespace xml
                     this->scalingTiers.at(i++) = {row.at("value") / 100., this->menuText.at(row.at("textId"))};
                 
             auto create_weapon = [&](const json &weapon_data) {
+                
+            };
+
+            this->weapons.reserve(weapons_json.size());
+            for (const auto &weapon_data : weapons_json)
+            {
                 auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_data.at("attackElementCorrectId").get<int>());
 
                 const auto &reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
@@ -627,7 +624,7 @@ namespace xml
                 auto url_part = weaponName;
                 std::ranges::replace(url_part, ' ', '_');
 
-                return calculator::Weapon{
+                this->weapons.emplace_back(calculator::Weapon{
                     .full_name = weapon_data.at("name").get<std::string>(),
                     .base_name = std::move(weaponName),
                     .url = weapon_data.value("url", "https://eldenring.fandom.com/wiki/" + url_part),
@@ -642,13 +639,8 @@ namespace xml
                     .base_attack_power = std::move(attack),
                     .attack_power_attribute_scaling = std::move(attackElementCorrect),
                     .attack_power_scaling_curves = std::move(weaponCalcCorrectGraphs),
-                    .scaling_tiers = this->scalingTiers};
-                };
-
-            this->weapons.reserve(weapons_json.size());
-            for (auto &&weapon_data : weapons_json)
-            {
-                this->weapons.emplace_back(create_weapon(weapon_data));
+                    .scaling_tiers = this->scalingTiers
+                });
             }
 
             std::println("{} weapons\n", this->weapons.size());

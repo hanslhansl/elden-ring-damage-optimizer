@@ -17,7 +17,7 @@ extern "C++" int main(int argc, char* argv[])
 
     auto new_weap_contain = xml::WeaponContainer(xml_data_directory);
 
-    if (weap_contain != new_weap_contain)
+    if (weap_contain.weapons != new_weap_contain.weapons)
         throw std::runtime_error("WeaponContainers are not equal");
 
 
