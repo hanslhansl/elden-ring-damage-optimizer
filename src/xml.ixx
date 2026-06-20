@@ -16,9 +16,17 @@ namespace xml
     constexpr long long default_damage_calc_correct_graph_id = 0;
     constexpr long long default_status_calc_correct_graph_id = 6;
 
-
-    std::map<long long, ParamRow> read_param_xml(const std::filesystem::path &file_path)
+    template<typename T>
+        requires (std::same_as<T, double> || std::same_as<T, long long>)
+    std::map<long long, std::map<std::string, T>> read_param_xml(const std::filesystem::path &file_path)
     {
+        auto get_as = [](const pugi::xml_attribute& attr, T def = 0){
+            if constexpr (std::same_as<T, double>)
+                return attr.as_double(def);
+            else if constexpr (std::same_as<T, long long>)
+                return attr.as_llong(def);
+        };
+
         pugi::xml_document data;
         auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
         if (!result)
@@ -26,27 +34,27 @@ namespace xml
 
         auto field_nodes = data.child("param").child("fields").children("field");
 
-        ParamRow default_values{};
+        std::map<std::string, T> default_values{};
         for (auto &&field_node : field_nodes)
         {
             auto name = field_node.attribute("name").as_string();
-            auto defaultValue = field_node.attribute("defaultValue").as_double(std::numeric_limits<double>::max());
+            auto defaultValue = get_as(field_node.attribute("defaultValue"), std::numeric_limits<T>::max());
 
-            if (defaultValue != std::numeric_limits<double>::max())
+            if (defaultValue != std::numeric_limits<T>::max())
                 default_values.emplace(name, defaultValue);
         }
 
         auto row_nodes = data.child("param").child("rows").children("row");
 
-        std::map<long long, ParamRow> ret{};
+        std::map<long long, std::map<std::string, T>> ret{};
         for (auto &&row_node : row_nodes)
         {
             auto name = row_node.attribute("name").as_string();
 
-            ParamRow row_data = default_values;
+            std::map<std::string, T> row_data = default_values;
             for (auto &&row_attribute : row_node.attributes())
             {
-                row_data[row_attribute.name()] = row_attribute.as_double();
+                row_data[row_attribute.name()] = get_as(row_attribute);
             }
 
             auto id = row_node.attribute("id").as_llong();
@@ -85,35 +93,31 @@ namespace xml
             return row.at("gemMountType") == 0 || row.at("disableGemAttr") == 1;
         }
 
-        std::map<long long, ParamRow> attackElementCorrectParams;
-        std::map<long long, ParamRow> calcCorrectGraphs;
-        std::map<long long, ParamRow> equipParamWeapons;
-        std::map<long long, ParamRow> reinforceParamWeapons;
-        std::map<long long, ParamRow> spEffectParams;
-        std::map<long long, ParamRow> menuValueTableParams;
+        std::map<long long, std::map<std::string, double>> attackElementCorrectParams;
+        std::map<long long, std::map<std::string, double>> calcCorrectGraphs;
+        std::map<long long, std::map<std::string, double>> equipParamWeapons;
+        std::map<long long, std::map<std::string, double>> reinforceParamWeapons;
+        std::map<long long, std::map<std::string, long long>> spEffectParams;
+        std::map<long long, std::map<std::string, double>> menuValueTableParams;
         std::map<long long, std::string> menuText;
         std::map<long long, std::string> weaponNames;
         std::map<long long, std::string> dlcWeaponNames;
 
-        std::map<calculator::AttackPowerType, double> parse_status_sp_effect_params(long long statusSpEffectParamId) const
+        std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(long long statusSpEffectParamId) const
         {
             if (!this->spEffectParams.contains(statusSpEffectParamId))
                 return {};
             auto &&spEffectRow = this->spEffectParams.at(statusSpEffectParamId);
 
-            std::map<calculator::AttackPowerType, double> statuses = {{calculator::AttackPowerType::POISON, spEffectRow.at("poizonAttackPowe"
-                                                                                                                 "r")},
-                                                                        {calculator::AttackPowerType::SCARLET_ROT, spEffectRow.at("diseaseAttackPowe"
-                                                                                                                      "r")},
-                                                                        {calculator::AttackPowerType::BLEED, spEffectRow.at("bloodAttackPowe"
-                                                                                                                "r")},
-                                                                        {calculator::AttackPowerType::FROST, spEffectRow.at("freezeAttackPowe"
-                                                                                                                "r")},
-                                                                        {calculator::AttackPowerType::SLEEP, spEffectRow.at("sleepAttackPowe"
-                                                                                                                "r")},
-                                                                        {calculator::AttackPowerType::MADNESS, spEffectRow.at("madnessAttackPowe"
-                                                                                                                  "r")},
-                                                                        {calculator::AttackPowerType::DEATH_BLIGHT, spEffectRow.at("curseAttackPower")}};
+            std::map<calculator::AttackPowerType, long long> statuses =  {
+                {calculator::AttackPowerType::POISON, spEffectRow.at("poizonAttackPower")},
+                {calculator::AttackPowerType::SCARLET_ROT, spEffectRow.at("diseaseAttackPower")},
+                {calculator::AttackPowerType::BLEED, spEffectRow.at("bloodAttackPower")},
+                {calculator::AttackPowerType::FROST, spEffectRow.at("freezeAttackPower")},
+                {calculator::AttackPowerType::SLEEP, spEffectRow.at("sleepAttackPower")},
+                {calculator::AttackPowerType::MADNESS, spEffectRow.at("madnessAttackPower")},
+                {calculator::AttackPowerType::DEATH_BLIGHT, spEffectRow.at("curseAttackPower")}
+            };
 
             if (std::ranges::any_of(statuses, [](auto &&v) { return v.second != 0; }))
                 return statuses;
@@ -253,20 +257,16 @@ namespace xml
             }
 
             if (!this->reinforceParamWeapons.contains(row.at("reinforceTypeId")))
-                throw std::runtime_error("could not find reinforce param weapon for "
-                                         "reinforceTypeId: " + std::to_string(row.at("reinforceTypeId")));
+                throw std::runtime_error("could not find reinforce param weapon for reinforceTypeId: " + std::to_string(row.at("reinforceTypeId")));
 
-            if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrect"
-                                                                  "Id")))
-                throw std::runtime_error("could not find attack element correct param for "
-                                         "attackElementCorrectId: " + std::to_string(row.at("attackElementCorrectId")));
+            if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrectId")))
+                throw std::runtime_error("could not find attack element correct param for attackElementCorrectId: " + std::to_string(row.at("attackElementCorrectId")));
 
             const auto affinityId = assert_floating_is<long long>((row_id % 10000) / 100.);
 
             const auto equipParamWeaponsId = row_id - 100 * affinityId;
             if (!this->equipParamWeapons.contains(equipParamWeaponsId))
-                throw std::runtime_error("could not find equip param weapon for "
-                                         "id: " + std::to_string(equipParamWeaponsId));
+                throw std::runtime_error("could not find equip param weapon for id: " + std::to_string(equipParamWeaponsId));
             const auto &uninfusedWeapon = this->equipParamWeapons.at(equipParamWeaponsId);
 
             if (affinityId != 0 && is_unique_weapon(uninfusedWeapon))
@@ -366,31 +366,23 @@ namespace xml
             {
                 if (is_valid_enum_integral<DamageType>(std::to_underlying(apt)))
                     if (calcCorrectGraphId != default_damage_calc_correct_graph_id && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for "
-                                                 "id: " + std::to_string(calcCorrectGraphId));
+                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
                 if (is_valid_enum_integral<StatusType>(std::to_underlying(apt)))
                     if (calcCorrectGraphId != default_status_calc_correct_graph_id && !this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                        throw std::runtime_error("could not find calc correct graph for "
-                                                 "id: " + std::to_string(calcCorrectGraphId));
+                        throw std::runtime_error("could not find calc correct graph for id: " + std::to_string(calcCorrectGraphId));
             }
 
             std::vector<std::pair<Attribute, double>> attributeScaling{};
             if (row.at("correctStrength"))
-                attributeScaling.emplace_back(Attribute::STRENGTH, row.at("correctStrengt"
-                                                                          "h") / 100.);
+                attributeScaling.emplace_back(Attribute::STRENGTH, row.at("correctStrength") / 100.);
             if (row.at("correctAgility"))
-                attributeScaling.emplace_back(Attribute::DEXTERITY, row.at("correctAgilit"
-                                                                           "y") / 100.);
+                attributeScaling.emplace_back(Attribute::DEXTERITY, row.at("correctAgility") / 100.);
             if (row.at("correctMagic"))
-                attributeScaling.emplace_back(Attribute::INTELLIGENCE, row.at("correctMag"
-                                                                              "i"
-                                                                              "c") / 100.);
+                attributeScaling.emplace_back(Attribute::INTELLIGENCE, row.at("correctMagic") / 100.);
             if (row.at("correctFaith"))
-                attributeScaling.emplace_back(Attribute::FAITH, row.at("correctFait"
-                                                                       "h") / 100.);
+                attributeScaling.emplace_back(Attribute::FAITH, row.at("correctFaith") / 100.);
             if (row.at("correctLuck"))
-                attributeScaling.emplace_back(Attribute::ARCAINE, row.at("correctLuc"
-                                                                         "k") / 100.);
+                attributeScaling.emplace_back(Attribute::ARCAINE, row.at("correctLuck") / 100.);
 
             json ret{};
             ret["name"] = name;
@@ -409,13 +401,8 @@ namespace xml
             ret["attributeScaling"] = attributeScaling;
             if (!statusSpEffectParamIds.empty())
                 ret["statusSpEffectParamIds"] = statusSpEffectParamIds;
-            ret["reinforceTypeId"] = assert_floating_is<long long>(row.at("reinforceTyp"
-                                                                          "eId"));
-            ret["attackElementCorrectId"] = assert_floating_is<long long>(row.at("attac"
-                                                                                 "kElem"
-                                                                                 "entCo"
-                                                                                 "rrect"
-                                                                                 "Id"));
+            ret["reinforceTypeId"] = assert_floating_is<long long>(row.at("reinforceTypeId"));
+            ret["attackElementCorrectId"] = assert_floating_is<long long>(row.at("attackElementCorrectId"));
             ret["calcCorrectGraphIds"] = calcCorrectGraphIds;
             if (row.at("isDualBlade") == 1)
                 ret["paired"] = true;
@@ -462,7 +449,16 @@ namespace xml
             return arr;
         }
 
-        json get_regulation_data_json()
+        WeaponContainer(const std::filesystem::path &xml_data_directory) : 
+            attackElementCorrectParams(read_param_xml<double>(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml")),
+            calcCorrectGraphs(read_param_xml<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml")),
+            equipParamWeapons(read_param_xml<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml")),
+            reinforceParamWeapons(read_param_xml<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml")),
+            spEffectParams(read_param_xml<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml")),
+            menuValueTableParams(read_param_xml<double>(xml_data_directory / witchy::MenuValueTableParamFile += ".xml")),
+            weaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponNameFile += ".xml")),
+            dlcWeaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml")),
+            menuText(read_fmg_xml(xml_data_directory / witchy::GR_MenuTextFile += ".xml"))
         {
             json weapons_json = json::array();
             for (auto &&[k, param_row] : this->equipParamWeapons)
@@ -484,10 +480,7 @@ namespace xml
             std::set<long long> attackElementCorrectIds{};
             for (auto &&weapon_json : weapons_json)
                 attackElementCorrectIds.insert(weapon_json.at("attackElementCorrectId").get<long long>());
-            json attack_element_corrects_json{};
-            for (auto &&[id, row] : this->attackElementCorrectParams)
-                if (attackElementCorrectIds.contains(id))
-                    attack_element_corrects_json[std::to_string(id)] = parse_attack_element_correct(row);
+            
 
             std::set<long long> reinforceTypeIds{};
             for (auto &&weapon_json : weapons_json)
@@ -533,73 +526,52 @@ namespace xml
                     }
                 }
             }
-            json status_sp_effect_params_json{};
+
+
+            /*----------------------------------------*/
+
+
+            for (const auto &[id_, calcCorrectGraph] : calc_correct_graphs_json.items())
+                this->calcCorrectGraphsById.emplace(std::stoi(id_), evaluate_CalcCorrectGraph(calcCorrectGraph.get<calculator::CalcCorrectGraph>()));
+
+
+
+            for (auto &&[id, row] : this->attackElementCorrectParams)
+            {
+                if (attackElementCorrectIds.contains(id))
+                {
+                    auto attackElementCorrect = parse_attack_element_correct(row);
+
+                    auto &&[inserted, success] = this->attackElementCorrectsById.emplace(id, attackElementCorrect);
+                    constexpr auto default_ = calculator::AttributeScaling{false, false, false, false, true}; // default value
+                    inserted->second[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
+                    inserted->second[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
+                    inserted->second[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
+                    inserted->second[std::to_underlying(calculator::AttackPowerType::SLEEP)] = default_;
+                }
+            }
+
+
+            std::map<int, std::vector<calculator::ReinforceTypesDict>> reinforceTypes{};
+            for (auto &&[id, reinforceType] : reinforce_types_json.items())
+                reinforceTypes.emplace(std::stoi(id), reinforceType);
+
+            std::map<int, std::map<calculator::AttackPowerType, long long>> statusSpEffectParams{};
             for (auto &&[spEffectParamId, _] : this->spEffectParams)
             {
                 if (statusSpEffectParamIds.contains(spEffectParamId))
                 {
                     auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId);
                     std::erase_if(status_sp_effect_params, [](auto &&v) { return v.second == 0; });
-                    status_sp_effect_params_json[std::to_string(spEffectParamId)] = status_sp_effect_params;
+                    statusSpEffectParams.try_emplace(spEffectParamId, status_sp_effect_params);
                 }
             }
 
-            json scaling_tiers_tson = json::array();
+            size_t  i = 0;
             for (auto &&[id, row] : this->menuValueTableParams)
                 if (row.at("compareType") == 1 && id >= 100)
-                    scaling_tiers_tson.push_back(json::array({row.at("value") / 100., this->menuText.at(row.at("textId"))}));
-
-            json regulation_data_json{
-                {"calcCorrectGraphs", calc_correct_graphs_json},
-                {"attackElementCorrects", attack_element_corrects_json},
-                {"reinforceTypes", reinforce_types_json},
-                {"statusSpEffectParams", status_sp_effect_params_json},
-                {"scalingTiers", scaling_tiers_tson},
-                {"weapons", weapons_json}
-            };
-
-            std::println("\nsuccessfully generated regulation data file");
-
-            return regulation_data_json;
-        }
-
-        WeaponContainer(const std::filesystem::path &xml_data_directory) : 
-            attackElementCorrectParams(read_param_xml(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml")),
-            calcCorrectGraphs(read_param_xml(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml")),
-            equipParamWeapons(read_param_xml(xml_data_directory / witchy::EquipParamWeaponFile += ".xml")),
-            reinforceParamWeapons(read_param_xml(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml")),
-            spEffectParams(read_param_xml(xml_data_directory / witchy::SpEffectParamFile += ".xml")),
-            menuValueTableParams(read_param_xml(xml_data_directory / witchy::MenuValueTableParamFile += ".xml")),
-            weaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponNameFile += ".xml")),
-            dlcWeaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml")),
-            menuText(read_fmg_xml(xml_data_directory / witchy::GR_MenuTextFile += ".xml"))
-        {
-            json data = this->get_regulation_data_json();
-
-
-            for (const auto &[id_, calcCorrectGraph] : data.at("calcCorrectGraphs").items())
-                this->calcCorrectGraphsById.emplace(std::stoi(id_), evaluate_CalcCorrectGraph(calcCorrectGraph.get<calculator::CalcCorrectGraph>()));
-
-            for (auto &&[id, attackElementCorrect] : data.at("attackElementCorrects").items())
-            {
-                auto &&[inserted, success] = this->attackElementCorrectsById.emplace(std::stoi(id), attackElementCorrect);
-                constexpr auto default_ = calculator::AttributeScaling{false, false, false, false, true}; // default value
-                inserted->second[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::SLEEP)] = default_;
-            }
-
-            std::map<int, std::vector<calculator::ReinforceTypesDict>> reinforceTypes{};
-            for (auto &&[id, reinforceType] : data.at("reinforceTypes").items())
-                reinforceTypes.emplace(std::stoi(id), reinforceType);
-
-            std::map<int, std::map<calculator::AttackPowerType, int>> statusSpEffectParams{};
-            for (auto &&[key, val] : data.at("statusSpEffectParams").items())
-                statusSpEffectParams.try_emplace(std::stoi(key), val.get<std::map<calculator::AttackPowerType, int>>());
-
-            this->scalingTiers = data.at("scalingTiers").get<decltype(this->scalingTiers)>();
-
+                    this->scalingTiers.at(i++) = {row.at("value") / 100., this->menuText.at(row.at("textId"))};
+                
             auto create_weapon = [&](const json &weapon_data) {
                 auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_data.at("attackElementCorrectId").get<int>());
 
@@ -673,9 +645,8 @@ namespace xml
                     .scaling_tiers = this->scalingTiers};
                 };
 
-            const auto &weapons_data = data.at("weapons");
-            this->weapons.reserve(weapons_data.size());
-            for (auto &&weapon_data : weapons_data)
+            this->weapons.reserve(weapons_json.size());
+            for (auto &&weapon_data : weapons_json)
             {
                 this->weapons.emplace_back(create_weapon(weapon_data));
             }
