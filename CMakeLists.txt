@@ -69,11 +69,18 @@ target_link_libraries(elden-ring-damage-optimizer PRIVATE
     BS_thread_pool
     pugixml::pugixml
 )
-target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+    target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
+endif()
 if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
     target_link_libraries(elden-ring-damage-optimizer PRIVATE stdc++exp) # std:: print, println, ...
 endif()
 
 # find_package(wxWidgets CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE wx::core wx::base)
+
+file(COPY
+    ${CMAKE_CURRENT_SOURCE_DIR}/xml_data
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+)

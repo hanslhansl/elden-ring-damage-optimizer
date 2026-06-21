@@ -1,6 +1,5 @@
 module;
-#include <meta>
-#include <ostream>
+// #include <meta>
 #include <pugixml.hpp>
 #include <nlohmann/json.hpp>
 export module erdo:calculator;
@@ -72,36 +71,6 @@ namespace calculator
         ARCAINE
     };
 
-    constexpr std::string_view attribute_to_json_string(Attribute at)
-    {
-        return enum_to_string(at);
-        // switch (at)
-        // {
-        // case Attribute::STRENGTH:
-        //     return "str";
-        // case Attribute::DEXTERITY:
-        //     return "dex";
-        // case Attribute::INTELLIGENCE:
-        //     return "int";
-        // case Attribute::FAITH:
-        //     return "fai";
-        // case Attribute::ARCAINE:
-        //     return "arc";
-        // }
-
-        // throw std::invalid_argument("invalid attribute");
-    }
-    using Stats = std::array<int, std::meta::enumerators_of(^^Attribute).size()>;
-    using FullStats = std::array<int, 8>;
-    constexpr Stats full_stats_to_stats(const FullStats &full_stats)
-    {
-        return {full_stats.at(3), full_stats.at(4), full_stats.at(5), full_stats.at(6), full_stats.at(7)};
-    }
-    constexpr FullStats merge_stats_and_full_stats(const Stats &stats, const FullStats &full_stats)
-    {
-        return {full_stats.at(0), full_stats.at(1), full_stats.at(2), stats.at(0), stats.at(1), stats.at(2), stats.at(3), stats.at(4)};
-    }
-
     enum class Class
     {
         HERO,
@@ -115,7 +84,6 @@ namespace calculator
         PROPHET,
         SAMURAI,
     };
-    const std::map<Class, Stats> ALL_CLASS_STATS{{Class::HERO, {16, 9, 7, 8, 11}}, {Class::BANDIT, {9, 13, 9, 8, 14}}, {Class::ASTROLOGER, {8, 12, 16, 7, 9}}, {Class::WARRIOR, {10, 16, 10, 8, 9}}, {Class::PRISONER, {11, 14, 14, 6, 9}}, {Class::CONFESSOR, {12, 12, 9, 14, 9}}, {Class::WRETCH, {10, 10, 10, 10, 10}}, {Class::VAGABOND, {14, 13, 9, 9, 7}}, {Class::PROPHET, {11, 10, 7, 16, 10}}, {Class::SAMURAI, {12, 15, 9, 8, 8}}};
 
     enum class AttackPowerType
     {
@@ -152,12 +120,6 @@ namespace calculator
         MADNESS = std::to_underlying(AttackPowerType::MADNESS),
         DEATH_BLIGHT = std::to_underlying(AttackPowerType::DEATH_BLIGHT)
     };
-
-    using ScalingCurve = std::array<double, 149>;
-
-    using AttributeScaling = std::array<double, std::meta::enumerators_of(^^Attribute).size()>;
-    using AttackElementCorrects = std::array<AttributeScaling, std::meta::enumerators_of(^^AttackPowerType).size()>;
-    using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
 
     enum class Affinity_
     {
@@ -225,6 +187,165 @@ namespace calculator
     };
 
 } // namespace calculator
+
+template<>
+constexpr std::array<std::pair<calculator::Attribute, std::string_view>, 5> enum_string_mapping<calculator::Attribute> = {
+    std::pair{calculator::Attribute::STRENGTH, "STRENGTH"},
+    std::pair{calculator::Attribute::DEXTERITY, "DEXTERITY"},
+    std::pair{calculator::Attribute::INTELLIGENCE, "INTELLIGENCE"},
+    std::pair{calculator::Attribute::FAITH, "FAITH"},
+    std::pair{calculator::Attribute::ARCAINE, "ARCAINE"}
+};
+template<>
+constexpr std::array<std::pair<calculator::AttackPowerType, std::string_view>, 12> enum_string_mapping<calculator::AttackPowerType> = {
+    std::pair{calculator::AttackPowerType::PHYSICAL, "PHYSICAL"},
+    std::pair{calculator::AttackPowerType::MAGIC, "MAGIC"},
+    std::pair{calculator::AttackPowerType::FIRE, "FIRE"},
+    std::pair{calculator::AttackPowerType::LIGHTNING, "LIGHTNING"},
+    std::pair{calculator::AttackPowerType::HOLY, "HOLY"},
+    std::pair{calculator::AttackPowerType::POISON, "POISON"},
+    std::pair{calculator::AttackPowerType::SCARLET_ROT, "SCARLET_ROT"},
+    std::pair{calculator::AttackPowerType::BLEED, "BLEED"},
+    std::pair{calculator::AttackPowerType::FROST, "FROST"},
+    std::pair{calculator::AttackPowerType::SLEEP, "SLEEP"},
+    std::pair{calculator::AttackPowerType::MADNESS, "MADNESS"},
+    std::pair{calculator::AttackPowerType::DEATH_BLIGHT, "DEATH_BLIGHT"}
+};
+template<>
+constexpr std::array<std::pair<calculator::DamageType, std::string_view>, 5> enum_string_mapping<calculator::DamageType> = {
+    std::pair{calculator::DamageType::PHYSICAL, "PHYSICAL"},
+    std::pair{calculator::DamageType::MAGIC, "MAGIC"},
+    std::pair{calculator::DamageType::FIRE, "FIRE"},
+    std::pair{calculator::DamageType::LIGHTNING, "LIGHTNING"},
+    std::pair{calculator::DamageType::HOLY, "HOLY"}
+};
+template<>
+constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enum_string_mapping<calculator::StatusType> = {
+    std::pair{calculator::StatusType::POISON, "POISON"},
+    std::pair{calculator::StatusType::SCARLET_ROT, "SCARLET_ROT"},
+    std::pair{calculator::StatusType::BLEED, "BLEED"},
+    std::pair{calculator::StatusType::FROST, "FROST"},
+    std::pair{calculator::StatusType::SLEEP, "SLEEP"},
+    std::pair{calculator::StatusType::MADNESS, "MADNESS"},
+    std::pair{calculator::StatusType::DEATH_BLIGHT, "DEATH_BLIGHT"}
+};
+template<>
+constexpr std::array<std::pair<calculator::Class, std::string_view>, 10> enum_string_mapping<calculator::Class> = {
+    std::pair{calculator::Class::HERO, "HERO"},
+    std::pair{calculator::Class::BANDIT, "BANDIT"},
+    std::pair{calculator::Class::ASTROLOGER, "ASTROLOGER"},
+    std::pair{calculator::Class::WARRIOR, "WARRIOR"},
+    std::pair{calculator::Class::PRISONER, "PRISONER"},
+    std::pair{calculator::Class::CONFESSOR, "CONFESSOR"},
+    std::pair{calculator::Class::WRETCH, "WRETCH"},
+    std::pair{calculator::Class::VAGABOND, "VAGABOND"},
+    std::pair{calculator::Class::PROPHET, "PROPHET"},
+    std::pair{calculator::Class::SAMURAI, "SAMURAI"}
+};
+template<>
+constexpr std::array<std::pair<calculator::Affinity_, std::string_view>, 14> enum_string_mapping<calculator::Affinity_> = {
+    std::pair{calculator::Affinity_::STANDARD, "STANDARD"},
+    std::pair{calculator::Affinity_::HEAVY, "HEAVY"},
+    std::pair{calculator::Affinity_::KEEN, "KEEN"},
+    std::pair{calculator::Affinity_::QUALITY, "QUALITY"},
+    std::pair{calculator::Affinity_::FIRE, "FIRE"},
+    std::pair{calculator::Affinity_::FLAME_ART, "FLAME_ART"},
+    std::pair{calculator::Affinity_::LIGHTNING, "LIGHTNING"},
+    std::pair{calculator::Affinity_::SACRED, "SACRED"},
+    std::pair{calculator::Affinity_::MAGIC, "MAGIC"},
+    std::pair{calculator::Affinity_::COLD, "COLD"},
+    std::pair{calculator::Affinity_::POISON, "POISON"},
+    std::pair{calculator::Affinity_::BLOOD, "BLOOD"},
+    std::pair{calculator::Affinity_::OCCULT, "OCCULT"},
+    std::pair{calculator::Affinity_::UNIQUE, "UNIQUE"}
+};
+template<>
+constexpr std::array<std::pair<calculator::Type_, std::string_view>, 47> enum_string_mapping<calculator::Type_> = {
+    std::pair{calculator::Type_::DAGGER, "DAGGER"},
+    std::pair{calculator::Type_::STRAIGHT_SWORD, "STRAIGHT_SWORD"},
+    std::pair{calculator::Type_::GREATSWORD, "GREATSWORD"},
+    std::pair{calculator::Type_::COLOSSAL_SWORD, "COLOSSAL_SWORD"},
+    std::pair{calculator::Type_::CURVED_SWORD, "CURVED_SWORD"},
+    std::pair{calculator::Type_::CURVED_GREATSWORD, "CURVED_GREATSWORD"},
+    std::pair{calculator::Type_::KATANA, "KATANA"},
+    std::pair{calculator::Type_::TWINBLADE, "TWINBLADE"},
+    std::pair{calculator::Type_::THRUSTING_SWORD, "THRUSTING_SWORD"},
+    std::pair{calculator::Type_::HEAVY_THRUSTING_SWORD, "HEAVY_THRUSTING_SWORD"},
+    std::pair{calculator::Type_::AXE, "AXE"},
+    std::pair{calculator::Type_::GREATAXE, "GREATAXE"},
+    std::pair{calculator::Type_::HAMMER, "HAMMER"},
+    std::pair{calculator::Type_::GREAT_HAMMER, "GREAT_HAMMER"},
+    std::pair{calculator::Type_::FLAIL, "FLAIL"},
+    std::pair{calculator::Type_::SPEAR, "SPEAR"},
+    std::pair{calculator::Type_::GREAT_SPEAR, "GREAT_SPEAR"},
+    std::pair{calculator::Type_::HALBERD, "HALBERD"},
+    std::pair{calculator::Type_::REAPER, "REAPER"},
+    std::pair{calculator::Type_::FIST, "FIST"},
+    std::pair{calculator::Type_::CLAW, "CLAW"},
+    std::pair{calculator::Type_::WHIP, "WHIP"},
+    std::pair{calculator::Type_::COLOSSAL_WEAPON, "COLOSSAL_WEAPON"},
+    std::pair{calculator::Type_::LIGHT_BOW, "LIGHT_BOW"},
+    std::pair{calculator::Type_::BOW, "BOW"},
+    std::pair{calculator::Type_::GREATBOW, "GREATBOW"},
+    std::pair{calculator::Type_::CROSSBOW, "CROSSBOW"},
+    std::pair{calculator::Type_::BALLISTA, "BALLISTA"},
+    std::pair{calculator::Type_::GLINTSTONE_STAFF, "GLINTSTONE_STAFF"},
+    std::pair{calculator::Type_::DUAL_CATALYST, "DUAL_CATALYST"},
+    std::pair{calculator::Type_::SACRED_SEAL, "SACRED_SEAL"},
+    std::pair{calculator::Type_::SMALL_SHIELD, "SMALL_SHIELD"},
+    std::pair{calculator::Type_::MEDIUM_SHIELD, "MEDIUM_SHIELD"},
+    std::pair{calculator::Type_::GREATSHIELD, "GREATSHIELD"},
+    std::pair{calculator::Type_::TORCH, "TORCH"},
+    std::pair{calculator::Type_::HAND_TO_HAND, "HAND_TO_HAND"},
+    std::pair{calculator::Type_::PERFUME_BOTTLE, "PERFUME_BOTTLE"},
+    std::pair{calculator::Type_::THRUSTING_SHIELD, "THRUSTING_SHIELD"},
+    std::pair{calculator::Type_::THROWING_BLADE, "THROWING_BLADE"},
+    std::pair{calculator::Type_::BACKHAND_BLADE, "BACKHAND_BLADE"},
+    std::pair{calculator::Type_::LIGHT_GREATSWORD, "LIGHT_GREATSWORD"},
+    std::pair{calculator::Type_::GREAT_KATANA, "GREAT_KATANA"},
+    std::pair{calculator::Type_::BEAST_CLAW, "BEAST_CLAW"}
+};
+
+namespace calculator
+{
+    constexpr std::string_view attribute_to_json_string(Attribute at)
+    {
+        return enum_to_string(at);
+        // switch (at)
+        // {
+        // case Attribute::STRENGTH:
+        //     return "str";
+        // case Attribute::DEXTERITY:
+        //     return "dex";
+        // case Attribute::INTELLIGENCE:
+        //     return "int";
+        // case Attribute::FAITH:
+        //     return "fai";
+        // case Attribute::ARCAINE:
+        //     return "arc";
+        // }
+
+        // throw std::invalid_argument("invalid attribute");
+    }
+
+    using Stats = std::array<int, enumerators_of<Attribute>().size()>;
+    using FullStats = std::array<int, 8>;
+    constexpr Stats full_stats_to_stats(const FullStats &full_stats)
+    {
+        return {full_stats.at(3), full_stats.at(4), full_stats.at(5), full_stats.at(6), full_stats.at(7)};
+    }
+    constexpr FullStats merge_stats_and_full_stats(const Stats &stats, const FullStats &full_stats)
+    {
+        return {full_stats.at(0), full_stats.at(1), full_stats.at(2), stats.at(0), stats.at(1), stats.at(2), stats.at(3), stats.at(4)};
+    }
+    const std::map<Class, Stats> ALL_CLASS_STATS{{Class::HERO, {16, 9, 7, 8, 11}}, {Class::BANDIT, {9, 13, 9, 8, 14}}, {Class::ASTROLOGER, {8, 12, 16, 7, 9}}, {Class::WARRIOR, {10, 16, 10, 8, 9}}, {Class::PRISONER, {11, 14, 14, 6, 9}}, {Class::CONFESSOR, {12, 12, 9, 14, 9}}, {Class::WRETCH, {10, 10, 10, 10, 10}}, {Class::VAGABOND, {14, 13, 9, 9, 7}}, {Class::PROPHET, {11, 10, 7, 16, 10}}, {Class::SAMURAI, {12, 15, 9, 8, 8}}};
+
+    using ScalingCurve = std::array<double, 149>;
+    using AttributeScaling = std::array<double, enumerators_of<Attribute>().size()>;
+    using AttackElementCorrects = std::array<AttributeScaling, enumerators_of<AttackPowerType>().size()>;
+    using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
+}
+
 
 namespace nlohmann
 {
@@ -434,8 +555,8 @@ namespace calculator
                 bool two_handing;
 
                 std::array<double, 3> total_attack_power;                                                        // a + b = c
-                std::array<std::array<double, 3>, std::meta::enumerators_of(^^DamageType).size()> attack_power;  // a + b = c
-                std::array<std::array<double, 3>, std::meta::enumerators_of(^^StatusType).size()> status_effect; // a + b = c
+                std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
+                std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
                 double spell_scaling;
                 std::vector<AttackPowerType> ineffective_attack_power_types;
                 std::vector<Attribute> ineffective_attributes;
@@ -473,7 +594,7 @@ namespace calculator
       private:
         inline static thread_local std::vector<Attribute> get_attack_rating_ineffective_attributes = []() {
             std::vector<Attribute> v{};
-            constexpr auto size = std::meta::enumerators_of(^^Attribute).size();
+            constexpr auto size = enumerators_of<Attribute>().size();
             v.reserve(size);
             return v; }();
 
@@ -532,12 +653,12 @@ namespace calculator
         // attribute (e.g. Attribute.STRENGTH)
         const std::vector<AttributeScaling> attribute_scaling;
         // base attack power at each upgrade level for each attack power type
-        const std::vector<std::array<double, std::meta::enumerators_of(^^AttackPowerType).size()>> base_attack_power;
+        const std::vector<std::array<double, enumerators_of<AttackPowerType>().size()>> base_attack_power;
         // map indicating which attack power types scale with which player
         // attributes
         const AttackElementCorrectsById::mapped_type attack_power_attribute_scaling;
         // map indicating which scaling curve is used for each attack power type
-        const std::array<ScalingCurve, std::meta::enumerators_of(^^AttackPowerType).size()> attack_power_scaling_curves;
+        const std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this
         // weapon. This isn't hardcoded for all weapons because it can be
         // changed by mods.
@@ -586,7 +707,7 @@ namespace calculator
                 result.two_handing = attack_options_.two_handing;
 
                 result.total_attack_power.fill({});
-                constexpr auto size = std::meta::enumerators_of(^^AttackPowerType).size();
+                constexpr auto size = enumerators_of<AttackPowerType>().size();
                 result.ineffective_attack_power_types.reserve(size);
             }
 
@@ -723,7 +844,7 @@ namespace calculator
             if constexpr (T::is_full)
             {
                 result.ineffective_attributes = std::move(Weapon::get_attack_rating_ineffective_attributes);
-                constexpr auto size = std::meta::enumerators_of(^^Attribute).size();
+                constexpr auto size = enumerators_of<Attribute>().size();
                 Weapon::get_attack_rating_ineffective_attributes.reserve(size);
             }
             Weapon::get_attack_rating_ineffective_attributes.clear();
@@ -1060,7 +1181,7 @@ namespace calculator
                 const auto &reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
 
                 auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<std::map<AttackPowerType, int>>();
-                std::array<ScalingCurve, std::meta::enumerators_of(^^AttackPowerType).size()> weaponCalcCorrectGraphs{};
+                std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> weaponCalcCorrectGraphs{};
                 for (auto damage_type : enumerators_of<DamageType>())
                     weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
                         integral_to_enum<AttackPowerType>(std::to_underlying(damage_type)),
@@ -1074,7 +1195,7 @@ namespace calculator
 
                 auto unupgradedAttack = weapon_data.at("attack").get<std::vector<std::pair<AttackPowerType, int>>>();
                 auto statusSpEffectParamIds = weapon_data.value("statusSpEffectParamIds", std::array<int, 3>{});
-                std::vector<std::array<double, std::meta::enumerators_of(^^AttackPowerType).size()>> attack{};
+                std::vector<std::array<double, enumerators_of<AttackPowerType>().size()>> attack{};
                 for (const auto &reinforceParam : reinforceParams)
                 {
                     auto &attack_at_upgrade_level = attack.emplace_back();

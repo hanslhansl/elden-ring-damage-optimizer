@@ -2,6 +2,29 @@ export module erdo:witchy;
 
 import std;
 
+template <typename CharT>
+struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_string_view<CharT>, CharT>
+{
+    template <typename FormatContext>
+    auto format(const std::filesystem::path& p, FormatContext& ctx) const
+    {
+        if constexpr (std::same_as<CharT, char>)
+        {
+            auto s = p.string();
+            return std::formatter<std::basic_string_view<char>, char>::format(s, ctx);
+        }
+        else if constexpr (std::same_as<CharT, wchar_t>)
+        {
+            auto s = p.wstring();
+            return std::formatter<std::basic_string_view<wchar_t>, wchar_t>::format(s, ctx);
+        }
+        else
+        {
+            static_assert(sizeof(CharT) == 0, "Unsupported character type for filesystem::path formatter");
+        }
+    }
+};
+
 std::string quote_path(const std::filesystem::path& p)
 {
     return std::format("\"{}\"", p);

@@ -544,38 +544,39 @@ namespace xml
                             }
                         }
                     }
-
-
-
-
-
-
                 }
             }
 
 
             for (const auto &weapon_json : weapons_json)
             {
+                {
                     auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_json.at("attackElementCorrectId").get<int>());
 
                     const auto &reinforceParams = reinforce_types.at(weapon_json.at("reinforceTypeId").get<int>());
 
                     auto calcCorrectGraphIds = weapon_json.at("calcCorrectGraphIds").get<std::map<calculator::AttackPowerType, int>>();
-                    std::array<calculator::ScalingCurve, std::meta::enumerators_of(^^calculator::AttackPowerType).size()> weaponCalcCorrectGraphs{};
+                    std::array<calculator::ScalingCurve, enumerators_of<calculator::AttackPowerType>().size()> weaponCalcCorrectGraphs{};
                     for (auto damage_type : enumerators_of<calculator::DamageType>())
-                        weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
-                            integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type)),
-                            default_damage_calc_correct_graph_id)
+                        weaponCalcCorrectGraphs.at(std::to_underlying(damage_type)) = this->calcCorrectGraphsById.at(
+                            map_get(
+                                calcCorrectGraphIds,
+                                integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type)),
+                                default_damage_calc_correct_graph_id
+                            )
                         );
                     for (auto status_type : enumerators_of<calculator::StatusType>())
-                        weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = this->calcCorrectGraphsById.at(map_get(calcCorrectGraphIds,
-                            integral_to_enum<calculator::AttackPowerType>(std::to_underlying(status_type)),
-                            default_status_calc_correct_graph_id)
+                        weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = this->calcCorrectGraphsById.at(
+                            map_get(
+                                calcCorrectGraphIds,
+                                integral_to_enum<calculator::AttackPowerType>(std::to_underlying(status_type)),
+                                default_status_calc_correct_graph_id
+                            )
                         );
 
                     auto unupgradedAttack = weapon_json.at("attack").get<std::vector<std::pair<calculator::AttackPowerType, int>>>();
                     auto statusSpEffectParamIds = weapon_json.value("statusSpEffectParamIds", std::array<int, 3>{});
-                    std::vector<std::array<double, std::meta::enumerators_of(^^calculator::AttackPowerType).size()>> attack{};
+                    std::vector<std::array<double, enumerators_of<calculator::AttackPowerType>().size()>> attack{};
                     for (const auto &reinforceParam : reinforceParams)
                     {
                         auto &attack_at_upgrade_level = attack.emplace_back();
@@ -627,7 +628,7 @@ namespace xml
                         .attack_power_scaling_curves = std::move(weaponCalcCorrectGraphs),
                         .scaling_tiers = this->scalingTiers
                     });
-                // }
+                }
             }
 
             std::println("{} weapons\n", this->weapons.size());
