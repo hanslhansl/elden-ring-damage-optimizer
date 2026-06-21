@@ -230,27 +230,32 @@ namespace xml
                 )}
             };
         }
-        json parse_reinforce_param_weapon(const ParamRow &row) const
+        calculator::ReinforceTypesDict parse_reinforce_param_weapon(const ParamRow &row) const
         {
-            using namespace calculator;
+            calculator::ReinforceTypesDict ret{};
+            for (auto damage_type : enumerators_of<calculator::DamageType>())
+            {
+                auto apt = integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type));
 
-            auto cut_dec = [](double f) -> json {
-                if (f == (long long)f)
-                    return (long long)f;
-                return f; };
+                auto atk_rate_str = attack_power_type_to_xml_string(apt);
+                std::ranges::transform(atk_rate_str, atk_rate_str.begin(),
+                   [](unsigned char c){ return std::tolower(c); }
+                  );
 
-            json ret = {{"attack", {{std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), cut_dec(row.at("physicsAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), cut_dec(row.at("magicAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::FIRE)), cut_dec(row.at("fireAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), cut_dec(row.at("thunderAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::HOLY)), cut_dec(row.at("darkAtkRate"))}}}, {"attributeScaling", {{calculator::attribute_to_json_string(Attribute::STRENGTH), row.at("correctStrengthRate")}, {calculator::attribute_to_json_string(Attribute::DEXTERITY), row.at("correctAgilityRate")}, {calculator::attribute_to_json_string(Attribute::INTELLIGENCE), row.at("correctMagicRate")}, {calculator::attribute_to_json_string(Attribute::FAITH), row.at("correctFaithRate")}, {calculator::attribute_to_json_string(Attribute::ARCAINE), row.at("correctLuckRate")}}}};
-
-            if (row.contains("spEffectId1"))
-                if (row.at("spEffectId1") != 0)
-                    ret["statusSpEffectId1"] = row.at("spEffectId1");
-            if (row.contains("spEffectId2"))
-                if (row.at("spEffectId2") != 0)
-                    ret["statusSpEffectId2"] = row.at("spEffectId2");
-            if (row.contains("spEffectId3"))
-                if (row.at("spEffectId3") != 0)
-                    ret["statusSpEffectId3"] = row.at("spEffectId3");
-
+                ret.attack.at(std::to_underlying(damage_type)) = row.at(std::format("{}AtkRate", atk_rate_str));
+            }
+            for (auto attribute : enumerators_of<calculator::Attribute>())
+            {
+                auto rate_str = std::format("correct{}Rate", attribute_to_xml_string(attribute));
+                ret.attributeScaling.at(std::to_underlying(attribute)) = row.at(rate_str);
+            }
+            for (size_t i = 0; i < 3; ++i)
+            {
+                auto s = std::format("spEffectId{}", i+1);
+                if (row.contains(s))
+                    if (row.at(s) != 0)
+                        ret.statusSpEffectId.at(i) = row.at(s);
+            }
             return ret;
         }
 
@@ -456,11 +461,21 @@ namespace xml
             dlcWeaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml")),
             menuText(read_fmg_xml(xml_data_directory / witchy::GR_MenuTextFile += ".xml"))
         {
+            std::map<long long, std::vector<calculator::ReinforceTypesDict>> reinforce_types;
+            for (auto &&[reinforce_param_id, reinforce_param_weapon] : this->reinforceParamWeapons)
+            {
+                auto reinforce_level = reinforce_param_id % 50;
+                auto reinforce_type_id = reinforce_param_id - reinforce_level;
+                auto &&reinforce_type = reinforce_types.try_emplace(reinforce_type_id).first->second;
+                if (reinforce_type.size() == reinforce_level)
+                    reinforce_type.push_back(parse_reinforce_param_weapon(reinforce_param_weapon));
+            }
+
             json weapons_json = json::array();
             std::set<long long> calc_correct_graph_ids{default_damage_calc_correct_graph_id, default_status_calc_correct_graph_id};
             std::set<long long> reinforceTypeIds{};
             std::set<long long> attackElementCorrectIds{};
-
+            std::set<long long> statusSpEffectParamIds{};
             for (auto &&[k, param_row] : this->equipParamWeapons)
             {
                 auto weapon_json = this->parse_weapon(param_row);
@@ -472,47 +487,23 @@ namespace xml
                         calc_correct_graph_ids.insert(calcCorrectGraphId.get<long long>());
 
                     attackElementCorrectIds.insert(weapon_json.at("attackElementCorrectId").get<long long>());  
-                    reinforceTypeIds.insert(weapon_json.at("reinforceTypeId").get<long long>());  
-                }
-            }
-            
-            json reinforce_types_json{};
-            for (auto &&[reinforceParamId, reinforceParamWeapon] : this->reinforceParamWeapons)
-            {
-                auto reinforceLevel = reinforceParamId % 50;
-                auto reinforceTypeId = reinforceParamId - reinforceLevel;
-                auto reinforceTypeId_string = std::to_string(reinforceTypeId);
+                    auto reinforceTypeId = weapon_json.at("reinforceTypeId").get<long long>();
+                    reinforceTypeIds.insert(reinforceTypeId);  
 
-                if (reinforceTypeIds.contains(reinforceTypeId))
-                {
-                    if (!reinforce_types_json.contains(reinforceTypeId_string))
-                        reinforce_types_json[reinforceTypeId_string] = json::array();
-
-                    auto &&reinforceTypeJson = reinforce_types_json[reinforceTypeId_string];
-                    if (reinforceTypeJson.size() == reinforceLevel)
-                        reinforceTypeJson.push_back(parse_reinforce_param_weapon(reinforceParamWeapon));
-                }
-            }
-
-            std::set<long long> statusSpEffectParamIds{};
-            for (auto &&weapon_json : weapons_json)
-            {
-                auto reinforceTypeId_string = std::to_string(weapon_json.at("reinforceTypeId").get<long long>());
-                auto &&reinforceParamWeapons = reinforce_types_json.at(reinforceTypeId_string);
-                for (auto &&reinforceParamWeapon : reinforceParamWeapons)
-                {
-                    if (weapon_json.contains("statusSpEffectParamIds"))
+                    for (auto &&reinforceParamWeapon : reinforce_types.at(reinforceTypeId))
                     {
-                        int i = 1;
-                        for (auto &&spEffectParamId : weapon_json.at("statusSpEffectParamIds").get<std::array<long long, 3>>())
+                        if (weapon_json.contains("statusSpEffectParamIds"))
                         {
-                            if (spEffectParamId)
+                            int i = 1;
+                            for (auto &&spEffectParamId : weapon_json.at("statusSpEffectParamIds").get<std::array<long long, 3>>())
                             {
-                                auto statusSpEffectId_string = "statusSpEffectId" + std::to_string(i);
-                                auto offset = reinforceParamWeapon.value(statusSpEffectId_string, 0ll);
-                                statusSpEffectParamIds.insert(spEffectParamId + offset);
+                                if (spEffectParamId)
+                                {
+                                    auto offset = reinforceParamWeapon.statusSpEffectId.at(i-1);
+                                    statusSpEffectParamIds.insert(spEffectParamId + offset);
+                                }
+                                ++i;
                             }
-                            ++i;
                         }
                     }
                 }
@@ -541,11 +532,6 @@ namespace xml
                 }
             }
 
-
-            std::map<int, std::vector<calculator::ReinforceTypesDict>> reinforceTypes{};
-            for (auto &&[id, reinforceType] : reinforce_types_json.items())
-                reinforceTypes.emplace(std::stoi(id), reinforceType);
-
             std::map<int, std::map<calculator::AttackPowerType, long long>> statusSpEffectParams{};
             for (auto &&[spEffectParamId, _] : this->spEffectParams)
             {
@@ -558,17 +544,13 @@ namespace xml
             for (auto &&[id, row] : this->menuValueTableParams)
                 if (row.at("compareType") == 1 && id >= 100)
                     this->scalingTiers.at(i++) = {row.at("value") / 100., this->menuText.at(row.at("textId"))};
-                
-            auto create_weapon = [&](const json &weapon_data) {
-                
-            };
 
             this->weapons.reserve(weapons_json.size());
             for (const auto &weapon_data : weapons_json)
             {
                 auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_data.at("attackElementCorrectId").get<int>());
 
-                const auto &reinforceParams = reinforceTypes.at(weapon_data.at("reinforceTypeId").get<int>());
+                const auto &reinforceParams = reinforce_types.at(weapon_data.at("reinforceTypeId").get<int>());
 
                 auto calcCorrectGraphIds = weapon_data.at("calcCorrectGraphIds").get<std::map<calculator::AttackPowerType, int>>();
                 std::array<calculator::ScalingCurve, std::meta::enumerators_of(^^calculator::AttackPowerType).size()> weaponCalcCorrectGraphs{};

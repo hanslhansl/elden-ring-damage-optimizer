@@ -769,6 +769,8 @@ namespace calculator
             r.statusSpEffectId.at(1) = j.value("statusSpEffectId2", 0);
             r.statusSpEffectId.at(2) = j.value("statusSpEffectId3", 0);
         }
+
+        bool operator==(const ReinforceTypesDict&) const = default;
     };
 
     constexpr size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats)
