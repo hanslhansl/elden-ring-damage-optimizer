@@ -18,8 +18,7 @@ namespace xml
 
     template<typename T>
         requires (std::same_as<T, double> || std::same_as<T, long long>)
-    std::map<long long, std::map<std::string, T>> read_param_xml(const std::filesystem::path &file_path)
-    {
+    std::map<long long, std::map<std::string, T>> read_param_xml(const std::filesystem::path &file_path) {
         auto get_as = [](const pugi::xml_attribute& attr, T def = 0){
             if constexpr (std::same_as<T, double>)
                 return attr.as_double(def);
@@ -63,8 +62,7 @@ namespace xml
 
         return ret;
     }
-    std::map<long long, std::string> read_fmg_xml(const std::filesystem::path &file_path)
-    {
+    std::map<long long, std::string> read_fmg_xml(const std::filesystem::path &file_path) {
         pugi::xml_document data;
         auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
         if (!result)
@@ -141,8 +139,7 @@ namespace xml
         std::map<long long, std::string> weaponNames;
         std::map<long long, std::string> dlcWeaponNames;
 
-        std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(long long statusSpEffectParamId) const
-        {
+        std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(long long statusSpEffectParamId) const {
             if (!this->spEffectParams.contains(statusSpEffectParamId))
                 return {};
             auto &&spEffectRow = this->spEffectParams.at(statusSpEffectParamId);
@@ -162,76 +159,46 @@ namespace xml
 
             return {};
         }
-        calculator::CalcCorrectGraph parse_calc_correct_graph(const ParamRow &row) const
-        {
-            return calculator::CalcCorrectGraph{
-                calculator::CalcCorrectGraphEntry{assert_floating_is<int>(row.at("stageMaxVal0")), row.at("stageMaxGrowVal0") / 100., row.at("adjPt_maxGrowVal0")},
-                calculator::CalcCorrectGraphEntry{assert_floating_is<int>(row.at("stageMaxVal1")), row.at("stageMaxGrowVal1") / 100., row.at("adjPt_maxGrowVal1")},
-                calculator::CalcCorrectGraphEntry{assert_floating_is<int>(row.at("stageMaxVal2")), row.at("stageMaxGrowVal2") / 100., row.at("adjPt_maxGrowVal2")},
-                calculator::CalcCorrectGraphEntry{assert_floating_is<int>(row.at("stageMaxVal3")), row.at("stageMaxGrowVal3") / 100., row.at("adjPt_maxGrowVal3")},
-                calculator::CalcCorrectGraphEntry{assert_floating_is<int>(row.at("stageMaxVal4")), row.at("stageMaxGrowVal4") / 100., row.at("adjPt_maxGrowVal4")},
-            };
+        static calculator::CalcCorrectGraph parse_calc_correct_graph(const ParamRow &row) {
+            calculator::CalcCorrectGraph ret{};
+            for (size_t i = 0; i < 5; ++i)
+            {
+                auto maxVal = assert_floating_is<int>(row.at(std::format("stageMaxVal{}", i)));
+                auto maxGrowVal = row.at(std::format("stageMaxGrowVal{}", i)) / 100.;
+                auto adjPt = row.at(std::format("adjPt_maxGrowVal{}", i));
+                ret.at(i) = calculator::CalcCorrectGraphEntry{maxVal, maxGrowVal, adjPt};
+            }
+            return ret;
         }
-        json parse_attack_element_correct(const ParamRow &row) const
-        {
-            using namespace calculator;
+        static calculator::AttackElementCorrects parse_attack_element_correct(const ParamRow &row) {
+            calculator::AttackElementCorrects ret{};
+            for (auto damage_type : enumerators_of<calculator::DamageType>())
+            {
+                auto apt = integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type));
+                auto apt_str = attack_power_type_to_xml_string(apt);
 
-            auto buildAttackElementCorrect = [](std::vector<std::tuple<Attribute, bool, double>> v) {
-                json entries = json::object();
-                for (auto &&elem : v)
+                auto&& attribute_scaling = ret.at(std::to_underlying(apt));
+
+                for (auto attribute : enumerators_of<calculator::Attribute>())
                 {
-                    auto &&[attribute, isCorrect, overwriteCorrect] = elem;
-                    if (isCorrect)
+                    auto attribute_str = attribute_to_xml_string(attribute);
+                    if (attribute_str == "Agility")
+                        attribute_str = "Dexterity";
+                    bool is_correct = row.at(std::format("is{}Correct_by{}", attribute_str, apt_str));
+                    auto overwrite_correct = row.at(std::format("overwrite{}CorrectRate_by{}", attribute_str, apt_str));
+
+                    if (is_correct)
                     {
-                        if (overwriteCorrect == -1)
-                            entries.emplace(
-                                enum_to_string(attribute), true);
+                        if (overwrite_correct == -1)
+                            attribute_scaling.at(std::to_underlying(attribute)) = true;
                         else
-                            entries.emplace(enum_to_string(attribute), overwriteCorrect / 100.);
+                            attribute_scaling.at(std::to_underlying(attribute)) = overwrite_correct / 100.;
                     }
                 }
-                return entries; };
-
-            return json{
-                {std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), buildAttackElementCorrect({
-                    {Attribute::STRENGTH, row.at("isStrengthCorrect_byPhysics"), row.at("overwriteStrengthCorrectRate_byPhysics")},
-                    {Attribute::DEXTERITY, row.at("isDexterityCorrect_byPhysics"), row.at("overwriteDexterityCorrectRate_byPhysics")},
-                    {Attribute::FAITH, row.at("isFaithCorrect_byPhysics"), row.at("overwriteFaithCorrectRate_byPhysics")},
-                    {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byPhysics"), row.at("overwriteMagicCorrectRate_byPhysics")},
-                    {Attribute::ARCAINE, row.at("isLuckCorrect_byPhysics"), row.at("overwriteLuckCorrectRate_byPhysics")}}
-                )},
-                {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), buildAttackElementCorrect({
-                    {Attribute::STRENGTH, row.at("isStrengthCorrect_byMagic"), row.at("overwriteStrengthCorrectRate_byMagic")},
-                    {Attribute::DEXTERITY, row.at("isDexterityCorrect_byMagic"), row.at("overwriteDexterityCorrectRate_byMagic")},
-                    {Attribute::FAITH, row.at("isFaithCorrect_byMagic"), row.at("overwriteFaithCorrectRate_byMagic")},
-                    {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byMagic"), row.at("overwriteMagicCorrectRate_byMagic")},
-                    {Attribute::ARCAINE, row.at("isLuckCorrect_byMagic"), row.at("overwriteLuckCorrectRate_byMagic")}}
-                )},
-                {std::to_string(std::to_underlying(AttackPowerType::FIRE)), buildAttackElementCorrect({
-                    {Attribute::STRENGTH, row.at("isStrengthCorrect_byFire"), row.at("overwriteStrengthCorrectRate_byFire")},
-                    {Attribute::DEXTERITY, row.at("isDexterityCorrect_byFire"), row.at("overwriteDexterityCorrectRate_byFire")},
-                    {Attribute::FAITH, row.at("isFaithCorrect_byFire"), row.at("overwriteFaithCorrectRate_byFire")},
-                    {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byFire"), row.at("overwriteMagicCorrectRate_byFire")},
-                    {Attribute::ARCAINE, row.at("isLuckCorrect_byFire"), row.at("overwriteLuckCorrectRate_byFire")}}
-                )},
-                {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), buildAttackElementCorrect({
-                    {Attribute::STRENGTH, row.at("isStrengthCorrect_byThunder"), row.at("overwriteStrengthCorrectRate_byThunder")},
-                    {Attribute::DEXTERITY, row.at("isDexterityCorrect_byThunder"), row.at("overwriteDexterityCorrectRate_byThunder")},
-                    {Attribute::FAITH, row.at("isFaithCorrect_byThunder"), row.at("overwriteFaithCorrectRate_byThunder")},
-                    {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byThunder"), row.at("overwriteMagicCorrectRate_byThunder")},
-                    {Attribute::ARCAINE, row.at("isLuckCorrect_byThunder"), row.at("overwriteLuckCorrectRate_byThunder")}}
-                )},
-                {std::to_string(std::to_underlying(AttackPowerType::HOLY)), buildAttackElementCorrect({
-                    {Attribute::STRENGTH, row.at("isStrengthCorrect_byDark"), row.at("overwriteStrengthCorrectRate_byDark")},
-                    {Attribute::DEXTERITY, row.at("isDexterityCorrect_byDark"), row.at("overwriteDexterityCorrectRate_byDark")},
-                    {Attribute::FAITH, row.at("isFaithCorrect_byDark"), row.at("overwriteFaithCorrectRate_byDark")},
-                    {Attribute::INTELLIGENCE, row.at("isMagicCorrect_byDark"), row.at("overwriteMagicCorrectRate_byDark")},
-                    {Attribute::ARCAINE, row.at("isLuckCorrect_byDark"), row.at("overwriteLuckCorrectRate_byDark")}}
-                )}
-            };
+            }
+            return ret;
         }
-        calculator::ReinforceTypesDict parse_reinforce_param_weapon(const ParamRow &row) const
-        {
+        static calculator::ReinforceTypesDict parse_reinforce_param_weapon(const ParamRow &row) {
             calculator::ReinforceTypesDict ret{};
             for (auto damage_type : enumerators_of<calculator::DamageType>())
             {
@@ -259,8 +226,7 @@ namespace xml
             return ret;
         }
 
-        json parse_weapon(const std::map<std::string, double> &row) const
-        {
+        json parse_weapon(const std::map<std::string, double> &row) const {
             using namespace calculator;
 
             auto row_id = assert_floating_is<long long>(row.at("id"));
@@ -417,8 +383,7 @@ namespace xml
             return ret;
         }
 
-        static calculator::ScalingCurve evaluate_CalcCorrectGraph(const calculator::CalcCorrectGraph &calcCorrectGraph)
-        {
+        static calculator::ScalingCurve evaluate_CalcCorrectGraph(const calculator::CalcCorrectGraph &calcCorrectGraph) {
             calculator::ScalingCurve arr{};
 
             for (size_t i = 1; i < calcCorrectGraph.size(); i++)
@@ -486,10 +451,8 @@ namespace xml
                 
             for (auto &&[id, row] : this->attackElementCorrectParams)
             {
-                auto attackElementCorrect = parse_attack_element_correct(row);
-
-                auto &&[inserted, success] = this->attackElementCorrectsById.emplace(id, attackElementCorrect);
-                constexpr auto default_ = calculator::AttributeScaling{false, false, false, false, true}; // default value
+                auto &&[inserted, success] = this->attackElementCorrectsById.emplace(id, parse_attack_element_correct(row));
+                constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
                 inserted->second[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
                 inserted->second[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
                 inserted->second[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
@@ -551,8 +514,6 @@ namespace xml
             for (const auto &weapon_json : weapons_json)
             {
                 {
-                    auto &&attackElementCorrect = this->attackElementCorrectsById.at(weapon_json.at("attackElementCorrectId").get<int>());
-
                     const auto &reinforceParams = reinforce_types.at(weapon_json.at("reinforceTypeId").get<int>());
 
                     auto calcCorrectGraphIds = weapon_json.at("calcCorrectGraphIds").get<std::map<calculator::AttackPowerType, int>>();
@@ -624,7 +585,7 @@ namespace xml
                         .requirements = weapon_json.at("requirements").get<calculator::Stats>(),
                         .attribute_scaling = std::move(attributeScaling),
                         .base_attack_power = std::move(attack),
-                        .attack_power_attribute_scaling = std::move(attackElementCorrect),
+                        .attack_power_attribute_scaling = this->attackElementCorrectsById.at(weapon_json.at("attackElementCorrectId").get<int>()),
                         .attack_power_scaling_curves = std::move(weaponCalcCorrectGraphs),
                         .scaling_tiers = this->scalingTiers
                     });
