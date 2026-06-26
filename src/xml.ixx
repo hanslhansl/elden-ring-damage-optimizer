@@ -18,7 +18,7 @@ namespace xml
     template<typename T>
         requires (std::same_as<T, double> || std::same_as<T, long long>)
     std::map<long long, std::map<std::string, T>> read_param_xml(const std::filesystem::path &file_path) {
-        auto get_as = [](const pugi::xml_attribute& attr, T def = 0){
+        static auto get_as = [](const pugi::xml_attribute& attr, T def = 0){
             if constexpr (std::same_as<T, double>)
                 return attr.as_double(def);
             else if constexpr (std::same_as<T, long long>)
@@ -120,28 +120,12 @@ namespace xml
 
     struct WeaponContainer : calculator::WeaponContainer
     {
-        using WeaponDict = json;
-
-        template<typename T>
-        static bool is_unique_weapon(const std::map<std::string, T> &row)
-        {
-            return row.at("gemMountType") == 0 || row.at("disableGemAttr") == 1;
-        }
-
-        std::map<long long, std::map<std::string, double>> attackElementCorrectParams;
-        std::map<long long, std::map<std::string, double>> calcCorrectGraphs;
-        std::map<long long, std::map<std::string, double>> equipParamWeapons;
-        std::map<long long, std::map<std::string, double>> reinforceParamWeapons;
-        std::map<long long, std::map<std::string, long long>> spEffectParams;
-        std::map<long long, std::map<std::string, double>> menuValueTableParams;
-        std::map<long long, std::string> menuText;
-        std::map<long long, std::string> weaponNames;
-        std::map<long long, std::string> dlcWeaponNames;
-
-        std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(long long statusSpEffectParamId) const {
-            if (!this->spEffectParams.contains(statusSpEffectParamId))
+        static std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(
+            long long statusSpEffectParamId,
+            const std::map<long long, std::map<std::string, long long>>& spEffectParams) {
+            if (!spEffectParams.contains(statusSpEffectParamId))
                 return {};
-            auto &&spEffectRow = this->spEffectParams.at(statusSpEffectParamId);
+            auto &&spEffectRow = spEffectParams.at(statusSpEffectParamId);
 
             std::map<calculator::AttackPowerType, long long> statuses =  {
                 {calculator::AttackPowerType::POISON, spEffectRow.at("poizonAttackPower")},
@@ -224,164 +208,6 @@ namespace xml
             }
             return ret;
         }
-
-        json parse_weapon(const std::map<std::string, double> &row) const {
-            using namespace calculator;
-
-            auto row_id = assert_floating_is<long long>(row.at("id"));
-
-            std::string name{};
-            bool dlc{};
-            if (this->weaponNames.contains(row_id))
-                name = this->weaponNames.at(row_id);
-            else if (this->dlcWeaponNames.contains(row_id))
-            {
-                name = this->dlcWeaponNames.at(row_id);
-                dlc = isVanilla;
-            }
-            else
-            {
-                std::println("ignoring: could not find weapon name for id: {}", row_id);
-                return {};
-            }
-
-            if (name.find("[ERROR]") != std::string::npos || name.find("%null%") != std::string::npos)
-            {
-                std::println("ignoring: weapon name: {}, id: {}", name, row_id);
-                return {};
-            }
-
-            const auto weaponType = weapon_type_overrides.contains(row_id) ? std::to_underlying(weapon_type_overrides.at(row_id)) : assert_floating_is<long long>(row.at("wepType"));
-            if (!is_valid_enum_integral<calculator::Weapon::Type>(weaponType))
-            {
-                if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
-                    std::println("ignoring: weapon {} because no real weapon", name);
-                else
-                {
-                    std::println("ignoring: Unknown weapon type {} for weapon {}", weaponType, name);
-                    throw std::runtime_error("unknown weapon type");
-                }
-                return {};
-            }
-
-            if (!this->reinforceParamWeapons.contains(row.at("reinforceTypeId")))
-                throw std::runtime_error(std::format("could not find reinforce param weapon for reinforceTypeId: {}", std::to_string(row.at("reinforceTypeId"))));
-
-            if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrectId")))
-                throw std::runtime_error(std::format("could not find attack element correct param for attackElementCorrectId: {}", std::to_string(row.at("attackElementCorrectId"))));
-
-            const auto affinityId = assert_floating_is<long long>((row_id % 10000) / 100.);
-
-            const auto equipParamWeaponsId = row_id - 100 * affinityId;
-            if (!this->equipParamWeapons.contains(equipParamWeaponsId))
-                throw std::runtime_error(std::format("could not find equip param weapon for id: {}", std::to_string(equipParamWeaponsId)));
-            const auto &uninfusedWeapon = this->equipParamWeapons.at(equipParamWeaponsId);
-
-            if (affinityId != 0 && is_unique_weapon(uninfusedWeapon))
-                throw std::runtime_error("unique weapon cannot have an affinity");
-
-            std::set<calculator::AttackPowerType> attackPowerTypes{};
-            std::vector<long long> statusSpEffectParamIds{};
-            for (size_t i = 0; i < 3; ++i)
-            {
-                auto spEffectParamId = assert_floating_is<long long>(row.at(std::format("spEffectBehaviorId{}", i)));
-                auto statusSpEffectParams = parse_status_sp_effect_params(spEffectParamId);
-                if (!statusSpEffectParams.empty())
-                {
-                    for (auto &&[k, v] : statusSpEffectParams)
-                        attackPowerTypes.insert(k);
-
-                    statusSpEffectParamIds.emplace_back(spEffectParamId);
-                }
-                else
-                    statusSpEffectParamIds.emplace_back(0);
-            }
-
-            if (std::ranges::all_of(statusSpEffectParamIds, [](long long id) { return id == 0; }))
-                statusSpEffectParamIds.clear();
-
-            if (isVanilla && row_id == 32131200)
-                statusSpEffectParamIds = {0, 0, 0};
-
-            std::vector<std::pair<AttackPowerType, double>> attack{};
-            for (auto damage_type : enumerators_of<DamageType>())
-            {
-                auto apt = integral_to_enum<AttackPowerType>(std::to_underlying(damage_type));
-                auto attack_power = row.at(std::format("attackBase{}", attack_power_type_to_xml_string(apt)));
-
-                if (attack_power != 0)
-                {
-                    attackPowerTypes.insert(apt);
-                    attack.emplace_back(apt, attack_power);
-                }
-            }
-
-            if (row.at("enableMagic") || row.at("enableMiracle"))
-                for (auto &&damageType : enumerators_of<DamageType>())
-                    attackPowerTypes.insert(integral_to_enum<AttackPowerType>(std::to_underlying(damageType)));
-
-            std::map<AttackPowerType, long long> calcCorrectGraphIds{};
-            for (auto apt : enumerators_of<AttackPowerType>())
-            {
-                if (attackPowerTypes.contains(apt))
-                {
-                    if (!std::set{ AttackPowerType::SCARLET_ROT, AttackPowerType::FROST, AttackPowerType::DEATH_BLIGHT }.contains(apt))
-                    {
-                        auto xml_str = std::format("correctType_{}", attack_power_type_to_xml_string(apt));
-                        auto def = is_valid_enum_integral<DamageType>(std::to_underlying(apt)) ? default_damage_calc_correct_graph_id : default_status_calc_correct_graph_id;
-                        if (row.contains(xml_str))
-                        {
-                            auto calcCorrectGraphId = assert_floating_is<long long>(row.at(xml_str));
-
-                            if (!this->calcCorrectGraphs.contains(calcCorrectGraphId))
-                                throw std::runtime_error(std::format("could not find calc correct graph for id: {}", calcCorrectGraphId));
-
-                            calcCorrectGraphIds[apt] = calcCorrectGraphId;
-                        } 
-                    }
-                }
-            }
-
-            std::vector<std::pair<Attribute, double>> attributeScaling{};
-            for (auto attribute : enumerators_of<Attribute>())
-            {
-                auto xml_str = std::format("correct{}", attribute_to_xml_string(attribute));
-                if (row.at(xml_str))
-                    attributeScaling.emplace_back(attribute, row.at(xml_str) / 100.);
-            }
-
-            json ret{};
-            ret["name"] = name;
-            ret["weaponName"] = (weaponNames.contains(uninfusedWeapon.at("id")) ? weaponNames.at(uninfusedWeapon.at("id")) : dlcWeaponNames.at(uninfusedWeapon.at("id")));
-            // ret["url"] = "";
-            ret["affinityId"] = is_unique_weapon(row) ? -1 : affinityId;
-            ret["weaponType"] = weaponType;
-            ret["requirements"] = Stats{
-                assert_floating_is<int>(row.at("properStrength")),
-                assert_floating_is<int>(row.at("properAgility")),
-                assert_floating_is<int>(row.at("properMagic")),
-                assert_floating_is<int>(row.at("properFaith")),
-                assert_floating_is<int>(row.at("properLuck")),
-            };
-            ret["attack"] = attack;
-            ret["attributeScaling"] = attributeScaling;
-            if (!statusSpEffectParamIds.empty())
-                ret["statusSpEffectParamIds"] = statusSpEffectParamIds;
-            ret["reinforceTypeId"] = assert_floating_is<long long>(row.at("reinforceTypeId"));
-            ret["attackElementCorrectId"] = assert_floating_is<long long>(row.at("attackElementCorrectId"));
-            ret["calcCorrectGraphIds"] = calcCorrectGraphIds;
-            if (row.at("isDualBlade") == 1)
-                ret["paired"] = true;
-            if (row.at("enableMagic") == 1)
-                ret["sorceryTool"] = true;
-            if (row.at("enableMiracle") == 1)
-                ret["incantationTool"] = true;
-            ret["dlc"] = dlc;
-
-            std::println("weapon: {}, type: {}", name, enum_to_string(integral_to_enum<Weapon::Type>(weaponType)));
-            return ret;
-        }
-
         static calculator::ScalingCurve evaluate_CalcCorrectGraph(const calculator::CalcCorrectGraph &calcCorrectGraph) {
             calculator::ScalingCurve arr{};
 
@@ -414,41 +240,52 @@ namespace xml
             return arr;
         }
 
-        WeaponContainer(const std::filesystem::path &xml_data_directory) : 
-            attackElementCorrectParams(read_param_xml<double>(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml")),
-            calcCorrectGraphs(read_param_xml<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml")),
-            equipParamWeapons(read_param_xml<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml")),
-            reinforceParamWeapons(read_param_xml<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml")),
-            spEffectParams(read_param_xml<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml")),
-            menuValueTableParams(read_param_xml<double>(xml_data_directory / witchy::MenuValueTableParamFile += ".xml")),
-            weaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponNameFile += ".xml")),
-            dlcWeaponNames(read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml")),
-            menuText(read_fmg_xml(xml_data_directory / witchy::GR_MenuTextFile += ".xml"))
+        static std::array<std::pair<double, std::string>, 6> get_scaling_tiers(const std::filesystem::path& menu_text_file, const std::filesystem::path& menu_value_table_params_file) {
+            auto menu_text = read_fmg_xml(menu_text_file);
+
+            std::array<std::pair<double, std::string>, 6> scaling_tiers{};
+            size_t  i = 0;
+            for (auto &&[id, row] : read_param_xml<long long>(menu_value_table_params_file))
+                if (row.at("compareType") == 1 && id >= 100)
+                    scaling_tiers.at(i++) = {row.at("value") / 100., menu_text.at(row.at("textId"))};
+
+            return scaling_tiers;
+        }
+
+        WeaponContainer(const std::filesystem::path &xml_data_directory)
         {
+            this->scalingTiers = get_scaling_tiers(
+                xml_data_directory / witchy::GR_MenuTextFile += ".xml",
+                xml_data_directory / witchy::MenuValueTableParamFile += ".xml"
+            );
+
+            auto spEffectParams = read_param_xml<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml");
+            auto calcCorrectGraphs = read_param_xml<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml");
+            auto equipParamWeapons = read_param_xml<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml");
+            auto reinforceParamWeapons = read_param_xml<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml");
+            auto weaponNames = read_fmg_xml(xml_data_directory / witchy::WeaponNameFile += ".xml");
+            auto dlcWeaponNames = read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml");
+
             std::map<long long, std::vector<calculator::ReinforceTypesDict>> reinforce_types;
-            for (auto &&[reinforce_param_id, reinforce_param_weapon] : this->reinforceParamWeapons)
+            for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)
             {
                 auto reinforce_level = reinforce_param_id % 50;
                 auto reinforce_type_id = reinforce_param_id - reinforce_level;
                 auto &&reinforce_type = reinforce_types.try_emplace(reinforce_type_id).first->second;
                 if (reinforce_type.size() == reinforce_level)
-                    reinforce_type.push_back(parse_reinforce_param_weapon(reinforce_param_weapon));
+                    reinforce_type.emplace_back(parse_reinforce_param_weapon(reinforce_param_weapon));
             }
 
-            size_t  i = 0;
-            for (auto &&[id, row] : this->menuValueTableParams)
-                if (row.at("compareType") == 1 && id >= 100)
-                    this->scalingTiers.at(i++) = {row.at("value") / 100., this->menuText.at(row.at("textId"))};
-
             std::map<int, std::map<calculator::AttackPowerType, long long>> statusSpEffectParams{};
-            for (auto &&[spEffectParamId, _] : this->spEffectParams)
+            for (auto &&[spEffectParamId, _] : spEffectParams)
             {
-                auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId);
+                auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId, spEffectParams);
                 std::erase_if(status_sp_effect_params, [](auto &&v) { return v.second == 0; });
                 statusSpEffectParams.try_emplace(spEffectParamId, status_sp_effect_params);
             }
                 
-            for (auto &&[id, row] : this->attackElementCorrectParams)
+            auto attackElementCorrectParams = read_param_xml<double>(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml");
+            for (auto &&[id, row] : attackElementCorrectParams)
             {
                 auto &&[inserted, success] = this->attackElementCorrectsById.emplace(id, parse_attack_element_correct(row));
                 constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
@@ -459,31 +296,30 @@ namespace xml
             }
 
             auto get_calc_correct_graph_by_id = [&](long long calc_correct_graph_id)->const calculator::ScalingCurve& {
-                auto&& [iterator, success] = this->calcCorrectGraphsById.try_emplace(calc_correct_graph_id);
+                auto&& [iterator, success] = calcCorrectGraphsById.try_emplace(calc_correct_graph_id);
                 auto&& [_, scaling_curve] = *iterator;
                 if (success)
                     scaling_curve = evaluate_CalcCorrectGraph(
                         parse_calc_correct_graph(
-                            this->calcCorrectGraphs.at(calc_correct_graph_id)
+                            calcCorrectGraphs.at(calc_correct_graph_id)
                         )
                     );
 
                 return scaling_curve;
             };
 
-            this->weapons.reserve(this->equipParamWeapons.size());
-            json weapons_json = json::array();
-            for (auto &&[k, row] : this->equipParamWeapons)
+            this->weapons.reserve(equipParamWeapons.size());
+            for (auto &&[k, row] : equipParamWeapons)
             {
                 auto row_id = assert_floating_is<long long>(row.at("id"));
 
                 std::string name{};
                 bool dlc{};
-                if (this->weaponNames.contains(row_id))
-                    name = this->weaponNames.at(row_id);
-                else if (this->dlcWeaponNames.contains(row_id))
+                if (weaponNames.contains(row_id))
+                    name = weaponNames.at(row_id);
+                else if (dlcWeaponNames.contains(row_id))
                 {
-                    name = this->dlcWeaponNames.at(row_id);
+                    name = dlcWeaponNames.at(row_id);
                     dlc = isVanilla;
                 }
                 else
@@ -498,33 +334,35 @@ namespace xml
                     continue;
                 }
 
-                const auto weaponType = weapon_type_overrides.contains(row_id) ? std::to_underlying(weapon_type_overrides.at(row_id)) : assert_floating_is<long long>(row.at("wepType"));
+                const auto weaponType = weapon_type_overrides.contains(row_id)
+                    ? std::to_underlying(weapon_type_overrides.at(row_id))
+                    : assert_floating_is<long long>(row.at("wepType"));
                 if (!is_valid_enum_integral<calculator::Weapon::Type>(weaponType))
                 {
                     if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
-                        std::println("ignoring: weapon {} because no real weapon", name);
-                    else
                     {
-                        std::println("ignoring: Unknown weapon type {} for weapon {}", weaponType, name);
-                        throw std::runtime_error("unknown weapon type");
+                        std::println("ignoring: weapon {} because no real weapon", name);
+                        continue;
                     }
-                    continue;
+
+                    throw std::runtime_error(std::format("unknown weapon type {} for weapon {}", weaponType, name));
                 }
 
-                if (!this->reinforceParamWeapons.contains(row.at("reinforceTypeId")))
+                if (!reinforceParamWeapons.contains(row.at("reinforceTypeId")))
                     throw std::runtime_error(std::format("could not find reinforce param weapon for reinforceTypeId: {}", std::to_string(row.at("reinforceTypeId"))));
 
-                if (!this->attackElementCorrectParams.contains(row.at("attackElementCorrectId")))
+                if (!this->attackElementCorrectsById.contains(row.at("attackElementCorrectId")))
                     throw std::runtime_error(std::format("could not find attack element correct param for attackElementCorrectId: {}", std::to_string(row.at("attackElementCorrectId"))));
 
                 const auto affinityId = assert_floating_is<long long>((row_id % 10000) / 100.);
 
                 const auto equipParamWeaponsId = row_id - 100 * affinityId;
-                if (!this->equipParamWeapons.contains(equipParamWeaponsId))
+                if (!equipParamWeapons.contains(equipParamWeaponsId))
                     throw std::runtime_error(std::format("could not find equip param weapon for id: {}", std::to_string(equipParamWeaponsId)));
-                const auto &uninfusedWeapon = this->equipParamWeapons.at(equipParamWeaponsId);
+                const auto &uninfusedWeapon = equipParamWeapons.at(equipParamWeaponsId);
 
-                if (affinityId != 0 && is_unique_weapon(uninfusedWeapon))
+                auto is_unique_weapon = uninfusedWeapon.at("gemMountType") == 0 || uninfusedWeapon.at("disableGemAttr") == 1;;
+                if (affinityId != 0 && is_unique_weapon)
                     throw std::runtime_error("unique weapon cannot have an affinity");
 
                 std::set<calculator::AttackPowerType> attackPowerTypes{};
@@ -532,7 +370,7 @@ namespace xml
                 for (size_t i = 0; i < 3; ++i)
                 {
                     auto spEffectParamId = assert_floating_is<long long>(row.at(std::format("spEffectBehaviorId{}", i)));
-                    auto statusSpEffectParams = parse_status_sp_effect_params(spEffectParamId);
+                    auto statusSpEffectParams = parse_status_sp_effect_params(spEffectParamId, spEffectParams);
                     if (!statusSpEffectParams.empty())
                     {
                         for (auto &&[k, v] : statusSpEffectParams)
@@ -581,7 +419,7 @@ namespace xml
                             {
                                 auto calcCorrectGraphId = assert_floating_is<long long>(row.at(xml_str));
 
-                                if (!this->calcCorrectGraphs.contains(calcCorrectGraphId))
+                                if (!calcCorrectGraphs.contains(calcCorrectGraphId))
                                     throw std::runtime_error(std::format("could not find calc correct graph for id: {}", calcCorrectGraphId));
 
                                 calcCorrectGraphIds[apt] = calcCorrectGraphId;
@@ -653,6 +491,11 @@ namespace xml
                 auto url_part = weaponName;
                 std::ranges::replace(url_part, ' ', '_');
 
+                calculator::Stats stats{};
+                for (auto attribute : enumerators_of<calculator::Attribute>())
+                    stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
+                
+
                 std::println("weapon: {}, type: {}", name, enum_to_string(integral_to_enum<calculator::Weapon::Type>(weaponType)));
 
                 this->weapons.emplace_back(calculator::Weapon{
@@ -664,14 +507,8 @@ namespace xml
                     .sorcery_tool = row.at("enableMagic") == 1,
                     .incantation_tool = row.at("enableMiracle") == 1,
                     .type = integral_to_enum<calculator::Weapon::Type>(weaponType),
-                    .affinity = integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon(row) ? -1 : affinityId),
-                    .requirements = calculator::Stats{
-                        assert_floating_is<int>(row.at("properStrength")),
-                        assert_floating_is<int>(row.at("properAgility")),
-                        assert_floating_is<int>(row.at("properMagic")),
-                        assert_floating_is<int>(row.at("properFaith")),
-                        assert_floating_is<int>(row.at("properLuck")),
-                    },
+                    .affinity = integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
+                    .requirements = stats,
                     .attribute_scaling = attributeScaling,
                     .base_attack_power = attack,
                     .attack_power_attribute_scaling = this->attackElementCorrectsById.at(assert_floating_is<long long>(row.at("attackElementCorrectId"))),
