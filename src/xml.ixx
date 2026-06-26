@@ -6,7 +6,7 @@ import :calculator;
 
 import std;
 
-namespace xml
+export namespace xml
 {
     using ParamRow = std::map<std::string, double>;
 

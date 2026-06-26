@@ -54,7 +54,7 @@ constexpr T assert_floating_is(double f)
     return f;
 }
 
-namespace calculator
+export namespace calculator
 {
     struct Weapon;
     using UpgradeLevels = std::array<int, 3>; // free handed, normal, somber
@@ -306,28 +306,8 @@ constexpr std::array<std::pair<calculator::Type_, std::string_view>, 47> enum_st
     std::pair{calculator::Type_::BEAST_CLAW, "BEAST_CLAW"}
 };
 
-namespace calculator
+export namespace calculator
 {
-    constexpr std::string_view attribute_to_json_string(Attribute at)
-    {
-        return enum_to_string(at);
-        // switch (at)
-        // {
-        // case Attribute::STRENGTH:
-        //     return "str";
-        // case Attribute::DEXTERITY:
-        //     return "dex";
-        // case Attribute::INTELLIGENCE:
-        //     return "int";
-        // case Attribute::FAITH:
-        //     return "fai";
-        // case Attribute::ARCAINE:
-        //     return "arc";
-        // }
-
-        // throw std::invalid_argument("invalid attribute");
-    }
-
     using Stats = std::array<int, enumerators_of<Attribute>().size()>;
     using FullStats = std::array<int, 8>;
     constexpr Stats full_stats_to_stats(const FullStats &full_stats)
@@ -473,7 +453,7 @@ namespace nlohmann
     };
 } // namespace nlohmann
 
-namespace calculator
+export namespace calculator
 {
 
     constexpr auto ineffective_attribute_penalty = 0.4;
@@ -1540,7 +1520,7 @@ namespace calculator
                     return (long long)f;
                 return f; };
 
-            json ret = {{"attack", {{std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), cut_dec(row.at("physicsAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), cut_dec(row.at("magicAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::FIRE)), cut_dec(row.at("fireAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), cut_dec(row.at("thunderAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::HOLY)), cut_dec(row.at("darkAtkRate"))}}}, {"attributeScaling", {{calculator::attribute_to_json_string(Attribute::STRENGTH), row.at("correctStrengthRate")}, {calculator::attribute_to_json_string(Attribute::DEXTERITY), row.at("correctAgilityRate")}, {calculator::attribute_to_json_string(Attribute::INTELLIGENCE), row.at("correctMagicRate")}, {calculator::attribute_to_json_string(Attribute::FAITH), row.at("correctFaithRate")}, {calculator::attribute_to_json_string(Attribute::ARCAINE), row.at("correctLuckRate")}}}};
+            json ret = {{"attack", {{std::to_string(std::to_underlying(AttackPowerType::PHYSICAL)), cut_dec(row.at("physicsAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::MAGIC)), cut_dec(row.at("magicAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::FIRE)), cut_dec(row.at("fireAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::LIGHTNING)), cut_dec(row.at("thunderAtkRate"))}, {std::to_string(std::to_underlying(AttackPowerType::HOLY)), cut_dec(row.at("darkAtkRate"))}}}, {"attributeScaling", {{enum_to_string(Attribute::STRENGTH), row.at("correctStrengthRate")}, {enum_to_string(Attribute::DEXTERITY), row.at("correctAgilityRate")}, {enum_to_string(Attribute::INTELLIGENCE), row.at("correctMagicRate")}, {enum_to_string(Attribute::FAITH), row.at("correctFaithRate")}, {enum_to_string(Attribute::ARCAINE), row.at("correctLuckRate")}}}};
 
             if (row.contains("spEffectId1"))
                 if (row.at("spEffectId1") != 0)
@@ -1907,14 +1887,14 @@ namespace calculator
 
 
 
-void test1()
+export void test1()
 {
     auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data_current_game_current_erdo.json";
     auto &&[weap_contain, weap_contain_time] = TimeFunctionExecution([&]() { return calculator::WeaponContainer(regulation_file); });
 
 
     calculator::AttackOptions atk_options = {{0, 25, 10}, true};
-    auto [stat_variations, stat_variations_time] = TimeFunctionExecution([&]() { return calculator::get_stat_variations(1 + 79, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)); });
+    auto [stat_variations, stat_variations_time] = TimeFunctionExecution([&]() { return calculator::get_stat_variations(1 + /*79*/60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)); });
 
     auto [filtered_weaps, filtered_weapons_time] = TimeFunctionExecution([&]() { return weap_contain.apply_filter(calculator::Weapon::Filter{{}, {}, {}}); });
     std::println();
@@ -1922,10 +1902,7 @@ void test1()
     auto [attack_rating, attack_rating_time] = TimeFunctionExecution([&]() { return calculator::OptimizationContext(10, stat_variations, filtered_weaps, atk_options, std::type_identity<calculator::AttackRating::total>{}).wait_and_get_result(); });
     std::println();
 
-    std::print("stats: ");
-    for (auto stat : attack_rating.stats)
-        std::print("{} ", stat);
-    std::println("\n");
+    std::println("stats: {}", attack_rating.stats);
 
     std::println("{}: {}\n", attack_rating.weapon->full_name, attack_rating.total_attack_power.at(2));
 
@@ -1945,8 +1922,6 @@ void test1()
     std::println("get stat variations: {}", stat_variations_time);
     std::println("filter weapons: {}", filtered_weapons_time);
     std::println("query best stats: {}", attack_rating_time);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100000));
 }
 
 void test2()

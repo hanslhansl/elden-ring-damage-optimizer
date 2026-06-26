@@ -49,10 +49,15 @@ CPMAddPackage(
     VERSION 1.15
 )
 
-# set up source files
+# add testing
+include(CTest)
+add_subdirectory(tests)
+
 set(SRC_DIR "src")
-add_executable(elden-ring-damage-optimizer)
-target_sources(elden-ring-damage-optimizer 
+
+# set up core library
+add_library(elden_ring_damage_optimizer_core)
+target_sources(elden_ring_damage_optimizer_core 
     PUBLIC FILE_SET CXX_MODULES
         BASE_DIRS ${SRC_DIR}
         FILES
@@ -63,24 +68,26 @@ target_sources(elden-ring-damage-optimizer
         ${SRC_DIR}/erdo.ixx
         # ${SRC_DIR}/ui.ixx
 )
-target_link_libraries(elden-ring-damage-optimizer PRIVATE
+target_link_libraries(elden_ring_damage_optimizer_core PRIVATE
     # nlohmann_json_modules
     nlohmann_json::nlohmann_json
     BS_thread_pool
     pugixml::pugixml
 )
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-    target_compile_options(elden-ring-damage-optimizer PUBLIC -freflection)
-endif()
 if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-    target_link_libraries(elden-ring-damage-optimizer PRIVATE stdc++exp) # std:: print, println, ...
+    target_link_libraries(elden_ring_damage_optimizer_core PRIVATE stdc++exp) # std:: print, println, ...
 endif()
 
-# find_package(wxWidgets CONFIG REQUIRED)
-# target_link_libraries(main PRIVATE wx::core wx::base)
+add_custom_command(TARGET elden_ring_damage_optimizer_core POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/xml_data
+        $<TARGET_FILE_DIR:elden_ring_damage_optimizer_core>/xml_data
+)
 
-file(COPY
-    ${CMAKE_CURRENT_SOURCE_DIR}/xml_data
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+
+# set up main executable
+add_executable(elden_ring_damage_optimizer ${SRC_DIR}/main.cpp)
+target_link_libraries(elden_ring_damage_optimizer PRIVATE
+    elden_ring_damage_optimizer_core
 )
