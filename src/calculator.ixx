@@ -835,7 +835,7 @@ export namespace calculator
 
     struct CalcCorrectGraphEntry
     {
-        int maxVal;
+        long long maxVal;
         double maxGrowVal, adjPt;
 
         friend void from_json(const json &j, CalcCorrectGraphEntry &c)

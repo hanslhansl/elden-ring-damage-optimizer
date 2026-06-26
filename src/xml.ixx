@@ -1,5 +1,6 @@
 module;
 #include <pugixml.hpp>
+#include <ranges>
 export module erdo:xml;
 import :witchy;
 import :calculator;
@@ -142,11 +143,11 @@ export namespace xml
 
             return {};
         }
-        static calculator::CalcCorrectGraph parse_calc_correct_graph(const ParamRow &row) {
+        static calculator::CalcCorrectGraph parse_calc_correct_graph(const std::map<std::string, double> &row) {
             calculator::CalcCorrectGraph ret{};
             for (size_t i = 0; i < 5; ++i)
             {
-                auto maxVal = assert_floating_is<int>(row.at(std::format("stageMaxVal{}", i)));
+                auto maxVal = assert_floating_is<long long>(row.at(std::format("stageMaxVal{}", i)));
                 auto maxGrowVal = row.at(std::format("stageMaxGrowVal{}", i)) / 100.;
                 auto adjPt = row.at(std::format("adjPt_maxGrowVal{}", i));
                 ret.at(i) = calculator::CalcCorrectGraphEntry{maxVal, maxGrowVal, adjPt};
@@ -252,12 +253,28 @@ export namespace xml
             return scaling_tiers;
         }
 
+        static calculator::AttackElementCorrectsById get_attack_element_corrects_by_id(const std::filesystem::path& attack_element_correct_param_file) {
+            constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
+            
+            calculator::AttackElementCorrectsById attack_element_corrects_by_id{};
+            for (auto &&[id, row] : read_param_xml<double>(attack_element_correct_param_file))
+            {
+                auto&& inserted = (attack_element_corrects_by_id[id] = parse_attack_element_correct(row));
+                inserted[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
+                inserted[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
+                inserted[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
+                inserted[std::to_underlying(calculator::AttackPowerType::SLEEP)] = default_;
+            }
+            return attack_element_corrects_by_id;
+        }
+
         WeaponContainer(const std::filesystem::path &xml_data_directory)
         {
             this->scalingTiers = get_scaling_tiers(
                 xml_data_directory / witchy::GR_MenuTextFile += ".xml",
                 xml_data_directory / witchy::MenuValueTableParamFile += ".xml"
             );
+            this->attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml");
 
             auto spEffectParams = read_param_xml<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml");
             auto calcCorrectGraphs = read_param_xml<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml");
@@ -282,17 +299,6 @@ export namespace xml
                 auto status_sp_effect_params = parse_status_sp_effect_params(spEffectParamId, spEffectParams);
                 std::erase_if(status_sp_effect_params, [](auto &&v) { return v.second == 0; });
                 statusSpEffectParams.try_emplace(spEffectParamId, status_sp_effect_params);
-            }
-                
-            auto attackElementCorrectParams = read_param_xml<double>(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml");
-            for (auto &&[id, row] : attackElementCorrectParams)
-            {
-                auto &&[inserted, success] = this->attackElementCorrectsById.emplace(id, parse_attack_element_correct(row));
-                constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
-                inserted->second[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
-                inserted->second[std::to_underlying(calculator::AttackPowerType::SLEEP)] = default_;
             }
 
             auto get_calc_correct_graph_by_id = [&](long long calc_correct_graph_id)->const calculator::ScalingCurve& {
