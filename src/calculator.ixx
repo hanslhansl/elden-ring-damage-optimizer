@@ -608,44 +608,44 @@ export namespace calculator
         };
 
         // the full unique name of the weapon, e.g. "Heavy Nightrider Glaive"
-        const std::string full_name;
+        std::string full_name;
         // the base weapon name without an affinity specified, e.g. "Nightrider
         // Glaive"
-        const std::string base_name;
+        std::string base_name;
         // a wiki link for the weapon
-        const std::string url;
+        std::string url;
         // true if the weapon was introduced with SOTE
-        const bool dlc;
+        bool dlc;
         // true if the weapon doesn't get a strength bonus when two-handing
-        const bool paired;
+        bool paired;
         // true if this weapon can cast glintstone sorceries
-        const bool sorcery_tool;
+        bool sorcery_tool;
         // true if this weapon can cast incantations
-        const bool incantation_tool;
+        bool incantation_tool;
         // the category of the weapon, e.g. Type.STRAIGHT_SWORD
-        const Type type;
+        Type type;
         // the affinity of the weapon, e.g. Affinity.HEAVY
-        const Affinity affinity;
+        Affinity affinity;
         // stat requirements necessary to use the weapon effectively (without an
         // attack rating penalty)
-        const Stats requirements;
+        Stats requirements;
         // scaling amount at each upgrade level (0-10 or 0-25) for each player
         // attribute (e.g. Attribute.STRENGTH)
-        const std::vector<AttributeScaling> attribute_scaling;
+        std::vector<AttributeScaling> attribute_scaling;
         // base attack power at each upgrade level for each attack power type
-        const std::vector<std::array<double, enumerators_of<AttackPowerType>().size()>> base_attack_power;
+        std::vector<std::array<double, enumerators_of<AttackPowerType>().size()>> base_attack_power;
         // map indicating which attack power types scale with which player
         // attributes
-        const AttackElementCorrectsById::mapped_type attack_power_attribute_scaling;
+        AttackElementCorrectsById::mapped_type attack_power_attribute_scaling;
         // map indicating which scaling curve is used for each attack power type
-        const std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> attack_power_scaling_curves;
+        std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this
         // weapon. This isn't hardcoded for all weapons because it can be
         // changed by mods.
-        const std::array<std::pair<double, std::string>, 6> scaling_tiers;
+        std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        const int upgrade_level_index = [&]() {
+        int upgrade_level_index = [&]() {
             if (this->base_attack_power.size() == 1)
                 return 0;
             else if (this->base_attack_power.size() == 11)

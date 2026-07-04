@@ -4,14 +4,14 @@ import erdo;
 
 TEST_CASE("addition")
 {
-    auto xml_data_directory = std::filesystem::current_path().parent_path() / "xml_data";
+    auto xml_data_directory = std::filesystem::current_path() / "test_xml_data";
 
-    auto weapon_contain = xml::WeaponContainer(xml_data_directory);
+    auto weapons = xml::get_weapons(xml_data_directory);
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     auto stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
 
-    auto filtered_weapons = weapon_contain.apply_filter(calculator::Weapon::Filter{{}, {}, {}});
+    auto filtered_weapons = xml::apply_filter(weapons, calculator::Weapon::Filter{{}, {}, {}});
 
     auto attack_rating = calculator::OptimizationContext(
         10,

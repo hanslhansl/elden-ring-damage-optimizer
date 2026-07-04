@@ -14,4 +14,11 @@ target_link_libraries(tests PRIVATE
     Catch2::Catch2WithMain
 )
 
+# copy xml_data to build directory
+add_custom_command(TARGET tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_data
+        $<TARGET_FILE_DIR:tests>/test_xml_data
+)
+
 catch_discover_tests(tests)

@@ -79,12 +79,12 @@ if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
     target_link_libraries(elden_ring_damage_optimizer_core PRIVATE stdc++exp) # std:: print, println, ...
 endif()
 
+# copy xml_data to build directory
 add_custom_command(TARGET elden_ring_damage_optimizer_core POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/xml_data
         $<TARGET_FILE_DIR:elden_ring_damage_optimizer_core>/xml_data
 )
-
 
 # set up main executable
 add_executable(elden_ring_damage_optimizer ${SRC_DIR}/main.cpp)

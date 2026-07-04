@@ -9,12 +9,20 @@ int main(int argc, char* argv[])
     auto xml_data_directory = executable_path.parent_path() / "xml_data";
 
     auto regulation_file = std::filesystem::current_path().parent_path() / "regulation_data_current_game_current_erdo.json";
-    auto weap_contain = calculator::WeaponContainer(regulation_file);
+    auto weapon_container = calculator::WeaponContainer(regulation_file);
+    std::ranges::sort(weapon_container.weapons, {}, &calculator::Weapon::full_name);
 
-    auto new_weap_contain = xml::WeaponContainer(xml_data_directory);
+    auto new_weapons = xml::get_weapons(xml_data_directory);
 
+    calculator::AttackOptions attack_options{{0, 25, 10}, true};
+    calculator::Stats stats{ 21, 10, 10, 10, 10 };
+    new_weapons | std::views::transform([&](const calculator::Weapon& w){
+        calculator::AttackRating::total attack_rating{};
+        w.get_attack_rating(attack_options, stats, attack_rating);
+        return attack_rating;
+    });
 
-    for (auto&& [w1, w2] : std::views::zip(weap_contain.weapons, new_weap_contain.weapons))
+    for (auto&& [w1, w2] : std::views::zip(weapon_container.weapons, new_weapons))
     {
         if (w1 != w2)
             throw std::runtime_error("WeaponContainers are not equal");
