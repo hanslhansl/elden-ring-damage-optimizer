@@ -16,11 +16,12 @@ int main(int argc, char* argv[])
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     calculator::Stats stats{ 21, 10, 10, 10, 10 };
-    new_weapons | std::views::transform([&](const calculator::Weapon& w){
+    auto total_attack_powers = new_weapons | std::views::transform([&](const calculator::Weapon& w){
         calculator::AttackRating::total attack_rating{};
         w.get_attack_rating(attack_options, stats, attack_rating);
-        return attack_rating;
-    });
+        return attack_rating.total_attack_power;
+    }) | std::ranges::to<std::vector>();
+    std::println("{}", total_attack_powers);
 
     for (auto&& [w1, w2] : std::views::zip(weapon_container.weapons, new_weapons))
     {

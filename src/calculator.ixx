@@ -8,13 +8,11 @@ import :witchy;
 
 import std;
 import BS.thread_pool;
-// import nlohmann.json;
 
 using json = nlohmann::json;
 
 template <typename Map, typename Key, typename Default>
-auto map_get(Map &&m, Key &&key, Default &&default_)
-{
+auto map_get(Map &&m, Key &&key, Default &&default_) {
     using result_type = std::common_reference_t<typename std::remove_cvref_t<Map>::mapped_type, Default &&>;
 
     auto it = m.find(std::forward<Key>(key));
@@ -24,8 +22,7 @@ auto map_get(Map &&m, Key &&key, Default &&default_)
 }
 
 template <typename T>
-std::pair<std::invoke_result_t<T &&>, std::chrono::nanoseconds> TimeFunctionExecution(T &&func)
-{
+std::pair<std::invoke_result_t<T &&>, std::chrono::nanoseconds> TimeFunctionExecution(T &&func) {
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
     auto &&result = func();
@@ -36,15 +33,6 @@ std::pair<std::invoke_result_t<T &&>, std::chrono::nanoseconds> TimeFunctionExec
     return {std::forward<decltype(result)>(result), t2 - t1};
 }
 
-template <>
-struct std::formatter<nlohmann::json, char> : std::formatter<std::string_view, char>
-{
-    auto format(const nlohmann::json &j, std::format_context &ctx) const
-    {
-        auto s = j.dump();
-        return std::formatter<std::string_view, char>::format(s, ctx);
-    }
-};
 
 export template <typename T>
 constexpr T assert_floating_is(double f)
