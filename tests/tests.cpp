@@ -32,8 +32,7 @@ TEST_CASE("optimize total attack rating") {
         0,
         stat_variations,
         filtered_weapons,
-        attack_options,
-        std::type_identity<calculator::AttackRating::total>{}
+        attack_options
     ).wait_and_get_result();
 
     REQUIRE(attack_rating.stats == calculator::Stats{ 21, 10, 10, 10, 10 });
@@ -55,9 +54,9 @@ TEST_CASE("check all weapons total attack rating") {
     calculator::Stats stats{ 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons | std::views::transform([&](const calculator::Weapon& w){
-        calculator::AttackRating::total attack_rating{};
+        calculator::AttackRating::full attack_rating{};
         w.get_attack_rating(attack_options, stats, attack_rating);
-        return attack_rating.total_attack_power;
+        return attack_rating.total_attack_power.at(2);
     }) | std::ranges::to<std::vector>();
 
 

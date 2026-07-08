@@ -43,7 +43,9 @@ CPMAddPackage(
 
 # add testing
 include(CTest)
-add_subdirectory(tests)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 set(SRC_DIR "src")
 

@@ -1,12 +1,7 @@
-module;
-// #include <meta>
-#include <pugixml.hpp>
 export module erdo:calculator;
 import :meta;
-import :witchy;
 
 import std;
-import BS.thread_pool;
 
 
 template <typename Map, typename Key, typename Default>
@@ -326,104 +321,20 @@ export namespace calculator
 
     namespace AttackRating
     {
-        namespace detail
-        {
-            struct base
-            {
-                static constexpr bool is_total_attack_power = false;
-                static constexpr bool is_individual_attack_power = false;
-                static constexpr bool is_individual_status_effect = false;
-                static constexpr bool is_spell_scaling = false;
-                static constexpr bool is_full = false;
+        struct full {
+            Stats stats{};
 
-                Stats stats{};
-            };
+            const Weapon *weapon;
+            UpgradeLevels upgrade_levels;
+            bool two_handing;
 
-            struct total_attack_power : base
-            {
-                static constexpr bool is_total_attack_power = true;
-
-                double total_attack_power;
-                constexpr auto value() const
-                {
-                    return total_attack_power;
-                }
-            };
-            template <AttackPowerType I>
-            struct individual_attack_power : base
-            {
-                static constexpr bool is_individual_attack_power = true;
-                static constexpr AttackPowerType attack_power_type = I;
-
-                double individual_attack_power;
-                constexpr auto value() const
-                {
-                    return individual_attack_power;
-                }
-            };
-            template <AttackPowerType I>
-            struct individual_status_effect : base
-            {
-                static constexpr bool is_individual_status_effect = true;
-                static constexpr AttackPowerType attack_power_type = I;
-
-                double individual_status_effect;
-                constexpr auto value() const
-                {
-                    return individual_status_effect;
-                }
-            };
-            struct spell_scaling : base
-            {
-                static constexpr bool is_spell_scaling = true;
-
-                double spell_scaling;
-                constexpr auto value() const
-                {
-                    return spell_scaling;
-                }
-            };
-            struct full : base
-            {
-                static constexpr bool is_full = true;
-
-                const Weapon *weapon;
-                UpgradeLevels upgrade_levels;
-                bool two_handing;
-
-                std::array<double, 3> total_attack_power;                                                        // a + b = c
-                std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
-                std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
-                double spell_scaling;
-                std::vector<AttackPowerType> ineffective_attack_power_types;
-                std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
-            };
-
-            template <typename B>
-            struct sparse_attack_rating : B
-            {
-            };
-        } // namespace detail
-
-        using total = detail::sparse_attack_rating<detail::total_attack_power>;
-
-        using physical = detail::sparse_attack_rating<detail::individual_attack_power<AttackPowerType::PHYSICAL>>;
-        using magic = detail::sparse_attack_rating<detail::individual_attack_power<AttackPowerType::MAGIC>>;
-        using fire = detail::sparse_attack_rating<detail::individual_attack_power<AttackPowerType::FIRE>>;
-        using lightning = detail::sparse_attack_rating<detail::individual_attack_power<AttackPowerType::LIGHTNING>>;
-        using holy = detail::sparse_attack_rating<detail::individual_attack_power<AttackPowerType::HOLY>>;
-
-        using poison_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::POISON>>;
-        using scarlet_rot_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::SCARLET_ROT>>;
-        using bleed_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::BLEED>>;
-        using frost_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::FROST>>;
-        using sleep_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::SLEEP>>;
-        using madness_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::MADNESS>>;
-        using death_blight_status = detail::sparse_attack_rating<detail::individual_status_effect<AttackPowerType::DEATH_BLIGHT>>;
-
-        using spell_scaling = detail::sparse_attack_rating<detail::spell_scaling>;
-
-        using full = detail::sparse_attack_rating<detail::full>;
+            std::array<double, 3> total_attack_power;                                                        // a + b = c
+            std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
+            std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
+            double spell_scaling;
+            std::vector<AttackPowerType> ineffective_attack_power_types;
+            std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
+        };
     } // namespace AttackRating
 
     struct Weapon
@@ -521,23 +432,18 @@ export namespace calculator
             return stats;
         }
 
-        template <typename T>
-        void get_attack_rating(const AttackOptions &attack_options_, const Stats &stats, T &result) const {
+        void get_attack_rating(const AttackOptions &attack_options_, const Stats &stats, AttackRating::full &result) const {
             auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options_.two_handing, stats);
 
             result.stats = stats;
-            if constexpr (T::is_total_attack_power)
-                result.total_attack_power = 0.;
-            if constexpr (T::is_full)
-            {
-                result.weapon = this;
-                result.upgrade_levels = attack_options_.upgrade_levels;
-                result.two_handing = attack_options_.two_handing;
+            
+            result.weapon = this;
+            result.upgrade_levels = attack_options_.upgrade_levels;
+            result.two_handing = attack_options_.two_handing;
 
-                result.total_attack_power.fill({});
-                constexpr auto size = enumerators_of<AttackPowerType>().size();
-                result.ineffective_attack_power_types.reserve(size);
-            }
+            result.total_attack_power.fill({});
+            constexpr auto size = enumerators_of<AttackPowerType>().size();
+            result.ineffective_attack_power_types.reserve(size);
 
             std::array<bool, enumerators_of<Attribute>().size()> attack_rating_ineffective_attributes{};
             for (auto attribute : enumerators_of<Attribute>())
@@ -568,8 +474,7 @@ export namespace calculator
                             }))
                     {
                         total_scaling = 1. - ineffective_attribute_penalty;
-                        if constexpr (T::is_full)
-                            result.ineffective_attack_power_types.push_back(attack_power_type);
+                        result.ineffective_attack_power_types.push_back(attack_power_type);
                     }
                     else
                     {
@@ -608,68 +513,37 @@ export namespace calculator
                     {
                         auto res = base_attack_power * total_scaling;
 
-                        if constexpr (T::is_total_attack_power)
-                            if (is_damage_type)
-                                result.total_attack_power += res;
-
-                        if constexpr (T::is_individual_attack_power)
-                            result.individual_attack_power = res;
-
-                        if constexpr (T::is_individual_status_effect)
-                            result.individual_status_effect = res;
-
-                        if constexpr (T::is_full)
+                        if (is_damage_type) // attack_power_type._to_integral() <= AttackPowerType::HOLY
                         {
-                            if (is_damage_type) // attack_power_type._to_integral() <= AttackPowerType::HOLY
-                            {
-                                auto &&att_pwr =
-                                    result.attack_power[std::to_underlying(attack_power_type)];
-                                att_pwr[0] = base_attack_power;
-                                att_pwr[1] = res - base_attack_power;
-                                att_pwr[2] = res;
-                                result.total_attack_power[0] += base_attack_power;
-                                result.total_attack_power[1] += res - base_attack_power;
-                                result.total_attack_power[2] += res;
-                            }
-                            else // attack_power_type._to__integral() > AttackPowerType::HOLY
-                            {
-                                auto &&att_pwr =
-                                    result.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON)];
-                                att_pwr[0] = base_attack_power;
-                                att_pwr[1] = res - base_attack_power;
-                                att_pwr[2] = res;
-                            }
+                            auto &&att_pwr =
+                                result.attack_power[std::to_underlying(attack_power_type)];
+                            att_pwr[0] = base_attack_power;
+                            att_pwr[1] = res - base_attack_power;
+                            att_pwr[2] = res;
+                            result.total_attack_power[0] += base_attack_power;
+                            result.total_attack_power[1] += res - base_attack_power;
+                            result.total_attack_power[2] += res;
                         }
+                        else // attack_power_type._to__integral() > AttackPowerType::HOLY
+                        {
+                            auto &&att_pwr =
+                                result.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON)];
+                            att_pwr[0] = base_attack_power;
+                            att_pwr[1] = res - base_attack_power;
+                            att_pwr[2] = res;
+                        }
+                        
                     }
 
-                    if constexpr (T::is_spell_scaling)
-                        if (is_sorcery_or_incantation_tool)
-                            result.spell_scaling = 100. * total_scaling;
-
-                    if constexpr (T::is_full)
-                        if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
-                            result.spell_scaling = 100. * total_scaling;
+                    if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
+                        result.spell_scaling = 100. * total_scaling;
                 } };
 
-            if constexpr (T::is_total_attack_power)
-                for (auto &&attack_power_type : enumerators_of<DamageType>())
-                    loop_cycle(integral_to_enum<AttackPowerType>(std::to_underlying(attack_power_type)));
 
-            if constexpr (T::is_individual_attack_power)
-                loop_cycle(T::attack_power_type);
+            for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
+                loop_cycle(attack_power_type);
 
-            if constexpr (T::is_individual_status_effect)
-                loop_cycle(T::attack_power_type);
-
-            if constexpr (T::is_spell_scaling)
-                loop_cycle(AttackPowerType::PHYSICAL);
-
-            if constexpr (T::is_full)
-                for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
-                    loop_cycle(attack_power_type);
-
-            if constexpr (T::is_full)
-                result.ineffective_attributes = attack_rating_ineffective_attributes;
+            result.ineffective_attributes = attack_rating_ineffective_attributes;
         }
     };
 
@@ -686,11 +560,11 @@ export namespace calculator
         std::array<int, 3> statusSpEffectId; // statusSpEffectId1, statusSpEffectId2, statusSpEffectId3
     };
 
-    constexpr size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats) {
+    constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats) {
         constexpr auto N = Stats{}.size();
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points;
-        size_t count = 0;
+        std::size_t count = 0;
 
         if (attribute_points > UPPER * min_stats.size())
             return 0;
