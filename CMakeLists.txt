@@ -20,14 +20,6 @@ file(
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
-# add nlohmann json
-add_compile_definitions(JSON_USE_IMPLICIT_CONVERSIONS=0)
-CPMAddPackage(
-    NAME nlohmann_json
-    GITHUB_REPOSITORY nlohmann/json
-    GIT_TAG develop
-)
-
 # add thread pool
 add_compile_definitions(BS_THREAD_POOL_IMPORT_STD)
 CPMAddPackage(
@@ -63,14 +55,13 @@ target_sources(elden_ring_damage_optimizer_core
         FILES
         ${SRC_DIR}/meta.ixx
         ${SRC_DIR}/witchy.ixx
-        ${SRC_DIR}/calculator.ixx
         ${SRC_DIR}/xml.ixx
-        ${SRC_DIR}/erdo.ixx
+        ${SRC_DIR}/calculator.ixx
+        ${SRC_DIR}/optimizer.ixx
         # ${SRC_DIR}/ui.ixx
+        ${SRC_DIR}/erdo.ixx
 )
 target_link_libraries(elden_ring_damage_optimizer_core PRIVATE
-    # nlohmann_json_modules
-    nlohmann_json::nlohmann_json
     BS_thread_pool
     pugixml::pugixml
 )

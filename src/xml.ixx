@@ -1,13 +1,13 @@
 module;
 #include <pugixml.hpp>
-#include <ranges>
+// #include <ranges>
 export module erdo:xml;
 import :witchy;
 import :calculator;
 
 import std;
 
-export namespace xml
+namespace xml
 {
     using ParamRow = std::map<std::string, double>;
 
@@ -267,7 +267,7 @@ export namespace xml
         return attack_element_corrects_by_id;
     }
 
-    auto get_weapons(const std::filesystem::path &xml_data_directory) {
+    export auto get_weapons(const std::filesystem::path &xml_data_directory) {
         auto scalingTiers = get_scaling_tiers(
             xml_data_directory / witchy::GR_MenuTextFile += ".xml",
             xml_data_directory / witchy::MenuValueTableParamFile += ".xml"
@@ -529,8 +529,8 @@ export namespace xml
     }
     
 
-    calculator::FilteredWeapons apply_filter(const std::vector<calculator::Weapon> &weapons, const calculator::Weapon::Filter &weapon_filter) {
-        calculator::FilteredWeapons filtered{};
+    export auto apply_filter(const std::vector<calculator::Weapon> &weapons, const calculator::Weapon::Filter &weapon_filter) {
+        std::vector<const calculator::Weapon*> filtered{};
         filtered.reserve(weapons.size());
 
         for (const auto &weapon : weapons)

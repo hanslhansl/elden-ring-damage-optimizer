@@ -28,7 +28,7 @@ TEST_CASE("optimize total attack rating") {
 
     auto filtered_weapons = xml::apply_filter(weapons, calculator::Weapon::Filter{{}, {}, {}});
 
-    auto attack_rating = calculator::OptimizationContext(
+    auto attack_rating = optimizer::OptimizationContext(
         0,
         stat_variations,
         filtered_weapons,
