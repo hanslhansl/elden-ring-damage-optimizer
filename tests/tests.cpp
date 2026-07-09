@@ -26,12 +26,10 @@ TEST_CASE("optimize total attack rating") {
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     auto stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
 
-    auto filtered_weapons = xml::apply_filter(weapons, calculator::Weapon::Filter{{}, {}, {}});
-
     auto attack_rating = optimizer::OptimizationContext(
         0,
         stat_variations,
-        filtered_weapons,
+        weapons,
         attack_options
     ).wait_and_get_result();
 
@@ -54,9 +52,7 @@ TEST_CASE("check all weapons total attack rating") {
     calculator::Stats stats{ 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons | std::views::transform([&](const calculator::Weapon& w){
-        calculator::AttackRating::full attack_rating{};
-        w.get_attack_rating(attack_options, stats, attack_rating);
-        return attack_rating.total_attack_power.at(2);
+        return w.get_attack_rating(attack_options, stats).total_attack_power.at(2);
     }) | std::ranges::to<std::vector>();
 
 

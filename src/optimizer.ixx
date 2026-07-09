@@ -12,11 +12,11 @@ export namespace optimizer
     {
         std::vector<AttackRating::full> optional_results;
         BS::thread_pool<> pool;
-        const std::vector<const Weapon *> &weapons;
+        const std::vector<Weapon>& weapons;
         AttackOptions attack_options;
 
-        OptimizationContext(int threads, const std::vector<Stats> &stat_variations, const std::vector<const Weapon *> &filtered_weapons_, AttackOptions attack_options_)
-            : optional_results{}, pool(threads), weapons(filtered_weapons_), attack_options(attack_options_)
+        OptimizationContext(int threads, const std::vector<Stats> &stat_variations, const std::vector<Weapon> &weapons, AttackOptions attack_options_)
+            : optional_results{}, pool(threads), weapons(weapons), attack_options(attack_options_)
         {
             // create a vector of optional results for each weapon
             auto &optional_results = this->optional_results;
@@ -24,16 +24,14 @@ export namespace optimizer
 
             // process one weapon
             auto do_weapon = [&](std::size_t i) {
-                auto &weapon = *this->weapons.at(i);
+                auto &&weapon = this->weapons.at(i);
 
-                AttackRating::full intermediate_attack_rating{};
-                AttackRating::full &best_attack_rating = optional_results[i];
+                auto &best_attack_rating = optional_results[i];
 
-                // loop through all stat variations and find the one resulting
-                // in the best attack rating
+                // loop through all stat variations and find the one resulting in the best attack rating
                 for (auto &&stats : stat_variations)
                 {
-                    weapon.get_attack_rating(this->attack_options, stats, intermediate_attack_rating);
+                    auto intermediate_attack_rating = weapon.get_attack_rating(this->attack_options, stats);
 
                     if (best_attack_rating.total_attack_power.at(2) < intermediate_attack_rating.total_attack_power.at(2))
                         best_attack_rating = std::move(intermediate_attack_rating);
@@ -61,16 +59,15 @@ export namespace optimizer
                 if (sparse_result_it == vec.end())
                     return std::pair{-1ll, Stats{}};
                 auto index = std::distance(vec.begin(), sparse_result_it);
-                return std::pair{index, sparse_result_it->stats}; };
+                return std::pair{index, sparse_result_it->stats};
+            };
 
             auto [index, stats] = loop_lambda(this->optional_results);
 
             if (index == -1)
                 return AttackRating::full{};
 
-            AttackRating::full best_attack_rating{};
-            this->weapons[index]->get_attack_rating(this->attack_options, stats, best_attack_rating);
-            return best_attack_rating;
+            return this->weapons.at(index).get_attack_rating(this->attack_options, stats);
         }
     };
 }

@@ -527,16 +527,4 @@ namespace xml
         std::println("{} weapons\n", weapons.size());
         return weapons;
     }
-    
-
-    export auto apply_filter(const std::vector<calculator::Weapon> &weapons, const calculator::Weapon::Filter &weapon_filter) {
-        std::vector<const calculator::Weapon*> filtered{};
-        filtered.reserve(weapons.size());
-
-        for (const auto &weapon : weapons)
-            if (weapon_filter(weapon))
-                filtered.push_back(&weapon);
-
-        return filtered;
-    }
 }
