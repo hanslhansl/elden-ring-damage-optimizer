@@ -118,7 +118,6 @@ namespace xml
 
         throw std::invalid_argument("unknown attack power type");
     }
-
     
     std::map<calculator::AttackPowerType, long long> parse_status_sp_effect_params(
         long long statusSpEffectParamId,
@@ -330,13 +329,13 @@ namespace xml
             }
             else
             {
-                std::println("ignoring: could not find weapon name for id: {}", row_id);
+                // std::println("ignoring: could not find weapon name for id: {}", row_id);
                 continue;
             }
 
             if (name.find("[ERROR]") != std::string::npos || name.find("%null%") != std::string::npos)
             {
-                std::println("ignoring: weapon name: {}, id: {}", name, row_id);
+                // std::println("ignoring: weapon name: {}, id: {}", name, row_id);
                 continue;
             }
 
@@ -347,7 +346,7 @@ namespace xml
             {
                 if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
                 {
-                    std::println("ignoring: weapon {} because no real weapon", name);
+                    // std::println("ignoring: weapon {} because no real weapon", name);
                     continue;
                 }
 

@@ -7,11 +7,14 @@ list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 
 include(Catch)
 
-add_executable(tests tests.cpp)
 
-target_link_libraries(tests PRIVATE
+add_executable(tests tests.cpp)
+target_link_libraries(tests PUBLIC
     elden_ring_damage_optimizer_core
     Catch2::Catch2WithMain
+
+    PUBLIC
+    coverage_flags
 )
 
 # copy xml_data to build directory

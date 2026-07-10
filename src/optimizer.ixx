@@ -4,6 +4,7 @@ import :calculator;
 import std;
 import BS.thread_pool;
 
+
 export namespace optimizer
 {
     using namespace calculator;
@@ -36,7 +37,7 @@ export namespace optimizer
                         best_attack_rating.emplace(std::move(intermediate_attack_rating));
                 }
 
-                std::println("completed {}: {}", i, weapon.full_name);
+                // std::println("completed {}: {}", i, weapon.full_name);
             };
 
             // loop through all weapons and get the best attack rating each asynchronously

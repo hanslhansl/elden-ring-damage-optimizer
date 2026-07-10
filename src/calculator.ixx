@@ -125,7 +125,6 @@ constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enu
     std::pair{calculator::StatusType::DEATH_BLIGHT, "DEATH_BLIGHT"}
 };
 
-
 export namespace calculator
 {
     enum class Class {

@@ -25,5 +25,5 @@ int main(int argc, char* argv[])
     //     xml_data_directory
     // );
 
-    return 1;
+    return 0;
 }

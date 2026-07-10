@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 4.3.0 FATAL_ERROR)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 26)
 
 # enable C++23 modules support
@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(
     "$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>"
 )
+
 
 # create project
 project(elden-ring-damage-optimizer LANGUAGES CXX)
@@ -52,10 +53,20 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
+# potentially add coverage
+add_library(coverage_flags INTERFACE)
+# target_compile_options(coverage_flags INTERFACE
+#     -fprofile-instr-generate
+#     -fcoverage-mapping
+# )
+# target_link_options(coverage_flags INTERFACE
+#     -fprofile-instr-generate
+# )
+
 # set up core library
 set(SRC_DIR "src")
-add_library(elden_ring_damage_optimizer_core)
-target_sources(elden_ring_damage_optimizer_core 
+add_library(elden_ring_damage_optimizer_core STATIC)
+target_sources(elden_ring_damage_optimizer_core
     PUBLIC FILE_SET CXX_MODULES
         BASE_DIRS ${SRC_DIR}
         FILES
@@ -67,9 +78,11 @@ target_sources(elden_ring_damage_optimizer_core
         # ${SRC_DIR}/ui.ixx
         ${SRC_DIR}/erdo.ixx
 )
+
 target_link_libraries(elden_ring_damage_optimizer_core PRIVATE
     BS_thread_pool
     pugixml::pugixml
+    coverage_flags
 )
 
 # enable std:: print, println etc for gcc
