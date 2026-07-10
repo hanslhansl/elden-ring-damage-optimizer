@@ -31,10 +31,10 @@ TEST_CASE("optimize total attack rating") {
         stat_variations,
         weapons,
         attack_options
-    ).wait_and_get_result();
+    ).wait_and_get_result().at(0);
 
     REQUIRE(attack_rating.stats == calculator::Stats{ 21, 10, 10, 10, 10 });
-    REQUIRE(attack_rating.weapon->full_name == "Fire Duelist Greataxe");
+    REQUIRE(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
 
     auto expected = 734.8908832256299;
     REQUIRE_THAT(attack_rating.total_attack_power.at(2), WithinAbs(expected, 1e-12) || WithinRel(expected, 1e-9));

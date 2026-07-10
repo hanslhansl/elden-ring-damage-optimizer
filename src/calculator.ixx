@@ -178,22 +178,18 @@ export namespace calculator
         static constexpr bool disable_two_handing_attack_power_bonus = false;
     };
 
-    namespace AttackRating
-    {
-        struct full {
-            Stats stats;
-            AttackOptions attack_options;
+    struct AttackRating {
+        Stats stats;
+        AttackOptions attack_options;
+        std::reference_wrapper<const Weapon> weapon;
 
-            const Weapon *weapon;
-
-            std::array<double, 3> total_attack_power;                                             // a + b = c
-            std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
-            std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
-            double spell_scaling;
-            std::array<bool, enumerators_of<AttackPowerType>().size()> ineffective_attack_power_types;
-            std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
-        };
-    } // namespace AttackRating
+        std::array<double, 3> total_attack_power;                                             // a + b = c
+        std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
+        std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
+        double spell_scaling;
+        std::array<bool, enumerators_of<AttackPowerType>().size()> ineffective_attack_power_types;
+        std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
+    };
 
     struct Weapon
     {
@@ -319,10 +315,10 @@ export namespace calculator
             return stats;
         }
 
-        AttackRating::full get_attack_rating(const AttackOptions &attack_options, const Stats &stats) const {
+        AttackRating get_attack_rating(const AttackOptions &attack_options, const Stats &stats) const {
             auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options.two_handing, stats);
 
-            AttackRating::full attack_rating{ stats, attack_options, this };
+            AttackRating attack_rating{ stats, attack_options, *this };
 
             // std::array<bool, enumerators_of<Attribute>().size()> attack_rating_ineffective_attributes{};
             for (auto attribute : enumerators_of<Attribute>())

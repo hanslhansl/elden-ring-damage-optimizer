@@ -501,9 +501,6 @@ namespace xml
             for (auto attribute : enumerators_of<calculator::Attribute>())
                 stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
             
-
-            std::println("weapon: {}, type: {}", name, enum_to_string(integral_to_enum<calculator::Weapon::Type>(weaponType)));
-
             weapons.emplace_back(calculator::Weapon{
                 .full_name = name,
                 .base_name = weaponName,
@@ -524,7 +521,7 @@ namespace xml
         }
 
         std::ranges::sort(weapons, {}, &calculator::Weapon::full_name);
-        std::println("{} weapons\n", weapons.size());
+        std::println("found {} weapons\n", weapons.size());
         return weapons;
     }
 }
