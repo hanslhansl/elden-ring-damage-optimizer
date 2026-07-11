@@ -13,11 +13,10 @@ add_compile_options(
     "$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>"
 )
 
-
 # create project
-project(elden-ring-damage-optimizer LANGUAGES CXX)
+project(erdo LANGUAGES CXX)
 
-# download CPM.cmake
+# download and include CPM.cmake
 file(
     DOWNLOAD
     https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.8/CPM.cmake
@@ -47,58 +46,50 @@ CPMAddPackage(
     VERSION 1.15
 )
 
+# set up core libraries
+set(SRC_DIR "src")
+function(configure_erdo_core_library target)
+    add_library(${target} STATIC)
+
+    target_sources(${target}
+        PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${SRC_DIR} FILES
+            ${SRC_DIR}/meta.ixx
+            ${SRC_DIR}/witchy.ixx
+            ${SRC_DIR}/xml.ixx
+            ${SRC_DIR}/calculator.ixx
+            ${SRC_DIR}/optimizer.ixx
+            # ${SRC_DIR}/ui.ixx
+            ${SRC_DIR}/erdo.ixx
+        )
+
+    target_link_libraries(${target} PRIVATE
+        BS_thread_pool
+        pugixml::pugixml
+    )
+
+    if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+        target_link_libraries(${target} PRIVATE stdc++exp) 
+    endif()
+
+    # copy xml_data to build directory
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/xml_data
+            $<TARGET_FILE_DIR:${target}>/xml_data
+    )
+endfunction()
+configure_erdo_core_library(erdo_core)
+configure_erdo_core_library(erdo_core_tests)
+
+
+# set up main executable
+add_executable(erdo ${SRC_DIR}/main.cpp)
+target_link_libraries(erdo PRIVATE
+    erdo_core
+)
+
 # add testing
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
-
-# potentially add coverage
-add_library(coverage_flags INTERFACE)
-# target_compile_options(coverage_flags INTERFACE
-#     -fprofile-instr-generate
-#     -fcoverage-mapping
-# )
-# target_link_options(coverage_flags INTERFACE
-#     -fprofile-instr-generate
-# )
-
-# set up core library
-set(SRC_DIR "src")
-add_library(elden_ring_damage_optimizer_core STATIC)
-target_sources(elden_ring_damage_optimizer_core
-    PUBLIC FILE_SET CXX_MODULES
-        BASE_DIRS ${SRC_DIR}
-        FILES
-        ${SRC_DIR}/meta.ixx
-        ${SRC_DIR}/witchy.ixx
-        ${SRC_DIR}/xml.ixx
-        ${SRC_DIR}/calculator.ixx
-        ${SRC_DIR}/optimizer.ixx
-        # ${SRC_DIR}/ui.ixx
-        ${SRC_DIR}/erdo.ixx
-)
-
-target_link_libraries(elden_ring_damage_optimizer_core PRIVATE
-    BS_thread_pool
-    pugixml::pugixml
-    coverage_flags
-)
-
-# enable std:: print, println etc for gcc
-if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-    target_link_libraries(elden_ring_damage_optimizer_core PRIVATE stdc++exp) 
-endif()
-
-# copy xml_data to build directory
-add_custom_command(TARGET elden_ring_damage_optimizer_core POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/xml_data
-        $<TARGET_FILE_DIR:elden_ring_damage_optimizer_core>/xml_data
-)
-
-# set up main executable
-add_executable(elden_ring_damage_optimizer ${SRC_DIR}/main.cpp)
-target_link_libraries(elden_ring_damage_optimizer PRIVATE
-    elden_ring_damage_optimizer_core
-)

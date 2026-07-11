@@ -27,20 +27,25 @@ const std::vector<double> expected_total_attack_powers {
     #include "excpected_total_attack_powers.inc"
 };
 
-TEST_CASE("verify total attack rating optimization correctness") {
+TEST_CASE("verify total attack rating optimization correctness")
+{
     
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
 
     std::vector<calculator::Stats> stat_variations{};
+#ifndef NO_BENCHMARKS
     BENCHMARK("calculator::get_stat_variations")
+#endif
     {
         stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
     };
 
     std::vector<calculator::AttackRating> attack_ratings{};
+#ifndef NO_BENCHMARKS
     BENCHMARK("optimizer::OptimizationContext")
+#endif
     {
         attack_ratings = optimizer::OptimizationContext(
             0,
@@ -58,7 +63,8 @@ TEST_CASE("verify total attack rating optimization correctness") {
     REQUIRE_THAT(attack_rating.total_attack_power.at(2), WithinAbs(expected, 1e-12) || WithinRel(expected, 1e-9));
 }
 
-TEST_CASE("verify total attack rating calculation correctness") {
+TEST_CASE("verify total attack rating calculation correctness")
+{
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
