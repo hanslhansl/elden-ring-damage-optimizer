@@ -47,12 +47,13 @@ TEST_CASE("verify total attack rating optimization correctness")
     BENCHMARK("optimizer::OptimizationContext")
 #endif
     {
-        attack_ratings = optimizer::OptimizationContext(
-            0,
-            stat_variations,
-            weapons,
-            attack_options
-        ).wait_and_get_result();
+        attack_ratings = optimizer::optimize(stat_variations, weapons, attack_options, 1);
+        // optimizer::OptimizationContext(
+        //     0,
+        //     stat_variations,
+        //     weapons,
+        //     attack_options
+        // ).wait_and_get_result();
     };
     auto&& attack_rating = attack_ratings.front();
 

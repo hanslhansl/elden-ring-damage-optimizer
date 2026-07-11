@@ -14,31 +14,31 @@ target_compile_options(erdo_core_tests PUBLIC
 target_link_options(erdo_core_tests PUBLIC
     -fprofile-instr-generate
 )
-add_executable(tests tests.cpp)
-target_link_libraries(tests PRIVATE
+add_executable(test_with_coverage tests.cpp)
+target_link_libraries(test_with_coverage PRIVATE
     erdo_core_tests
     Catch2::Catch2WithMain
 )
-target_compile_definitions(tests PRIVATE NO_BENCHMARKS)
+target_compile_definitions(test_with_coverage PRIVATE NO_BENCHMARKS)
 
 # build tests with benchmarks but without coverage instrumentation
-add_executable(test_benchmarks tests.cpp)
-target_link_libraries(test_benchmarks PRIVATE
+add_executable(test_with_benchmarks tests.cpp)
+target_link_libraries(test_with_benchmarks PRIVATE
     erdo_core
     Catch2::Catch2WithMain
 )
 
 # copy xml_data to build directory
-add_custom_command(TARGET tests POST_BUILD
+add_custom_command(TARGET test_with_coverage POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_data
-        $<TARGET_FILE_DIR:tests>/test_xml_data
+        $<TARGET_FILE_DIR:test_with_coverage>/test_xml_data
 )
-add_custom_command(TARGET test_benchmarks POST_BUILD
+add_custom_command(TARGET test_with_benchmarks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_data
-        $<TARGET_FILE_DIR:test_benchmarks>/test_xml_data
+        $<TARGET_FILE_DIR:test_with_benchmarks>/test_xml_data
 )
 
-catch_discover_tests(tests)
-catch_discover_tests(test_benchmarks)
+catch_discover_tests(test_with_coverage)
+catch_discover_tests(test_with_benchmarks)
