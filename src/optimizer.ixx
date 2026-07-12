@@ -34,8 +34,9 @@ namespace optimizer
 
 
     export
+    template<auto...th_flags>
     SortedMultiFuture<AttackRating, std::ranges::greater, decltype(&total_attack_power_projection)>
-    optimize(const std::vector<Stats> &stat_variations, const std::vector<Weapon> &weapons, AttackOptions attack_options, std::size_t threads = 0) {
+    optimize(const std::vector<Stats> &stat_variations, const std::vector<Weapon> &weapons, AttackOptions attack_options, BS::thread_pool<th_flags...>& pool) {
 
         if (stat_variations.empty())
             return {
@@ -43,8 +44,6 @@ namespace optimizer
                 {},
                 total_attack_power_projection
             };
-
-        BS::thread_pool<> pool{ threads };
 
         // process one weapon
         auto do_weapon = [&](std::size_t i) {

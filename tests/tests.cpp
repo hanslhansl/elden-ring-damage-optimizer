@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
-// #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 import std;
+import BS.thread_pool;
 import erdo;
 
 
@@ -45,18 +45,13 @@ TEST_CASE("verify total attack rating optimization correctness") {
 
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
+    BS::thread_pool<> thread_pool{ 1 };
     std::vector<calculator::AttackRating> attack_ratings{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::OptimizationContext")
 #endif
     {
-        attack_ratings = optimizer::optimize(stat_variations, weapons, attack_options, 1).get();
-        // optimizer::OptimizationContext(
-        //     0,
-        //     stat_variations,
-        //     weapons,
-        //     attack_options
-        // ).wait_and_get_result();
+        attack_ratings = optimizer::optimize(stat_variations, weapons, attack_options, thread_pool).get();
     };
     auto&& attack_rating = attack_ratings.front();
 
