@@ -20,8 +20,8 @@ int main(int argc, char* argv[])
 
 
     // witchy::run_witchy(
-    //     "F:/Programme/Steam/steamapps/common/ELDEN RING/Game",
-    //     "C:/Users/Paul/Downloads/WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe",
+    //     ".../Steam/steamapps/common/ELDEN RING/Game",
+    //     ".../WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe",
     //     xml_data_directory
     // );
 
