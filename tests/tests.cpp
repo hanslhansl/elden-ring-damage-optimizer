@@ -37,7 +37,7 @@ TEST_CASE("verify stat variations correctness") {
 TEST_CASE("verify total attack rating optimization correctness") {
     std::vector<calculator::Stats> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
-    BENCHMARK("calculator::get_stat_variations")
+    //BENCHMARK("calculator::get_stat_variations")
 #endif
     {
         stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
@@ -51,7 +51,7 @@ TEST_CASE("verify total attack rating optimization correctness") {
     BENCHMARK("optimizer::OptimizationContext")
 #endif
     {
-        attack_ratings = optimizer::optimize(stat_variations, weapons, attack_options, thread_pool).get();
+        attack_ratings = optimizer::optimize<optimizer::optimize_weapon>(weapons, stat_variations, attack_options, thread_pool).get();
     };
     auto&& attack_rating = attack_ratings.front();
 
@@ -61,6 +61,36 @@ TEST_CASE("verify total attack rating optimization correctness") {
     auto expected = 734.8908832256299;
     CHECK_THAT(attack_rating.total_attack_power.at(2), Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
+
+// TEST_CASE("alternative optimization with stat variations as generator") {
+//     std::optional<calculator::Generator<calculator::Stats>> optional_stat_variations{};
+// #ifdef ENABLE_BENCHMARKS
+//     BENCHMARK("calculator::get_stat_variations")
+// #endif
+//     {
+//         optional_stat_variations.emplace(calculator::get_stat_variations_coroutine(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)));
+//     };
+//     auto&& stat_variations = optional_stat_variations.value();
+
+//     auto&& weapons = get_weapons();
+//     calculator::AttackOptions attack_options{{0, 25, 10}, true};
+//     BS::thread_pool<> thread_pool{ 1 };
+//     std::vector<calculator::AttackRating> attack_ratings{};
+// #ifdef ENABLE_BENCHMARKS
+//     BENCHMARK("optimizer::OptimizationContext")
+// #endif
+//     {
+//         attack_ratings = optimizer::optimize_range(stat_variations, weapons, attack_options, thread_pool).get();
+//     };
+//     auto&& attack_rating = attack_ratings.front();
+
+//     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
+//     CHECK(attack_rating.stats == calculator::Stats{ 21, 10, 10, 10, 10 });
+
+//     auto expected = 734.8908832256299;
+//     CHECK_THAT(attack_rating.total_attack_power.at(2), Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
+// }
+
 
 TEST_CASE("verify total attack rating calculation correctness") {
     auto&& weapons = get_weapons();

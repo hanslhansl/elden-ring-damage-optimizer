@@ -1,22 +1,49 @@
+﻿
+#include <QCoreApplication>
+#include <QDebug>
+#include <QApplication>
+#include <QLabel>
 
 import std;
 import erdo;
+import BS.thread_pool;
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+
+    QLabel label("Hello, World!");
+    label.resize(250, 100);
+    label.setAlignment(Qt::AlignCenter);
+    label.show();
+
+    return app.exec();
+}
 
 
-int main(int argc, char* argv[])
+int main2(int argc, char* argv[])
 {
     auto executable_path = std::filesystem::absolute(std::filesystem::path(argv[0]));
     auto xml_data_directory = executable_path.parent_path() / "xml_data";
 
     auto weapons = xml::get_weapons(xml_data_directory);
 
-    calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::Stats stats{ 21, 10, 10, 10, 10 };
+    auto stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
 
-    auto total_attack_powers = weapons | std::views::transform([&](const calculator::Weapon& w){
-        return w.get_attack_rating(attack_options, stats).total_attack_power.at(2);
-    }) | std::ranges::to<std::vector>();
-    std::println("{}", total_attack_powers);
+    calculator::AttackOptions attack_options{ {0, 25, 10}, true };
+    BS::thread_pool<> thread_pool{ 1 };
+    std::vector<calculator::AttackRating> attack_ratings = optimizer::optimize<optimizer::optimize_weapon>(weapons, stat_variations, attack_options, thread_pool).get();
+    auto&& attack_rating = attack_ratings.front();
+
+    std::println("{}", attack_rating.weapon.get().full_name);
+
+    //calculator::AttackOptions attack_options{{0, 25, 10}, true};
+    //calculator::Stats stats{ 21, 10, 10, 10, 10 };
+
+    //auto total_attack_powers = weapons | std::views::transform([&](const calculator::Weapon& w){
+    //    return w.get_attack_rating(attack_options, stats).total_attack_power.at(2);
+    //}) | std::ranges::to<std::vector>();
+    //std::println("{}", total_attack_powers);
 
 
     // witchy::run_witchy(

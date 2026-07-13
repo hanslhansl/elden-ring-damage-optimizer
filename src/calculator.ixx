@@ -190,6 +190,17 @@ export namespace calculator
         std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
     };
 
+    auto calculate_upgrade_level_index(const auto& base_attack_power) {
+        if (base_attack_power.size() == 1)
+            return 0;
+        else if (base_attack_power.size() == 11)
+            return 2;
+        else if (base_attack_power.size() == 26)
+            return 1;
+        else
+            throw std::runtime_error("invalid base attack power size");
+    }
+
     struct Weapon
     {
         enum class Affinity {
@@ -287,16 +298,7 @@ export namespace calculator
         std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        int upgrade_level_index = [&]() {
-            if (this->base_attack_power.size() == 1)
-                return 0;
-            else if (this->base_attack_power.size() == 11)
-                return 2;
-            else if (this->base_attack_power.size() == 26)
-                return 1;
-            else
-                throw std::runtime_error("invalid base attack power size");
-            }();
+        int upgrade_level_index = calculate_upgrade_level_index(base_attack_power);
 
         Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const {
             // Paired weapons do not get the two handing bonus
@@ -319,7 +321,6 @@ export namespace calculator
 
             AttackRating attack_rating{ stats, attack_options, *this };
 
-            // std::array<bool, enumerators_of<Attribute>().size()> attack_rating_ineffective_attributes{};
             for (auto attribute : enumerators_of<Attribute>())
                 if (adjusted_stats[std::to_underlying(attribute)] < this->requirements[std::to_underlying(attribute)])
                     attack_rating.ineffective_attributes.at(std::to_underlying(attribute)) = true;
@@ -336,8 +337,7 @@ export namespace calculator
                 if (base_attack_power != 0 || is_sorcery_or_incantation_tool)
                 {
                     auto is_damage_type = std::to_underlying(attack_power_type) <= std::to_underlying(AttackPowerType::HOLY);
-                    auto &&scaling_attributes =
-                        this->attack_power_attribute_scaling.at(std::to_underlying(attack_power_type));
+                    auto &&scaling_attributes = this->attack_power_attribute_scaling.at(std::to_underlying(attack_power_type));
                     double total_scaling = 1.;
 
                     if (std::ranges::any_of(
@@ -411,13 +411,13 @@ export namespace calculator
 
                     if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
                         attack_rating.spell_scaling = 100. * total_scaling;
-                } };
+                } 
+            };
 
 
             for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
                 loop_cycle(attack_power_type);
 
-            // attack_rating.ineffective_attributes = attack_rating_ineffective_attributes;
             return attack_rating;
         }
     };

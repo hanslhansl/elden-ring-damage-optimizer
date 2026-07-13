@@ -500,23 +500,25 @@ namespace xml
             for (auto attribute : enumerators_of<calculator::Attribute>())
                 stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
             
-            weapons.emplace_back(calculator::Weapon{
-                .full_name = name,
-                .base_name = weaponName,
-                .url = "https://eldenring.fandom.com/wiki/" + url_part,
-                .dlc = dlc,
-                .paired = row.at("isDualBlade") == 1,
-                .sorcery_tool = row.at("enableMagic") == 1,
-                .incantation_tool = row.at("enableMiracle") == 1,
-                .type = integral_to_enum<calculator::Weapon::Type>(weaponType),
-                .affinity = integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
-                .requirements = stats,
-                .attribute_scaling = attributeScaling,
-                .base_attack_power = attack,
-                .attack_power_attribute_scaling = attackElementCorrectsById.at(assert_floating_is<long long>(row.at("attackElementCorrectId"))),
-                .attack_power_scaling_curves = weaponCalcCorrectGraphs,
-                .scaling_tiers = scalingTiers
-            });
+            calculator::Weapon w{
+                name,
+                weaponName,
+                "https://eldenring.fandom.com/wiki/" + url_part,
+                dlc,
+                row.at("isDualBlade") == 1,
+                row.at("enableMagic") == 1,
+                row.at("enableMiracle") == 1,
+                integral_to_enum<calculator::Weapon::Type>(weaponType),
+                integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
+                stats,
+                attributeScaling,
+                attack,
+                attackElementCorrectsById.at(assert_floating_is<long long>(row.at("attackElementCorrectId"))),
+                weaponCalcCorrectGraphs,
+                scalingTiers
+            };
+
+            weapons.emplace_back(std::move(w));
         }
 
         std::ranges::sort(weapons, {}, &calculator::Weapon::full_name);
