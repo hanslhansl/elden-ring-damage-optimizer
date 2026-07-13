@@ -8,11 +8,16 @@ set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
 set(CMAKE_CXX_MODULE_STD 1)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
 # create project
 project(erdo LANGUAGES CXX)
 
+
+# necessary for Qt
+add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-pthread>")
 # enable clang/libc++ experimental support
 add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>")
+
 # enable g++ module support
 add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
 
@@ -51,7 +56,10 @@ CPMAddPackage(
 )
 
 # add Qt6
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 # set up core libraries
 set(SRC_DIR "src")
@@ -65,7 +73,6 @@ function(configure_erdo_core_library target)
             ${SRC_DIR}/xml.ixx
             ${SRC_DIR}/calculator.ixx
             ${SRC_DIR}/optimizer.ixx
-            # ${SRC_DIR}/ui.ixx
             ${SRC_DIR}/erdo.ixx
         )
 
@@ -90,8 +97,13 @@ configure_erdo_core_library(erdo_core_tests)
 
 
 # set up main executable
-add_executable(erdo ${SRC_DIR}/main.cpp)
 # qt_standard_project_setup()
+add_executable(erdo
+    ${SRC_DIR}/main.cpp
+    ${SRC_DIR}/main_window.ui
+
+)
+target_sources(erdo PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${SRC_DIR} FILES ${SRC_DIR}/ui.ixx)
 # qt_add_executable(erdo ${SRC_DIR}/main.cpp)
 target_link_libraries(erdo PRIVATE
     erdo_core

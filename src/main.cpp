@@ -6,6 +6,7 @@
 
 import std;
 import erdo;
+import erdo.ui;
 import BS.thread_pool;
 
 int main(int argc, char *argv[])
@@ -18,6 +19,8 @@ int main(int argc, char *argv[])
     label.show();
 
     return app.exec();
+
+    return 0;
 }
 
 

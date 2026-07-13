@@ -5,10 +5,12 @@
 
 # custom
 /build
+/.vscode
 /Directory.build.props
 *.sln
 *.vcxproj
 *.vcxproj.filters
+CMakeSettings.json
 
 # User-specific files
 *.rsuser
@@ -368,4 +370,3 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-CMakeSettings.json
