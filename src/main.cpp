@@ -13,14 +13,10 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    QLabel label("Hello, World!");
-    label.resize(250, 100);
-    label.setAlignment(Qt::AlignCenter);
-    label.show();
+    ui::MainWindow window{};
+    window.show();
 
     return app.exec();
-
-    return 0;
 }
 
 

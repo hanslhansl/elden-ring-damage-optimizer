@@ -34,31 +34,7 @@
               <property name="title">
                <string>character stats</string>
               </property>
-              <layout class="QFormLayout" name="formLayout">
-               <item row="1" column="1">
-                <widget class="QSpinBox" name="vigor_spinbox"/>
-               </item>
-               <item row="2" column="1">
-                <widget class="QSpinBox" name="mind_spinbox"/>
-               </item>
-               <item row="3" column="1">
-                <widget class="QSpinBox" name="endurance_spinbox"/>
-               </item>
-               <item row="4" column="1">
-                <widget class="QSpinBox" name="strength_spinbox"/>
-               </item>
-               <item row="5" column="1">
-                <widget class="QSpinBox" name="dexterity_spinbox"/>
-               </item>
-               <item row="6" column="1">
-                <widget class="QSpinBox" name="intelligence_spinbox"/>
-               </item>
-               <item row="7" column="1">
-                <widget class="QSpinBox" name="faith_spinbox"/>
-               </item>
-               <item row="8" column="1">
-                <widget class="QSpinBox" name="arcane_spinbox"/>
-               </item>
+              <layout class="QFormLayout" name="character_stats_layout">
                <item row="0" column="0">
                 <widget class="QLabel" name="label_3">
                  <property name="text">
@@ -68,62 +44,6 @@
                </item>
                <item row="0" column="1">
                 <widget class="QComboBox" name="starting_class_combobox"/>
-               </item>
-               <item row="8" column="0">
-                <widget class="QLabel" name="label_8">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="7" column="0">
-                <widget class="QLabel" name="label_9">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="6" column="0">
-                <widget class="QLabel" name="label_10">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="5" column="0">
-                <widget class="QLabel" name="label_11">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="4" column="0">
-                <widget class="QLabel" name="label_12">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="0">
-                <widget class="QLabel" name="label_13">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="0">
-                <widget class="QLabel" name="label_14">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="0">
-                <widget class="QLabel" name="label_15">
-                 <property name="text">
-                  <string>TextLabel</string>
-                 </property>
-                </widget>
                </item>
               </layout>
              </widget>
@@ -174,13 +94,13 @@
           <item>
            <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
-             <widget class="QGroupBox" name="weapon_name_box">
+             <widget class="QGroupBox" name="weapon_base_name_box">
               <property name="title">
-               <string>weapon name</string>
+               <string>weapon base name</string>
               </property>
               <layout class="QVBoxLayout" name="verticalLayout_4">
                <item>
-                <widget class="QListWidget" name="weapon_name_list"/>
+                <widget class="QListWidget" name="weapon_base_name_list"/>
                </item>
               </layout>
              </widget>
@@ -219,7 +139,7 @@
                 </widget>
                </item>
                <item row="0" column="1">
-                <widget class="QLabel" name="weapon_name_label">
+                <widget class="QLabel" name="weapon_full_name_label">
                  <property name="text">
                   <string/>
                  </property>
@@ -242,7 +162,7 @@
                <item row="2" column="0">
                 <widget class="QLabel" name="label_4">
                  <property name="text">
-                  <string>base game/dlc</string>
+                  <string>found in</string>
                  </property>
                 </widget>
                </item>
