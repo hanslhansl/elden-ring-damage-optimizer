@@ -108,7 +108,7 @@ namespace xml
         if (apt == calculator::AttackPowerType::HOLY)
             return "Dark";
 
-        if (apt == calculator::AttackPowerType::POISON)
+        if (apt == calculator::AttackPowerType::/*poison*/POISON)
             return "Poison";
         if (apt == calculator::AttackPowerType::BLEED)
             return "Bleed";
@@ -128,7 +128,7 @@ namespace xml
         auto &&spEffectRow = spEffectParams.at(statusSpEffectParamId);
 
         std::map<calculator::AttackPowerType, long long> statuses =  {
-            {calculator::AttackPowerType::POISON, spEffectRow.at("poizonAttackPower")},
+            {calculator::AttackPowerType::/*poison*/POISON, spEffectRow.at("poizonAttackPower")},
             {calculator::AttackPowerType::SCARLET_ROT, spEffectRow.at("diseaseAttackPower")},
             {calculator::AttackPowerType::BLEED, spEffectRow.at("bloodAttackPower")},
             {calculator::AttackPowerType::FROST, spEffectRow.at("freezeAttackPower")},
@@ -259,7 +259,7 @@ namespace xml
         for (auto &&[id, row] : read_param_xml<double>(attack_element_correct_param_file))
         {
             auto&& inserted = (attack_element_corrects_by_id[id] = parse_attack_element_correct(row));
-            inserted[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
+            inserted[std::to_underlying(calculator::AttackPowerType::/*poison*/POISON)] = default_;
             inserted[std::to_underlying(calculator::AttackPowerType::BLEED)] = default_;
             inserted[std::to_underlying(calculator::AttackPowerType::MADNESS)] = default_;
             inserted[std::to_underlying(calculator::AttackPowerType::SLEEP)] = default_;
