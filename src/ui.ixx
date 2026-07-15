@@ -6,6 +6,38 @@ export module erdo.ui;
 import erdo;
 import std;
 
+QString string_to_display(const QString& str) {
+    QStringList words = str.split(QRegularExpression("[_\\s]+"), Qt::SkipEmptyParts);
+
+    for (QString &word : words) {
+        word = word.toLower();
+        // if (!word.isEmpty())
+        //     word[0] = word[0].toUpper();
+    }
+
+    return words.join(' ');
+}
+QString string_to_display(const char* str) {
+    return string_to_display(QString::fromStdString(str));
+}
+QString string_to_display(std::string_view str) {
+    return string_to_display(QString::fromStdString(std::string(str)));
+}
+
+QString format_float(double x) {
+    std::string s = std::format("{:.3f}", x);
+
+    // Remove trailing zeros
+    while (!s.empty() && s.back() == '0')
+        s.pop_back();
+
+    // Remove trailing decimal point
+    if (!s.empty() && s.back() == '.')
+        s.pop_back();
+
+    return QString::fromStdString(s);
+}
+
 export namespace ui
 {
     class MainWindow : public QMainWindow
@@ -15,8 +47,8 @@ export namespace ui
         std::vector<calculator::Weapon> weapons{};
 
         std::vector<QSpinBox*> attribute_spinboxes{};
-        std::vector<QLabel*> attack_power_labels{};
-        std::vector<QLabel*> status_effect_labels{};
+        std::vector<std::array<QLabel*, 3>> attack_power_labels{};
+        std::vector<std::array<QLabel*, 3>> status_effect_labels{};
 
 
         long long _calculate_weapon_stats_counter = 0;
@@ -43,33 +75,79 @@ export namespace ui
             // get attack options
             calculator::AttackOptions attack_options{};
             attack_options.two_handing = this->ui->two_handing_checkbox->isChecked();
-            attack_options.upgrade_levels.at(weapon.upgrade_level_index) = this->ui->upgrade_level_spinbox->value();
+            auto upgrade_level = attack_options.upgrade_levels.at(weapon.upgrade_level_index) = this->ui->upgrade_level_spinbox->value();
 
             // set weapon stats
             auto attack_rating = weapon.get_attack_rating(attack_options, stats);
 
-            this->ui->weapon_full_name_label->setText(QString::fromStdString(weapon.full_name));
-            this->ui->weapon_type_label->setText(QString::fromStdString(std::string(enum_to_string(weapon.type))));
-            this->ui->base_game_dlc_label->setText(weapon.dlc ? "dlc" : "base game");
+            auto full_name = QString::fromStdString(weapon.full_name);
+            if (upgrade_level != 0)
+                full_name += " +" + QString::number(upgrade_level);
+            this->ui->weapon_full_name_label->setText(full_name);
+            this->ui->weapon_type_label->setText(string_to_display(enum_to_string(weapon.type)));
+            this->ui->base_game_dlc_label->setText(string_to_display(weapon.dlc ? "dlc" : "base game"));
 
-            this->ui->spell_scaling_label->setText(QString::number(attack_rating.spell_scaling, 'f', 2) + "%");
+            this->ui->spell_scaling_label->setText(format_float(attack_rating.spell_scaling));
 
-            this->ui->total_attack_power_label->setText(QString::number(attack_rating.total_attack_power.at(2), 'f', 2));
-            for (auto&& [label, attack_power] : std::views::zip(attack_power_labels, attack_rating.attack_power))
-                label->setText(QString::number(attack_power.at(2), 'f', 2));
+            auto format_a = [](double value){
+                return format_float(value);
+            };
+            auto format_b = [](double value){
+                QString text = format_float(value);
+                if (value >= 0)
+                    text.prepend("+");
+                return text;
+            };
+            auto format_c = [](double value){
+                return "= " + format_float(value);
+            };
 
-            for (auto&& [label, status_effect] : std::views::zip(status_effect_labels, attack_rating.status_effect))
-                label->setText(QString::number(status_effect.at(2), 'f', 2));
+            this->ui->total_attack_power_label_0->setText(format_a(attack_rating.total_attack_power.at(0)));
+            this->ui->total_attack_power_label_1->setText(format_b(attack_rating.total_attack_power.at(1)));
+            this->ui->total_attack_power_label_2->setText(format_c(attack_rating.total_attack_power.at(2)));
+
+
+            for (auto&& [labels, attack_power] : std::views::zip(attack_power_labels, attack_rating.attack_power))
+            {
+                labels.at(0)->setText(format_a(attack_power.at(0)));
+                labels.at(1)->setText(format_b(attack_power.at(1)));
+                labels.at(2)->setText(format_c(attack_power.at(2)));
+            }
+
+            for (auto&& [labels, status_effect] : std::views::zip(status_effect_labels, attack_rating.status_effect))
+            {
+                labels.at(0)->setText(format_a(status_effect.at(0)));
+                labels.at(1)->setText(format_b(status_effect.at(1)));
+                labels.at(2)->setText(format_c(status_effect.at(2)));
+            }
         }
 
     public:
         explicit MainWindow(QWidget *parent = nullptr) {
             this->ui->setupUi(this);
 
-            auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
-            auto xml_data_directory = application_directory / "xml_data";
+            setWindowTitle(string_to_display(windowTitle()));
+            for (QWidget *w : findChildren<QWidget *>())
+            {
+                if (auto tab = qobject_cast<QTabWidget *>(w)) {
+                    for (int i = 0; i < tab->count(); ++i) {
+                        tab->setTabText(i, string_to_display(tab->tabText(i)));
+                    }
+                }
+                else if (auto label = qobject_cast<QLabel *>(w)) {
+                    label->setText(string_to_display(label->text()));
+                }
+                else if (auto button = qobject_cast<QAbstractButton *>(w)) {
+                    button->setText(string_to_display(button->text()));
+                }
+                else if (auto box = qobject_cast<QGroupBox *>(w)) {
+                    box->setTitle(string_to_display(box->title()));
+                }
+                else if (auto menu = qobject_cast<QMenu *>(w)) {
+                    menu->setTitle(string_to_display(menu->title()));
+                }
+            }
 
-            
             // starting class combobox
             for (const auto& [class_name, _] : calculator::character_class_stats)
                 this->ui->starting_class_combobox->addItem(QString::fromStdString(class_name));
@@ -91,7 +169,7 @@ export namespace ui
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 this->ui->character_stats_layout->addRow(
-                    QString::fromStdString(std::string(enum_to_string(attribute))),
+                    string_to_display(enum_to_string(attribute)),
                     attribute_spinbox
                 );
 
@@ -138,6 +216,8 @@ export namespace ui
                         throw std::runtime_error("base weapon not found in weapons list");
                     auto&& weapon = *it;
 
+                    this->ui->upgrade_level_spinbox->setMaximum(weapon.base_attack_power.size() - 1);
+
                     QString previous_affinity_string{};
                     current_item = this->ui->weapon_affinity_list->currentItem();
                     if (current_item)
@@ -174,25 +254,28 @@ export namespace ui
             });
 
             // attack power labels
-            for (auto& attribute : enumerators_of<calculator::DamageType>())
+            for (auto&& [row, damage_type] : enumerators_of<calculator::DamageType>() | std::views::enumerate)
             {
-                auto attack_power_label = this->attack_power_labels.emplace_back(new QLabel());
-                this->ui->attack_power_layout->addRow(
-                    QString::fromStdString(std::string(enum_to_string(attribute))),
-                    attack_power_label
-                );
+                ++row;
+
+                this->ui->attack_power_layout->addWidget(new QLabel(string_to_display(enum_to_string(damage_type))), row, 0);
+
+                for (auto&& [col, attack_power_label] : this->attack_power_labels.emplace_back() | std::views::enumerate)
+                    this->ui->attack_power_layout->addWidget(attack_power_label = new QLabel(), row, col + 1);
             }
 
             // status effect labels
-            for (auto& attribute : enumerators_of<calculator::StatusType>())
+            for (auto&& [row, status_type] : enumerators_of<calculator::StatusType>() | std::views::enumerate)
             {
-                auto status_effect_label = this->status_effect_labels.emplace_back(new QLabel());
-                this->ui->status_effect_layout->addRow(
-                    QString::fromStdString(std::string(enum_to_string(attribute))),
-                    status_effect_label
-                );
+                this->ui->status_effect_layout->addWidget(new QLabel(string_to_display(enum_to_string(status_type))), row, 0);
+
+                for (auto&& [col, status_effect_label] : this->status_effect_labels.emplace_back() | std::views::enumerate)
+                    this->ui->status_effect_layout->addWidget(status_effect_label = new QLabel(), row, col + 1);
             }
 
+            // load weapon data
+            auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
+            auto xml_data_directory = application_directory / "xml_data";
             this->set_weapon_data(xml::get_weapons(xml_data_directory));
         }
 

@@ -100,9 +100,8 @@ configure_erdo_core_library(erdo_core_tests)
 # qt_standard_project_setup()
 add_executable(erdo
     ${SRC_DIR}/main.cpp
-    ${SRC_DIR}/main_window.ui
-
 )
+qt_add_ui(erdo SOURCES ${SRC_DIR}/main_window.ui)
 target_sources(erdo PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${SRC_DIR} FILES ${SRC_DIR}/ui.ixx)
 # qt_add_executable(erdo ${SRC_DIR}/main.cpp)
 target_link_libraries(erdo PRIVATE

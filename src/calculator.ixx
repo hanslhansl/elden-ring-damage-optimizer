@@ -67,7 +67,7 @@ export namespace calculator
         FIRE = 2,
         LIGHTNING = 3,
         HOLY = 4,
-        /*poison*/POISON = 5,
+        POISON = 5,
         SCARLET_ROT = 6,
         BLEED = 7,
         FROST = 8,
@@ -85,7 +85,7 @@ export namespace calculator
     };
 
     enum class StatusType {
-        /*poison*/POISON = std::to_underlying(AttackPowerType::/*poison*/POISON),
+        POISON = std::to_underlying(AttackPowerType::POISON),
         SCARLET_ROT = std::to_underlying(AttackPowerType::SCARLET_ROT),
         BLEED = std::to_underlying(AttackPowerType::BLEED),
         FROST = std::to_underlying(AttackPowerType::FROST),
@@ -121,7 +121,7 @@ constexpr std::array<std::pair<calculator::AttackPowerType, std::string_view>, 1
     std::pair{calculator::AttackPowerType::FIRE, "FIRE"},
     std::pair{calculator::AttackPowerType::LIGHTNING, "LIGHTNING"},
     std::pair{calculator::AttackPowerType::HOLY, "HOLY"},
-    std::pair{calculator::AttackPowerType::/*poison*/POISON, /*poison*/"POISON"},
+    std::pair{calculator::AttackPowerType::POISON, "POISON"},
     std::pair{calculator::AttackPowerType::SCARLET_ROT, "SCARLET_ROT"},
     std::pair{calculator::AttackPowerType::BLEED, "BLEED"},
     std::pair{calculator::AttackPowerType::FROST, "FROST"},
@@ -139,7 +139,7 @@ constexpr std::array<std::pair<calculator::DamageType, std::string_view>, 5> enu
 };
 template<>
 constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enum_string_mapping<calculator::StatusType> = {
-    std::pair{calculator::StatusType::/*poison*/POISON, /*poison*/"POISON"},
+    std::pair{calculator::StatusType::POISON, "POISON"},
     std::pair{calculator::StatusType::SCARLET_ROT, "SCARLET_ROT"},
     std::pair{calculator::StatusType::BLEED, "BLEED"},
     std::pair{calculator::StatusType::FROST, "FROST"},
@@ -415,7 +415,7 @@ export namespace calculator
                         }
                         else // attack_power_type._to__integral() > AttackPowerType::HOLY
                         {
-                            auto &&att_pwr = attack_rating.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::/*poison*/POISON)];
+                            auto &&att_pwr = attack_rating.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON)];
                             att_pwr[0] = base_attack_power;
                             att_pwr[1] = res - base_attack_power;
                             att_pwr[2] = res;
