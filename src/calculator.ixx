@@ -306,7 +306,7 @@ export namespace calculator
         // base attack power at each upgrade level for each attack power type
         std::vector<std::array<double, enumerators_of<AttackPowerType>().size()>> base_attack_power;
         // map indicating which attack power types scale with which player attributes
-        AttackElementCorrectsById::mapped_type attack_power_attribute_scaling;
+        AttackElementCorrects attack_power_attribute_scaling;
         // map indicating which scaling curve is used for each attack power type
         std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.

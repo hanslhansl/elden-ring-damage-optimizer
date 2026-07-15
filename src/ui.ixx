@@ -24,7 +24,7 @@ QString string_to_display(std::string_view str) {
     return string_to_display(QString::fromStdString(std::string(str)));
 }
 
-QString format_float(double x) {
+std::string format_float(double x) {
     std::string s = std::format("{:.3f}", x);
 
     // Remove trailing zeros
@@ -35,7 +35,7 @@ QString format_float(double x) {
     if (!s.empty() && s.back() == '.')
         s.pop_back();
 
-    return QString::fromStdString(s);
+    return s;
 }
 
 export namespace ui
@@ -87,39 +87,62 @@ export namespace ui
             this->ui->weapon_type_label->setText(string_to_display(enum_to_string(weapon.type)));
             this->ui->base_game_dlc_label->setText(string_to_display(weapon.dlc ? "dlc" : "base game"));
 
-            this->ui->spell_scaling_label->setText(format_float(attack_rating.spell_scaling));
+            this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
 
             auto format_a = [](double value){
-                return format_float(value);
+                return QString::fromStdString(format_float(value));
             };
             auto format_b = [](double value){
-                QString text = format_float(value);
+                auto text = format_float(value);
                 if (value >= 0)
-                    text.prepend("+");
-                return text;
+                    text.insert(0, "+");
+                else
+                    text = std::format("<font color='red'>{}</font>", text);
+                return QString::fromStdString(text);
             };
             auto format_c = [](double value){
-                return "= " + format_float(value);
+                return "= " + QString::fromStdString(format_float(value));
             };
 
-            this->ui->total_attack_power_label_0->setText(format_a(attack_rating.total_attack_power.at(0)));
-            this->ui->total_attack_power_label_1->setText(format_b(attack_rating.total_attack_power.at(1)));
-            this->ui->total_attack_power_label_2->setText(format_c(attack_rating.total_attack_power.at(2)));
+            auto formatters = std::vector<QString(*)(double)>{
+                [](double value){
+                    return QString::fromStdString(format_float(value));
+                },
+                [](double value){
+                    auto text = format_float(value);
+                    if (value >= 0)
+                        text.insert(0, "+");
+                    else
+                        text = std::format("<font color='red'>{}</font>", text);
+                    return QString::fromStdString(text);
+                },
+                [](double value){
+                    return "= " + QString::fromStdString(format_float(value));
+                }
+            };
 
+            std::array<std::array<QLabel*, 3>, 1> total_attack_power_labels{{
+                this->ui->total_attack_power_label_0,
+                this->ui->total_attack_power_label_1,
+                this->ui->total_attack_power_label_2
+            }};
 
-            for (auto&& [labels, attack_power] : std::views::zip(attack_power_labels, attack_rating.attack_power))
-            {
-                labels.at(0)->setText(format_a(attack_power.at(0)));
-                labels.at(1)->setText(format_b(attack_power.at(1)));
-                labels.at(2)->setText(format_c(attack_power.at(2)));
-            }
+            std::array<std::array<double, 3>, 1> total_attack_power_array { attack_rating.total_attack_power };
 
-            for (auto&& [labels, status_effect] : std::views::zip(status_effect_labels, attack_rating.status_effect))
-            {
-                labels.at(0)->setText(format_a(status_effect.at(0)));
-                labels.at(1)->setText(format_b(status_effect.at(1)));
-                labels.at(2)->setText(format_c(status_effect.at(2)));
-            }
+            for (auto&& [labels, values] : std::views::zip(
+                std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{
+                    total_attack_power_labels,
+                    attack_power_labels,
+                    status_effect_labels
+                })),
+                std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{
+                    total_attack_power_array,
+                    attack_rating.attack_power,
+                    attack_rating.status_effect
+                })))
+            )
+                for (auto&& [formatter, label, value] : std::views::zip(formatters, labels, values))
+                    label->setText(formatter(value));
         }
 
     public:
