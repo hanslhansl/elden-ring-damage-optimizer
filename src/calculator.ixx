@@ -41,12 +41,24 @@ export namespace calculator
 
     constexpr bool isVanilla = true;
 
-    enum class Attribute {
+    enum class RelevantAttribute {
         STRENGTH,
         DEXTERITY,
         INTELLIGENCE,
         FAITH,
-        ARCAINE
+        ARCAINE,
+    };
+
+    enum class Attribute {
+        VIGOR = -3,
+        MIND = -2,
+        ENDURANCE = -1,
+        
+        STRENGTH = std::to_underlying(RelevantAttribute::STRENGTH),
+        DEXTERITY = std::to_underlying(RelevantAttribute::DEXTERITY),
+        INTELLIGENCE = std::to_underlying(RelevantAttribute::INTELLIGENCE),
+        FAITH = std::to_underlying(RelevantAttribute::FAITH),
+        ARCAINE = std::to_underlying(RelevantAttribute::ARCAINE),
     };
 
     enum class AttackPowerType {
@@ -84,7 +96,18 @@ export namespace calculator
 } // namespace calculator
 
 template<>
-constexpr std::array<std::pair<calculator::Attribute, std::string_view>, 5> enum_string_mapping<calculator::Attribute> = {
+constexpr std::array<std::pair<calculator::RelevantAttribute, std::string_view>, 5> enum_string_mapping<calculator::RelevantAttribute> = {
+    std::pair{calculator::RelevantAttribute::STRENGTH, "STRENGTH"},
+    std::pair{calculator::RelevantAttribute::DEXTERITY, "DEXTERITY"},
+    std::pair{calculator::RelevantAttribute::INTELLIGENCE, "INTELLIGENCE"},
+    std::pair{calculator::RelevantAttribute::FAITH, "FAITH"},
+    std::pair{calculator::RelevantAttribute::ARCAINE, "ARCAINE"}
+};
+template<>
+constexpr std::array<std::pair<calculator::Attribute, std::string_view>, 8> enum_string_mapping<calculator::Attribute> = {
+    std::pair{calculator::Attribute::VIGOR, "VIGOR"},
+    std::pair{calculator::Attribute::MIND, "MIND"},
+    std::pair{calculator::Attribute::ENDURANCE, "ENDURANCE"},
     std::pair{calculator::Attribute::STRENGTH, "STRENGTH"},
     std::pair{calculator::Attribute::DEXTERITY, "DEXTERITY"},
     std::pair{calculator::Attribute::INTELLIGENCE, "INTELLIGENCE"},
@@ -127,42 +150,35 @@ constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enu
 
 export namespace calculator
 {
-    enum class Class {
-        HERO,
-        BANDIT,
-        ASTROLOGER,
-        WARRIOR,
-        PRISONER,
-        CONFESSOR,
-        WRETCH,
-        VAGABOND,
-        PROPHET,
-        SAMURAI,
-    };
+    constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
+    struct Stats : std::array<int, enumerators_of<RelevantAttribute>().size()> {
 
-    using Stats = std::array<int, enumerators_of<Attribute>().size()>;
-    using FullStats = std::array<int, 8>;
-    constexpr Stats full_stats_to_stats(const FullStats &full_stats) {
-        return {full_stats.at(3), full_stats.at(4), full_stats.at(5), full_stats.at(6), full_stats.at(7)};
-    }
-    constexpr FullStats merge_stats_and_full_stats(const Stats &stats, const FullStats &full_stats) {
-        return {full_stats.at(0), full_stats.at(1), full_stats.at(2), stats.at(0), stats.at(1), stats.at(2), stats.at(3), stats.at(4)};
-    }
-    const std::map<Class, Stats> ALL_CLASS_STATS{
-        {Class::HERO, {16, 9, 7, 8, 11}},
-        {Class::BANDIT, {9, 13, 9, 8, 14}},
-        {Class::ASTROLOGER, {8, 12, 16, 7, 9}},
-        {Class::WARRIOR, {10, 16, 10, 8, 9}},
-        {Class::PRISONER, {11, 14, 14, 6, 9}},
-        {Class::CONFESSOR, {12, 12, 9, 14, 9}},
-        {Class::WRETCH, {10, 10, 10, 10, 10}},
-        {Class::VAGABOND, {14, 13, 9, 9, 7}},
-        {Class::PROPHET, {11, 10, 7, 16, 10}},
-        {Class::SAMURAI, {12, 15, 9, 8, 8}}
+    };
+    struct FullStats : std::array<int, enumerators_of<Attribute>().size()> {
+        constexpr Stats to_stats() const {
+            Stats stats{};
+            for (auto attribute : enumerators_of<RelevantAttribute>())
+                stats.at(std::to_underlying(attribute)) = this->at(std::to_underlying(attribute) + irrelevant_attribute_count);
+            return stats;
+        }
+    };
+    const std::map<std::string, FullStats> character_class_stats{
+        {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
+        {"bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
+        {"astrologer", {9, 12, 15, 8, 12, 16, 7, 9}},
+        {"warrior", {11, 16, 12, 10, 16, 10, 8, 9}},
+        {"prisoner", {11, 14, 12, 11, 14, 14, 6, 9}},
+        {"confessor", {10, 12, 13, 12, 12, 9, 14, 9}},
+        {"wretch", {10, 10, 10, 10, 10, 10, 10, 10}},
+        {"vagabond", {15, 13, 10, 14, 13, 9, 9, 7}},
+        {"prophet", {10, 10, 14, 11, 10, 7, 16, 10}},
+        {"samurai", {12, 15, 11, 12, 15, 9, 8, 8}},
+        {"heavy knight", {14, 11, 8, 7, 17, 8, 15, 9}},
+        {"idus knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     };
 
     using ScalingCurve = std::array<double, 149>;
-    using AttributeScaling = std::array<double, enumerators_of<Attribute>().size()>;
+    using AttributeScaling = std::array<double, enumerators_of<RelevantAttribute>().size()>;
     using AttackElementCorrects = std::array<AttributeScaling, enumerators_of<AttackPowerType>().size()>;
     using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
 
@@ -187,7 +203,7 @@ export namespace calculator
         std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
         double spell_scaling;
         std::array<bool, enumerators_of<AttackPowerType>().size()> ineffective_attack_power_types;
-        std::array<bool, enumerators_of<Attribute>().size()> ineffective_attributes;
+        std::array<bool, enumerators_of<RelevantAttribute>().size()> ineffective_attributes;
     };
 
     auto calculate_upgrade_level_index(const auto& base_attack_power) {
@@ -311,7 +327,7 @@ export namespace calculator
                 two_handing = true;
 
             if (two_handing)
-                stats.at(std::to_underlying(Attribute::STRENGTH)) *= 1.5;
+                stats.at(std::to_underlying(RelevantAttribute::STRENGTH)) *= 1.5;
 
             return stats;
         }
@@ -321,7 +337,7 @@ export namespace calculator
 
             AttackRating attack_rating{ stats, attack_options, *this };
 
-            for (auto attribute : enumerators_of<Attribute>())
+            for (auto attribute : enumerators_of<RelevantAttribute>())
                 if (adjusted_stats[std::to_underlying(attribute)] < this->requirements[std::to_underlying(attribute)])
                     attack_rating.ineffective_attributes.at(std::to_underlying(attribute)) = true;
 
@@ -341,8 +357,8 @@ export namespace calculator
                     double total_scaling = 1.;
 
                     if (std::ranges::any_of(
-                            enumerators_of<Attribute>(),
-                            [&](Attribute attribute)
+                            enumerators_of<RelevantAttribute>(),
+                            [&](RelevantAttribute attribute)
                             {
                                 return attack_rating.ineffective_attributes.at(std::to_underlying(attribute)) && scaling_attributes[std::to_underlying(attribute)] != 0;
                             }))
@@ -358,7 +374,7 @@ export namespace calculator
                                 ? adjusted_stats
                                 : stats;
 
-                        for (auto &&attribute : enumerators_of<Attribute>())
+                        for (auto &&attribute : enumerators_of<RelevantAttribute>())
                         {
                             auto &&attribute_correct =
                                 scaling_attributes.at(std::to_underlying(attribute));
@@ -570,19 +586,19 @@ export namespace calculator
 } // namespace calculator
 
 
-template<>
-constexpr std::array<std::pair<calculator::Class, std::string_view>, 10> enum_string_mapping<calculator::Class> = {
-    std::pair{calculator::Class::HERO, "HERO"},
-    std::pair{calculator::Class::BANDIT, "BANDIT"},
-    std::pair{calculator::Class::ASTROLOGER, "ASTROLOGER"},
-    std::pair{calculator::Class::WARRIOR, "WARRIOR"},
-    std::pair{calculator::Class::PRISONER, "PRISONER"},
-    std::pair{calculator::Class::CONFESSOR, "CONFESSOR"},
-    std::pair{calculator::Class::WRETCH, "WRETCH"},
-    std::pair{calculator::Class::VAGABOND, "VAGABOND"},
-    std::pair{calculator::Class::PROPHET, "PROPHET"},
-    std::pair{calculator::Class::SAMURAI, "SAMURAI"}
-};
+// template<>
+// constexpr std::array<std::pair<calculator::Class, std::string_view>, 10> enum_string_mapping<calculator::Class> = {
+//     std::pair{calculator::Class::HERO, "HERO"},
+//     std::pair{calculator::Class::BANDIT, "BANDIT"},
+//     std::pair{calculator::Class::ASTROLOGER, "ASTROLOGER"},
+//     std::pair{calculator::Class::WARRIOR, "WARRIOR"},
+//     std::pair{calculator::Class::PRISONER, "PRISONER"},
+//     std::pair{calculator::Class::CONFESSOR, "CONFESSOR"},
+//     std::pair{calculator::Class::WRETCH, "WRETCH"},
+//     std::pair{calculator::Class::VAGABOND, "VAGABOND"},
+//     std::pair{calculator::Class::PROPHET, "PROPHET"},
+//     std::pair{calculator::Class::SAMURAI, "SAMURAI"}
+// };
 template<>
 constexpr std::array<std::pair<calculator::Weapon::Affinity, std::string_view>, 14> enum_string_mapping<calculator::Weapon::Affinity> = {
     std::pair{calculator::Weapon::Affinity::STANDARD, "STANDARD"},

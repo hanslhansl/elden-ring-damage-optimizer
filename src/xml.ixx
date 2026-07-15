@@ -1,5 +1,6 @@
 module;
 #include <pugixml.hpp>
+#include <ranges>
 // #include <ranges>
 export module erdo:xml;
 import :witchy;
@@ -81,16 +82,16 @@ namespace xml
         return ret;
     }
 
-    std::string attribute_to_xml_string(calculator::Attribute attr) {
-        if (attr == calculator::Attribute::STRENGTH)
+    std::string attribute_to_xml_string(calculator::RelevantAttribute attr) {
+        if (attr == calculator::RelevantAttribute::STRENGTH)
             return "Strength";
-        if (attr == calculator::Attribute::DEXTERITY)
+        if (attr == calculator::RelevantAttribute::DEXTERITY)
             return "Agility";
-        if (attr == calculator::Attribute::INTELLIGENCE)
+        if (attr == calculator::RelevantAttribute::INTELLIGENCE)
             return "Magic";
-        if (attr == calculator::Attribute::FAITH)
+        if (attr == calculator::RelevantAttribute::FAITH)
             return "Faith";
-        if (attr == calculator::Attribute::ARCAINE)
+        if (attr == calculator::RelevantAttribute::ARCAINE)
             return "Luck";
 
         throw std::invalid_argument("unknown attribute");
@@ -161,7 +162,7 @@ namespace xml
 
             auto&& attribute_scaling = ret.at(std::to_underlying(apt));
 
-            for (auto attribute : enumerators_of<calculator::Attribute>())
+            for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
             {
                 auto attribute_str = attribute_to_xml_string(attribute);
                 if (attribute_str == "Agility")
@@ -193,7 +194,7 @@ namespace xml
 
             ret.attack.at(std::to_underlying(damage_type)) = row.at(std::format("{}AtkRate", atk_rate_str));
         }
-        for (auto attribute : enumerators_of<calculator::Attribute>())
+        for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
         {
             auto rate_str = std::format("correct{}Rate", attribute_to_xml_string(attribute));
             ret.attributeScaling.at(std::to_underlying(attribute)) = row.at(rate_str);
@@ -433,8 +434,8 @@ namespace xml
                 }
             }
 
-            std::vector<std::pair<calculator::Attribute, double>> unupgradedAttributeScaling{};
-            for (auto attribute : enumerators_of<calculator::Attribute>())
+            std::vector<std::pair<calculator::RelevantAttribute, double>> unupgradedAttributeScaling{};
+            for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
             {
                 auto xml_str = std::format("correct{}", attribute_to_xml_string(attribute));
                 if (row.at(xml_str))
@@ -496,10 +497,10 @@ namespace xml
             auto url_part = weaponName;
             std::ranges::replace(url_part, ' ', '_');
 
-            calculator::Stats stats{};
-            for (auto attribute : enumerators_of<calculator::Attribute>())
-                stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
-            
+            calculator::Stats required_stats{};
+            for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
+                required_stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
+
             calculator::Weapon w{
                 name,
                 weaponName,
@@ -510,7 +511,7 @@ namespace xml
                 row.at("enableMiracle") == 1,
                 integral_to_enum<calculator::Weapon::Type>(weaponType),
                 integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
-                stats,
+                required_stats,
                 attributeScaling,
                 attack,
                 attackElementCorrectsById.at(assert_floating_is<long long>(row.at("attackElementCorrectId"))),

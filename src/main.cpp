@@ -27,7 +27,10 @@ int main2(int argc, char* argv[])
 
     auto weapons = xml::get_weapons(xml_data_directory);
 
-    auto stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
+    auto stat_variations = calculator::get_stat_variations(
+        1 + 60,
+        calculator::character_class_stats.at("wretch").to_stats()
+    );
 
     calculator::AttackOptions attack_options{ {0, 25, 10}, true };
     BS::thread_pool<> thread_pool{ 1 };

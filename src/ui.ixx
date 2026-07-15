@@ -8,7 +8,6 @@ import std;
 
 export namespace ui
 {
-
     class MainWindow : public QMainWindow
     {
         Q_OBJECT
@@ -16,36 +15,30 @@ export namespace ui
         std::vector<calculator::Weapon> weapons{};
 
         std::vector<QSpinBox*> attribute_spinboxes{};
-        QString most_recently_selected_affinity;
+        std::vector<QLabel*> attack_power_labels{};
+        std::vector<QLabel*> status_effect_labels{};
 
 
-        // void set_weapon_stats(const calculator::Weapon& weapon, const calculator::AttackOptions& attack_options, const calculator::Stats& stats) {
-        // }
+        long long _calculate_weapon_stats_counter = 0;
+        class calculate_weapon_stats_counter {
+            MainWindow* self;
+        public:
+            explicit calculate_weapon_stats_counter(MainWindow* self) : self{self} {
+                self->_calculate_weapon_stats_counter++;
+            }
 
-        bool try_collect_and_set_weapon_stats() {
+            ~calculate_weapon_stats_counter() {
+                if (--self->_calculate_weapon_stats_counter == 0)
+                    self->calculate_weapon_stats();
+            }
+        };
 
-            auto current_item = this->ui->weapon_base_name_list->currentItem();
-            if (!current_item)
-                return false;
-            auto weapon_base_name = current_item->text().toStdString();
-
-            current_item = this->ui->weapon_affinity_list->currentItem();
-            if (!current_item)
-                return false;
-            auto weapon_affinity = string_to_enum<calculator::Weapon::Affinity>(current_item->text().toStdString());
-
+        void calculate_weapon_stats() {
             // get weapon
-            auto it = std::ranges::find_if(this->weapons, [&](const calculator::Weapon& w) {
-                return w.base_name == weapon_base_name && w.affinity == weapon_affinity;
-            });
-            if (it == this->weapons.end())
-                return false;
-            auto&& weapon = *it;
+            auto&& weapon = this->get_weapon();
 
             // get character stats
-            calculator::Stats stats{};
-            for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes, stats))
-                stat = spinbox->value();
+            auto stats = this->get_character_stats();
 
             // get attack options
             calculator::AttackOptions attack_options{};
@@ -53,95 +46,244 @@ export namespace ui
             attack_options.upgrade_levels.at(weapon.upgrade_level_index) = this->ui->upgrade_level_spinbox->value();
 
             // set weapon stats
-            this->ui->weapon_full_name_label->setText(weapon.full_name.c_str());
-            this->ui->weapon_type_label->setText(std::string(enum_to_string(weapon.type)).c_str());
+            auto attack_rating = weapon.get_attack_rating(attack_options, stats);
+
+            this->ui->weapon_full_name_label->setText(QString::fromStdString(weapon.full_name));
+            this->ui->weapon_type_label->setText(QString::fromStdString(std::string(enum_to_string(weapon.type))));
             this->ui->base_game_dlc_label->setText(weapon.dlc ? "dlc" : "base game");
 
-            // this->set_weapon_stats();
-            return true;
+            this->ui->spell_scaling_label->setText(QString::number(attack_rating.spell_scaling, 'f', 2) + "%");
+
+            this->ui->total_attack_power_label->setText(QString::number(attack_rating.total_attack_power.at(2), 'f', 2));
+            for (auto&& [label, attack_power] : std::views::zip(attack_power_labels, attack_rating.attack_power))
+                label->setText(QString::number(attack_power.at(2), 'f', 2));
+
+            for (auto&& [label, status_effect] : std::views::zip(status_effect_labels, attack_rating.status_effect))
+                label->setText(QString::number(status_effect.at(2), 'f', 2));
         }
 
     public:
         explicit MainWindow(QWidget *parent = nullptr) {
             this->ui->setupUi(this);
 
-
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
 
-            this->set_weapon_data(xml::get_weapons(xml_data_directory));
             
+            // starting class combobox
+            for (const auto& [class_name, _] : calculator::character_class_stats)
+                this->ui->starting_class_combobox->addItem(QString::fromStdString(class_name));
+            this->ui->starting_class_combobox->setCurrentIndex(-1);
+            connect(this->ui->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
+                auto raii = calculate_weapon_stats_counter(this);
 
-            connect(this->ui->weapon_base_name_list, &QListWidget::currentItemChanged,
-                this, [this](QListWidgetItem *current, QListWidgetItem *previous) {
-                    if (current)
-                        this->set_base_weapon(current->text().toStdString());
-                }
-            );
+                if (text.isEmpty())
+                    return;
 
-            connect(this->ui->weapon_affinity_list, &QListWidget::currentItemChanged,
-                this, [this](QListWidgetItem *current, QListWidgetItem *previous) {
-                    if (current)
-                    {
-                        this->most_recently_selected_affinity = current->text();
-                        this->try_collect_and_set_weapon_stats();
-                    }
-                }
-            );
-
+                auto full_stats = calculator::character_class_stats.at(text.toStdString());
+                this->ui->starting_class_combobox->blockSignals(true);
+                this->set_character_full_stats(full_stats);
+                this->ui->starting_class_combobox->blockSignals(false);
+            });
+            
+            // character stats spinboxes
             for (auto& attribute : enumerators_of<calculator::Attribute>())
             {
-                auto attribute_string = std::string(enum_to_string(attribute));
+                auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
+                this->ui->character_stats_layout->addRow(
+                    QString::fromStdString(std::string(enum_to_string(attribute))),
+                    attribute_spinbox
+                );
 
-                QLabel *label = new QLabel(attribute_string.c_str());
-                auto spinBox = attribute_spinboxes.emplace_back(new QSpinBox());
+                connect(attribute_spinbox, &QSpinBox::valueChanged, this, [this]() {
+                    auto raii = calculate_weapon_stats_counter(this);
 
-                this->ui->character_stats_layout->addRow(label, spinBox);
+                    auto full_stats = this->get_character_full_stats();
+                    auto it = std::ranges::find_if(calculator::character_class_stats, [&](const auto& pair) {
+                        return pair.second == full_stats;
+                    });
+
+                    std::ranges::for_each(attribute_spinboxes, [](QSpinBox* spinbox) { spinbox->blockSignals(true); });
+
+                    if (it != calculator::character_class_stats.end()) 
+                        this->ui->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
+                    else
+                        this->ui->starting_class_combobox->setCurrentIndex(-1);
+
+                    std::ranges::for_each(attribute_spinboxes, [](QSpinBox* spinbox) { spinbox->blockSignals(false); });
+                });
             }
+
+            // upgrade level spinbox
+            connect(this->ui->upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
+                auto raii = calculate_weapon_stats_counter(this);
+            });
+
+            // two-handing checkbox
+            connect(this->ui->two_handing_checkbox, &QCheckBox::checkStateChanged, this, [this]() {
+                auto raii = calculate_weapon_stats_counter(this);
+            });
+
+            // weapon base name list widget
+            connect(this->ui->weapon_base_name_list, &QListWidget::currentItemChanged,
+                this, [this](QListWidgetItem *current_item, QListWidgetItem*) {
+                    auto raii = calculate_weapon_stats_counter(this);
+
+                    if (!current_item)
+                        return;
+                    auto base_weapon = current_item->text().toStdString();
+
+                    auto it = std::ranges::find(this->weapons, base_weapon, &calculator::Weapon::base_name);
+                    if (it == this->weapons.end())
+                        throw std::runtime_error("base weapon not found in weapons list");
+                    auto&& weapon = *it;
+
+                    QString previous_affinity_string{};
+                    current_item = this->ui->weapon_affinity_list->currentItem();
+                    if (current_item)
+                        previous_affinity_string = current_item->text();
+
+                    auto affinities = this->weapons
+                        | std::views::filter([&](const calculator::Weapon& w) { return w.base_name == weapon.base_name; })
+                        | std::views::transform(&calculator::Weapon::affinity)
+                        | std::ranges::to<std::vector>();
+                    if (affinities.empty())
+                        throw std::runtime_error("no affinities found for base weapon");
+                    constexpr auto all_affinities = enumerators_of<calculator::Weapon::Affinity>();
+                    std::ranges::sort(affinities, [&](auto a, auto b) {
+                        return std::ranges::find(all_affinities, a) < std::ranges::find(all_affinities, b);
+                    });
+                    this->ui->weapon_affinity_list->clear();
+                    this->ui->weapon_affinity_list->addItems(
+                        affinities
+                        | std::views::transform([](const calculator::Weapon::Affinity& a) { return QString::fromStdString(std::string(enum_to_string(a))); })
+                        | std::ranges::to<QList>()
+                    );
+
+                    auto matches = this->ui->weapon_affinity_list->findItems(previous_affinity_string, Qt::MatchExactly);
+                    if (!matches.isEmpty())
+                        this->ui->weapon_affinity_list->setCurrentItem(matches.first());
+                    else
+                        this->ui->weapon_affinity_list->setCurrentRow(0);
+                }
+            );
+
+            // affinity list widget
+            connect(this->ui->weapon_affinity_list, &QListWidget::currentItemChanged, this, [this]() {
+                auto raii = calculate_weapon_stats_counter(this);
+            });
+
+            // attack power labels
+            for (auto& attribute : enumerators_of<calculator::DamageType>())
+            {
+                auto attack_power_label = this->attack_power_labels.emplace_back(new QLabel());
+                this->ui->attack_power_layout->addRow(
+                    QString::fromStdString(std::string(enum_to_string(attribute))),
+                    attack_power_label
+                );
+            }
+
+            // status effect labels
+            for (auto& attribute : enumerators_of<calculator::StatusType>())
+            {
+                auto status_effect_label = this->status_effect_labels.emplace_back(new QLabel());
+                this->ui->status_effect_layout->addRow(
+                    QString::fromStdString(std::string(enum_to_string(attribute))),
+                    status_effect_label
+                );
+            }
+
+            this->set_weapon_data(xml::get_weapons(xml_data_directory));
         }
 
         void set_weapon_data(std::vector<calculator::Weapon>&& weapons) {
+            if (weapons.empty())
+                throw std::runtime_error("weapons list is empty");
+
             this->weapons = std::move(weapons);
 
             auto weapon_base_names = this->weapons
-                | std::views::transform([](const calculator::Weapon& w) -> QString { return w.base_name.c_str(); })
+                | std::views::transform([](const calculator::Weapon& w) { return QString::fromStdString(w.base_name); })
                 | std::ranges::to<std::set>()
                 | std::ranges::to<QList>();
+            this->ui->weapon_base_name_list->clear();
             this->ui->weapon_base_name_list->addItems(weapon_base_names);
+            this->ui->weapon_base_name_list->setCurrentRow(0);
         }
 
-        void set_base_weapon(const std::string& weapon_base_name) {
-            // this->ui->weapon_base_name_list->blockSignals(true);
+        calculator::Stats get_character_stats() {
+            calculator::Stats stats{};
+            for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
+                stat = spinbox->value();
+            return stats;
+        }
+        void set_character_stats(const calculator::Stats& stats) {
+            auto raii = calculate_weapon_stats_counter(this);
 
-            this->ui->weapon_base_name_list->setCurrentItem(this->ui->weapon_base_name_list->findItems(weapon_base_name.c_str(), Qt::MatchExactly).first());
-
-            // if (this->ui->weapon_affinity_list->currentItem())
-            //     this->most_recently_selected_affinity = this->ui->weapon_affinity_list->currentItem()->text();
-
-            auto affinities = this->weapons
-                | std::views::filter([&](const calculator::Weapon& w) { return w.base_name == weapon_base_name; })
-                | std::views::transform(&calculator::Weapon::affinity)
-                | std::views::transform([](const calculator::Weapon::Affinity& a) -> QString { return std::string(enum_to_string(a)).c_str(); })
-                | std::ranges::to<QList>();
-            this->ui->weapon_affinity_list->clear();
-            this->ui->weapon_affinity_list->addItems(affinities);
-
-            // this->ui->weapon_base_name_list->blockSignals(false);
-
-            auto matches = this->ui->weapon_affinity_list->findItems(this->most_recently_selected_affinity, Qt::MatchExactly);
-            if (!matches.isEmpty())
-                this->ui->weapon_affinity_list->setCurrentItem(matches.first());
+            for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
+                spinbox->setValue(stat);
         }
 
+        calculator::FullStats get_character_full_stats() {
+            calculator::FullStats full_stats{};
+            for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes, full_stats))
+                stat = spinbox->value();
+            return full_stats;
+        }
+        void set_character_full_stats(const calculator::FullStats& full_stats) {
+            auto raii = calculate_weapon_stats_counter(this);
+
+            for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes, full_stats))
+                spinbox->setValue(stat);
+        }
+
+        std::string get_base_weapon() {
+            auto current_item = this->ui->weapon_base_name_list->currentItem();
+            if (!current_item)
+                throw std::runtime_error("no weapon base name selected");
+            return current_item->text().toStdString();
+        }
+        void set_base_weapon(const std::string& base_weapon) {
+            auto raii = calculate_weapon_stats_counter(this);
+
+            auto matches = this->ui->weapon_base_name_list->findItems(QString::fromStdString(base_weapon), Qt::MatchExactly);
+            if (matches.isEmpty())
+                throw std::runtime_error("weapon base name not found in list widget");
+            this->ui->weapon_base_name_list->setCurrentItem(matches.first());
+        }
+
+        calculator::Weapon::Affinity get_affinity() {
+            auto current_item = this->ui->weapon_affinity_list->currentItem();
+            if (!current_item)
+                throw std::runtime_error("no weapon affinity selected");
+            return string_to_enum<calculator::Weapon::Affinity>(current_item->text().toStdString());
+        }
         void set_affinity(calculator::Weapon::Affinity affinity) {
-            auto affinity_string = std::string(enum_to_string(affinity));
+            auto raii = calculate_weapon_stats_counter(this);
 
-            auto matches = this->ui->weapon_affinity_list->findItems(affinity_string.c_str(), Qt::MatchExactly);
-            if (!matches.isEmpty())
-                this->ui->weapon_affinity_list->setCurrentItem(matches.first());
+            auto affinity_string = QString::fromStdString(std::string(enum_to_string(affinity)));
+            auto matches = this->ui->weapon_affinity_list->findItems(affinity_string, Qt::MatchExactly);
+            if (matches.isEmpty())
+                throw std::runtime_error("weapon affinity not found in list widget");
+            this->ui->weapon_affinity_list->setCurrentItem(matches.first());
         }
 
+        calculator::Weapon& get_weapon() {
+            auto weapon_base_name = this->get_base_weapon();
+            auto weapon_affinity = this->get_affinity();
+
+            // get weapon
+            auto it = std::ranges::find_if(this->weapons, [&](const calculator::Weapon& w) {
+                return w.base_name == weapon_base_name && w.affinity == weapon_affinity;
+            });
+            if (it == this->weapons.end())
+                throw std::runtime_error("weapon not found");
+
+            return *it;
+        }
         void set_weapon(const calculator::Weapon& weapon) {
+            auto raii = calculate_weapon_stats_counter(this);
+
             this->set_base_weapon(weapon.base_name);
             this->set_affinity(weapon.affinity);
         }

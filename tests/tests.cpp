@@ -27,20 +27,29 @@ const std::vector<double> expected_total_attack_powers {
 TEST_CASE("verify stat variations correctness") {
     auto expected_stat_variation_count = 1365;
 
-    auto stat_variation_count = calculator::get_stat_variation_count(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
+    auto stat_variation_count = calculator::get_stat_variation_count(
+        1 + 60,
+        calculator::character_class_stats.at("wretch").to_stats()
+    );
     CHECK(stat_variation_count == expected_stat_variation_count);
-
-    auto stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
+    
+    auto stat_variations = calculator::get_stat_variations(
+        1 + 60,
+        calculator::character_class_stats.at("wretch").to_stats()
+    );
     CHECK(stat_variations.size() == expected_stat_variation_count);
 }
 
 TEST_CASE("verify total attack rating optimization correctness") {
     std::vector<calculator::Stats> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
-    //BENCHMARK("calculator::get_stat_variations")
+    BENCHMARK("calculator::get_stat_variations")
 #endif
     {
-        stat_variations = calculator::get_stat_variations(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH));
+        stat_variations = calculator::get_stat_variations(
+            1 + 60,
+            calculator::character_class_stats.at("wretch").to_stats()
+        );
     };
 
     auto&& weapons = get_weapons();
@@ -68,7 +77,7 @@ TEST_CASE("verify total attack rating optimization correctness") {
 //     BENCHMARK("calculator::get_stat_variations")
 // #endif
 //     {
-//         optional_stat_variations.emplace(calculator::get_stat_variations_coroutine(1 + 60, calculator::ALL_CLASS_STATS.at(calculator::Class::WRETCH)));
+//         optional_stat_variations.emplace(calculator::get_stat_variations_coroutine(1 + 60, calculator::character_class_stats.at("wretch")));
 //     };
 //     auto&& stat_variations = optional_stat_variations.value();
 
