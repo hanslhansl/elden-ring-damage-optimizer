@@ -108,6 +108,7 @@ target_link_libraries(erdo PRIVATE
     erdo_core
     Qt6::Core
     Qt6::Widgets
+    Qt6::Gui
 )
 
 # add testing

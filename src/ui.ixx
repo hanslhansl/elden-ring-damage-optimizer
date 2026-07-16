@@ -1,5 +1,7 @@
 module;
 #include <QMainWindow>
+#include <QPainter>
+// #include <QMatrix>
 #include "ui_main_window.h"
 export module erdo.ui;
 
@@ -38,6 +40,7 @@ std::string format_float(double x) {
     return s;
 }
 
+
 export namespace ui
 {
     class MainWindow : public QMainWindow
@@ -49,6 +52,8 @@ export namespace ui
         std::vector<QSpinBox*> attribute_spinboxes{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
         std::vector<std::array<QLabel*, 3>> status_effect_labels{};
+        std::vector<QLabel*> attribute_scaling_labels{};
+        std::vector<QLabel*> attribute_requirements_labels{};
 
 
         long long _calculate_weapon_stats_counter = 0;
@@ -86,63 +91,60 @@ export namespace ui
             this->ui->weapon_full_name_label->setText(full_name);
             this->ui->weapon_type_label->setText(string_to_display(enum_to_string(weapon.type)));
             this->ui->base_game_dlc_label->setText(string_to_display(weapon.dlc ? "dlc" : "base game"));
-
             this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
 
-            auto format_a = [](double value){
-                return QString::fromStdString(format_float(value));
-            };
-            auto format_b = [](double value){
-                auto text = format_float(value);
-                if (value >= 0)
-                    text.insert(0, "+");
-                else
-                    text = std::format("<font color='red'>{}</font>", text);
-                return QString::fromStdString(text);
-            };
-            auto format_c = [](double value){
-                return "= " + QString::fromStdString(format_float(value));
-            };
-
-            auto formatters = std::vector<QString(*)(double)>{
-                [](double value){
+            auto formatters = std::array<QString(*)(double, bool), 3>{
+                [](double value, bool is_ineffective){
                     return QString::fromStdString(format_float(value));
                 },
-                [](double value){
+                [](double value, bool is_ineffective){
                     auto text = format_float(value);
                     if (value >= 0)
                         text.insert(0, "+");
-                    else
+                    if (is_ineffective)
                         text = std::format("<font color='red'>{}</font>", text);
                     return QString::fromStdString(text);
                 },
-                [](double value){
+                [](double value, bool is_ineffective){
                     return "= " + QString::fromStdString(format_float(value));
                 }
             };
 
-            std::array<std::array<QLabel*, 3>, 1> total_attack_power_labels{{
-                this->ui->total_attack_power_label_0,
-                this->ui->total_attack_power_label_1,
-                this->ui->total_attack_power_label_2
-            }};
+            for (auto&& [formatter, label, value] : std::views::zip(
+                formatters,
+                std::array { this->ui->total_attack_power_label_0, this->ui->total_attack_power_label_1, this->ui->total_attack_power_label_2 },
+                attack_rating.total_attack_power
+            ))
+                label->setText(formatter(value, false));
 
-            std::array<std::array<double, 3>, 1> total_attack_power_array { attack_rating.total_attack_power };
-
-            for (auto&& [labels, values] : std::views::zip(
-                std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{
-                    total_attack_power_labels,
-                    attack_power_labels,
-                    status_effect_labels
-                })),
-                std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{
-                    total_attack_power_array,
-                    attack_rating.attack_power,
-                    attack_rating.status_effect
-                })))
-            )
+            for (auto&& [labels, values, is_ineffective] : std::views::zip(
+                std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{ this->attack_power_labels, this->status_effect_labels })),
+                std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{ attack_rating.attack_power, attack_rating.status_effect })),
+                attack_rating.ineffective_attack_power_types
+            ))
                 for (auto&& [formatter, label, value] : std::views::zip(formatters, labels, values))
-                    label->setText(formatter(value));
+                    label->setText(formatter(value, is_ineffective));
+
+            // ineffective_attributes
+            for (auto&& [scaling_label, requirement_label, requirement, is_ineffective] : std::views::zip(
+                this->attribute_scaling_labels,
+                this->attribute_requirements_labels,
+                weapon.requirements,
+                attack_rating.ineffective_attributes
+            ))
+            {
+                std::string text = "\u2012";
+                if (requirement != 0)
+                {
+                    if (is_ineffective)
+                        text = std::format("<font color='red'>\u2265{}</font>", requirement);
+                    else
+                        text = std::format("\u2265{}", requirement);
+                }
+                requirement_label->setText(QString::fromStdString(text));
+            }
+
+            // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
         }
 
     public:
@@ -191,6 +193,8 @@ export namespace ui
             for (auto& attribute : enumerators_of<calculator::Attribute>())
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
+                attribute_spinbox->setMinimum(1);
+                attribute_spinbox->setMaximum(99);
                 this->ui->character_stats_layout->addRow(
                     string_to_display(enum_to_string(attribute)),
                     attribute_spinbox
@@ -296,10 +300,21 @@ export namespace ui
                     this->ui->status_effect_layout->addWidget(status_effect_label = new QLabel(), row, col + 1);
             }
 
+            // attribute labels
+            for (auto&& [row, attribute] : enumerators_of<calculator::RelevantAttribute>() | std::views::enumerate)
+            {
+                row += 2;
+
+                this->ui->attribute_layout->addWidget(new QLabel(string_to_display(enum_to_string(attribute))), row, 0);
+
+                this->ui->attribute_layout->addWidget(this->attribute_scaling_labels.emplace_back(new QLabel()), row, 1);
+                this->ui->attribute_layout->addWidget(this->attribute_requirements_labels.emplace_back(new QLabel()), row, 2);
+            }
+
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
-            this->set_weapon_data(xml::get_weapons(xml_data_directory));
+            this->set_weapon_data(xml::load_weapons(xml_data_directory));
         }
 
         void set_weapon_data(std::vector<calculator::Weapon>&& weapons) {

@@ -25,7 +25,7 @@ int main2(int argc, char* argv[])
     auto executable_path = std::filesystem::absolute(std::filesystem::path(argv[0]));
     auto xml_data_directory = executable_path.parent_path() / "xml_data";
 
-    auto weapons = xml::get_weapons(xml_data_directory);
+    auto weapons = xml::load_weapons(xml_data_directory);
 
     auto stat_variations = calculator::get_stat_variations(
         1 + 60,

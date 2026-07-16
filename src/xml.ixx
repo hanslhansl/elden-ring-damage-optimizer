@@ -1,12 +1,29 @@
 module;
 #include <pugixml.hpp>
-#include <ranges>
-// #include <ranges>
 export module erdo:xml;
 import :witchy;
 import :calculator;
 
 import std;
+
+
+template <typename T>
+constexpr T assert_floating_is(double f) {
+    if (f != (T)f)
+        throw std::runtime_error("floating is not T");
+    return f;
+}
+
+template <typename Map, typename Key, typename Default>
+auto map_get(Map &&m, Key &&key, Default &&default_) {
+    using result_type = std::common_reference_t<typename std::remove_cvref_t<Map>::mapped_type, Default &&>;
+
+    auto it = m.find(std::forward<Key>(key));
+    if (it == m.end())
+        return result_type(std::forward<Default>(default_));
+    return result_type(it->second);
+}
+
 
 namespace xml
 {
@@ -267,7 +284,7 @@ namespace xml
         return attack_element_corrects_by_id;
     }
 
-    export auto get_weapons(const std::filesystem::path &xml_data_directory) {
+    export auto load_weapons(const std::filesystem::path &xml_data_directory) {
         auto scalingTiers = get_scaling_tiers(
             xml_data_directory / witchy::GR_MenuTextFile += ".xml",
             xml_data_directory / witchy::MenuValueTableParamFile += ".xml"

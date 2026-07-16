@@ -4,36 +4,6 @@ import :meta;
 import std;
 
 
-template <typename Map, typename Key, typename Default>
-auto map_get(Map &&m, Key &&key, Default &&default_) {
-    using result_type = std::common_reference_t<typename std::remove_cvref_t<Map>::mapped_type, Default &&>;
-
-    auto it = m.find(std::forward<Key>(key));
-    if (it == m.end())
-        return result_type(std::forward<Default>(default_));
-    return result_type(it->second);
-}
-
-template <typename T>
-std::pair<std::invoke_result_t<T &&>, std::chrono::nanoseconds> TimeFunctionExecution(T &&func) {
-    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-
-    auto &&result = func();
-
-    std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-
-    // Getting number of milliseconds as a double
-    return {std::forward<decltype(result)>(result), t2 - t1};
-}
-
-
-export template <typename T>
-constexpr T assert_floating_is(double f) {
-    if (f != (T)f)
-        throw std::runtime_error("floating is not T");
-    return f;
-}
-
 export namespace calculator
 {
     struct Weapon;
@@ -206,7 +176,7 @@ export namespace calculator
         std::array<bool, enumerators_of<RelevantAttribute>().size()> ineffective_attributes;
     };
 
-    auto calculate_upgrade_level_index(const auto& base_attack_power) {
+    long long calculate_upgrade_level_index(const auto& base_attack_power) {
         if (base_attack_power.size() == 1)
             return 0;
         else if (base_attack_power.size() == 11)
@@ -313,7 +283,7 @@ export namespace calculator
         std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        int upgrade_level_index = calculate_upgrade_level_index(base_attack_power);
+        long long upgrade_level_index = calculate_upgrade_level_index(base_attack_power);
 
         Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const {
             // Paired weapons do not get the two handing bonus
@@ -341,91 +311,80 @@ export namespace calculator
                     attack_rating.ineffective_attributes.at(std::to_underlying(attribute)) = true;
 
             auto upgrade_level = attack_options.upgrade_levels.at(upgrade_level_index);
-            auto &base_attack_power_at_upgrade_level = this->base_attack_power.at(upgrade_level);
+            auto&& base_attack_power_at_upgrade_level = this->base_attack_power.at(upgrade_level);
 
             bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
             auto loop_cycle = [&](const AttackPowerType &attack_power_type) {
                 auto temp_index = std::to_underlying(attack_power_type);
-                auto base_attack_power = base_attack_power_at_upgrade_level[temp_index];
+                auto base_attack_power = base_attack_power_at_upgrade_level.at(temp_index);
 
-                if (base_attack_power != 0 || is_sorcery_or_incantation_tool)
+                auto is_damage_type = std::to_underlying(attack_power_type) <= std::to_underlying(AttackPowerType::HOLY);
+                auto &&scaling_attributes = this->attack_power_attribute_scaling.at(std::to_underlying(attack_power_type));
+                double total_scaling = 1.;
+
+                if (std::ranges::any_of(
+                        enumerators_of<RelevantAttribute>(),
+                        [&](RelevantAttribute attribute)
+                        {
+                            return attack_rating.ineffective_attributes.at(std::to_underlying(attribute))
+                                && scaling_attributes.at(std::to_underlying(attribute)) != 0;
+                        }))
                 {
-                    auto is_damage_type = std::to_underlying(attack_power_type) <= std::to_underlying(AttackPowerType::HOLY);
-                    auto &&scaling_attributes = this->attack_power_attribute_scaling.at(std::to_underlying(attack_power_type));
-                    double total_scaling = 1.;
+                    total_scaling = 1. - ineffective_attribute_penalty;
+                    attack_rating.ineffective_attack_power_types.at(std::to_underlying(attack_power_type)) = true;
+                }
+                else
+                {
+                    auto &effective_stats = (!attack_options.disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
 
-                    if (std::ranges::any_of(
-                            enumerators_of<RelevantAttribute>(),
-                            [&](RelevantAttribute attribute)
-                            {
-                                return attack_rating.ineffective_attributes.at(std::to_underlying(attribute)) && scaling_attributes[std::to_underlying(attribute)] != 0;
-                            }))
+                    for (auto &&attribute : enumerators_of<RelevantAttribute>())
                     {
-                        total_scaling = 1. - ineffective_attribute_penalty;
-                        attack_rating.ineffective_attack_power_types.at(std::to_underlying(attack_power_type)) = true;
-                    }
-                    else
-                    {
-                        auto &effective_stats =
-                            (!attack_options.disable_two_handing_attack_power_bonus &&
-                             is_damage_type)
-                                ? adjusted_stats
-                                : stats;
+                        auto &&attribute_correct = scaling_attributes.at(std::to_underlying(attribute));
+                        double scaling{};
 
-                        for (auto &&attribute : enumerators_of<RelevantAttribute>())
+                        if (attribute_correct != 0)
                         {
-                            auto &&attribute_correct =
-                                scaling_attributes.at(std::to_underlying(attribute));
-                            double scaling{};
+                            if (attribute_correct == 1)
+                                scaling = this->attribute_scaling.at(upgrade_level).at(std::to_underlying(attribute));
+                            else
+                                scaling = attribute_correct
+                                    * this->attribute_scaling.at(upgrade_level).at(std::to_underlying(attribute))
+                                    / this->attribute_scaling.at(0).at(std::to_underlying(attribute));
 
-                            if (attribute_correct != 0)
-                            {
-                                if (attribute_correct == 1)
-                                    scaling = this->attribute_scaling.at(upgrade_level)
-                                                  .at(std::to_underlying(attribute));
-                                else
-                                    scaling =
-                                        attribute_correct *
-                                        this->attribute_scaling.at(upgrade_level)
-                                            .at(std::to_underlying(attribute)) /
-                                        this->attribute_scaling.at(0).at(std::to_underlying(attribute));
-
-                                if (scaling != 0.)
-                                    total_scaling +=
-                                        this->attack_power_scaling_curves[std::to_underlying(attack_power_type)][effective_stats[std::to_underlying(attribute)]] * scaling;
-                            }
+                            if (scaling != 0.)
+                                total_scaling += scaling
+                                    * this->attack_power_scaling_curves[std::to_underlying(attack_power_type)][effective_stats[std::to_underlying(attribute)]];
                         }
                     }
+                }
 
-                    if (base_attack_power != 0)
+                if (base_attack_power != 0)
+                {
+                    auto res = base_attack_power * total_scaling;
+
+                    if (is_damage_type) // attack_power_type._to_integral() <= AttackPowerType::HOLY
                     {
-                        auto res = base_attack_power * total_scaling;
-
-                        if (is_damage_type) // attack_power_type._to_integral() <= AttackPowerType::HOLY
-                        {
-                            auto &&att_pwr =
-                                attack_rating.attack_power[std::to_underlying(attack_power_type)];
-                            att_pwr[0] = base_attack_power;
-                            att_pwr[1] = res - base_attack_power;
-                            att_pwr[2] = res;
-                            attack_rating.total_attack_power[0] += base_attack_power;
-                            attack_rating.total_attack_power[1] += res - base_attack_power;
-                            attack_rating.total_attack_power[2] += res;
-                        }
-                        else // attack_power_type._to__integral() > AttackPowerType::HOLY
-                        {
-                            auto &&att_pwr = attack_rating.status_effect[std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON)];
-                            att_pwr[0] = base_attack_power;
-                            att_pwr[1] = res - base_attack_power;
-                            att_pwr[2] = res;
-                        }
-                        
+                        auto &&att_pwr = attack_rating.attack_power[std::to_underlying(attack_power_type)];
+                        att_pwr[0] = base_attack_power;
+                        att_pwr[1] = res - base_attack_power;
+                        att_pwr[2] = res;
+                        attack_rating.total_attack_power[0] += base_attack_power;
+                        attack_rating.total_attack_power[1] += res - base_attack_power;
+                        attack_rating.total_attack_power[2] += res;
                     }
+                    else // attack_power_type._to__integral() > AttackPowerType::HOLY
+                    {
+                        auto &&att_pwr = attack_rating.status_effect.at(std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON));
+                        att_pwr[0] = base_attack_power;
+                        att_pwr[1] = res - base_attack_power;
+                        att_pwr[2] = res;
+                    }
+                    
+                }
 
-                    if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
-                        attack_rating.spell_scaling = 100. * total_scaling;
-                } 
+                if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)
+                    attack_rating.spell_scaling = 100. * total_scaling;
             };
 
 
