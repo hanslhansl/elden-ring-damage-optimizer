@@ -342,6 +342,9 @@
           </layout>
          </widget>
         </item>
+        <item>
+         <widget class="QTableView" name="tableView"/>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="optimize_tab">

@@ -1,26 +1,25 @@
-﻿
-#include <QCoreApplication>
-#include <QDebug>
-#include <QApplication>
-#include <QLabel>
+﻿import std;
 
-import std;
-import erdo;
 import erdo.ui;
-import BS.thread_pool;
 
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    // std::cout << std::getenv("PATH") << std::endl;
+    // std::cout << std::getenv("Path") << std::endl;
 
-    ui::MainWindow window{};
-    window.show();
-
-    return app.exec();
+    // return 0;
+    return erdo::ui::run_ui(argc, argv);
 }
 
 
-int main2(int argc, char* argv[])
+
+
+
+/*
+import erdo;
+import BS.thread_pool;
+
+int main(int argc, char* argv[])
 {
     auto executable_path = std::filesystem::absolute(std::filesystem::path(argv[0]));
     auto xml_data_directory = executable_path.parent_path() / "xml_data";
@@ -55,4 +54,4 @@ int main2(int argc, char* argv[])
     // );
 
     return 0;
-}
+}*/

@@ -1,7 +1,6 @@
 module;
 #include <QMainWindow>
 #include <QPainter>
-// #include <QMatrix>
 #include "ui_main_window.h"
 export module erdo.ui;
 
@@ -40,8 +39,7 @@ std::string format_float(double x) {
     return s;
 }
 
-
-export namespace ui
+namespace erdo::ui
 {
     class MainWindow : public QMainWindow
     {
@@ -409,6 +407,16 @@ export namespace ui
             this->set_affinity(weapon.affinity);
         }
     };
+
+    export int run_ui(int argc, char *argv[])
+    {
+        QApplication app(argc, argv);
+
+        MainWindow window{};
+        window.show();
+
+        return app.exec();
+    }
 }
 
 #include "ui.moc"

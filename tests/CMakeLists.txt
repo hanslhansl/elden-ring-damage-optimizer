@@ -24,8 +24,6 @@ function(configure_test_executable target erdo_core_library test_prefix)
             $<TARGET_FILE_DIR:${target}>/test_xml_data
     )
 
-    # target_compile_definitions(${target} PUBLIC ENABLE_BENCHMARKS)
-
     catch_discover_tests(${target} TEST_PREFIX "${test_prefix}.")
 endfunction()
 

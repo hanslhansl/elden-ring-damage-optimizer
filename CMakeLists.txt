@@ -34,82 +34,13 @@ file(
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
-# add thread pool
-add_compile_definitions(BS_THREAD_POOL_IMPORT_STD)
-CPMAddPackage(
-    NAME BS_thread_pool
-    GITHUB_REPOSITORY bshoshany/thread-pool
-    VERSION 5.1.0
-    EXCLUDE_FROM_ALL
-    SYSTEM
-)
-add_library(BS_thread_pool)
-target_sources(BS_thread_pool PUBLIC FILE_SET CXX_MODULES FILES ${BS_thread_pool_SOURCE_DIR}/modules/BS.thread_pool.cppm)
-target_include_directories(BS_thread_pool PRIVATE ${BS_thread_pool_SOURCE_DIR}/include)
 
-# add pugixml
-add_compile_definitions(PUGIXML_HEADER_ONLY)
-CPMAddPackage(
-    NAME pugixml
-    GITHUB_REPOSITORY zeux/pugixml
-    VERSION 1.15
-)
+# add core library
+add_subdirectory(src)
 
-# add Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
+# add ui
+add_subdirectory(app)
 
-# set up core libraries
-set(SRC_DIR "src")
-function(configure_erdo_core_library target)
-    add_library(${target} STATIC)
-
-    target_sources(${target}
-        PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${SRC_DIR} FILES
-            ${SRC_DIR}/meta.ixx
-            ${SRC_DIR}/witchy.ixx
-            ${SRC_DIR}/xml.ixx
-            ${SRC_DIR}/calculator.ixx
-            ${SRC_DIR}/optimizer.ixx
-            ${SRC_DIR}/erdo.ixx
-        )
-
-    target_link_libraries(${target} PRIVATE
-        BS_thread_pool
-        pugixml::pugixml
-    )
-
-    if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-        target_link_libraries(${target} PRIVATE stdc++exp) 
-    endif()
-
-    # copy xml_data to build directory
-    add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/xml_data
-            $<TARGET_FILE_DIR:${target}>/xml_data
-    )
-endfunction()
-configure_erdo_core_library(erdo_core)
-configure_erdo_core_library(erdo_core_tests)
-
-
-# set up main executable
-# qt_standard_project_setup()
-add_executable(erdo
-    ${SRC_DIR}/main.cpp
-)
-qt_add_ui(erdo SOURCES ${SRC_DIR}/main_window.ui)
-target_sources(erdo PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${SRC_DIR} FILES ${SRC_DIR}/ui.ixx)
-# qt_add_executable(erdo ${SRC_DIR}/main.cpp)
-target_link_libraries(erdo PRIVATE
-    erdo_core
-    Qt6::Core
-    Qt6::Widgets
-    Qt6::Gui
-)
 
 # add testing
 include(CTest)
