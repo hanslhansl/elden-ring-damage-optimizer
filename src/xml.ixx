@@ -7,10 +7,9 @@ import :calculator;
 import std;
 
 
-template <typename T>
-constexpr T assert_floating_is(double f) {
-    if (f != (T)f)
-        throw std::runtime_error("floating is not T");
+long long assert_float_is_llong(double f) {
+    if (f != (long long)f)
+        throw std::runtime_error("float is not long long");
     return f;
 }
 
@@ -25,29 +24,47 @@ auto map_get(Map &&m, Key &&key, Default &&default_) {
 }
 
 
-namespace xml
+namespace erdo::xml
 {
-    using ParamRow = std::map<std::string, double>;
-
-    const std::map<long long, calculator::Weapon::Type> weapon_type_overrides = {{110000, calculator::Weapon::Type::FIST}};
-    constexpr bool isVanilla = true;
-    constexpr long long default_damage_calc_correct_graph_id = 0;
-    constexpr long long default_status_calc_correct_graph_id = 6;
-
-    template<typename T>
-        requires (std::same_as<T, double> || std::same_as<T, long long>)
-    std::map<long long, std::map<std::string, T>> read_param_xml(const std::filesystem::path &file_path) {
-        static auto get_as = [](const pugi::xml_attribute& attr, T def = 0){
-            if constexpr (std::same_as<T, double>)
-                return attr.as_double(def);
-            else if constexpr (std::same_as<T, long long>)
-                return attr.as_llong(def);
-        };
-
+    pugi::xml_document load_file(const std::filesystem::path &file_path) {
         pugi::xml_document data;
         auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
         if (!result)
             throw std::runtime_error(std::format("could not load xml file: {}", result.description()));
+        return data;
+    }
+
+    template<typename T>
+    auto get_value(const auto& attr, T def = 0) {
+        if constexpr (std::same_as<T, double>)
+            return attr.as_double(def);
+        else if constexpr (std::same_as<T, long long>)
+            return attr.as_llong(def);
+        else
+            static_assert(false, "unsupported type");
+    }
+
+    template<typename T>
+    T get_element_value(const pugi::xml_document& doc, const std::vector<std::string>& path, T def = 0) {
+        pugi::xml_node node{};
+        for (auto&& element : path)
+        {
+            if (node)
+                node = node.child(element.c_str());
+            else
+                node = doc.child(element.c_str());
+
+            if (!node)
+                throw std::runtime_error(std::format("could not find element {}", element));
+        }
+
+        return get_value<T>(node.text(), def);
+    }
+
+    template<typename T>
+        requires (std::same_as<T, double> || std::same_as<T, long long>)
+    std::map<long long, std::map<std::string, T>> read_param_file(const std::filesystem::path &file_path) {
+        pugi::xml_document data = load_file(file_path);
 
         auto field_nodes = data.child("param").child("fields").children("field");
 
@@ -55,7 +72,7 @@ namespace xml
         for (auto &&field_node : field_nodes)
         {
             auto name = field_node.attribute("name").as_string();
-            auto defaultValue = get_as(field_node.attribute("defaultValue"), std::numeric_limits<T>::max());
+            auto defaultValue = get_value<T>(field_node.attribute("defaultValue"), std::numeric_limits<T>::max());
 
             if (defaultValue != std::numeric_limits<T>::max())
                 default_values.emplace(name, defaultValue);
@@ -71,7 +88,7 @@ namespace xml
             std::map<std::string, T> row_data = default_values;
             for (auto &&row_attribute : row_node.attributes())
             {
-                row_data[row_attribute.name()] = get_as(row_attribute);
+                row_data[row_attribute.name()] = get_value<T>(row_attribute);
             }
 
             auto id = row_node.attribute("id").as_llong();
@@ -80,11 +97,8 @@ namespace xml
 
         return ret;
     }
-    std::map<long long, std::string> read_fmg_xml(const std::filesystem::path &file_path) {
-        pugi::xml_document data;
-        auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
-        if (!result)
-            throw std::runtime_error(std::format("could not load xml file: {}", result.description()));
+    std::map<long long, std::string> read_fmg_file(const std::filesystem::path &file_path) {
+        pugi::xml_document data = load_file(file_path);
 
         auto text_nodes = data.child("fmg").child("entries").children("text");
 
@@ -98,6 +112,17 @@ namespace xml
 
         return ret;
     }
+}
+
+namespace erdo::parser
+{
+    using ParamRow = std::map<std::string, double>;
+
+    const std::map<long long, calculator::Weapon::Type> weapon_type_overrides = {{110000, calculator::Weapon::Type::FIST}};
+    constexpr bool isVanilla = true;
+    constexpr long long default_damage_calc_correct_graph_id = 0;
+    constexpr long long default_status_calc_correct_graph_id = 6;
+
 
     std::string attribute_to_xml_string(calculator::RelevantAttribute attr) {
         if (attr == calculator::RelevantAttribute::STRENGTH)
@@ -163,7 +188,7 @@ namespace xml
         calculator::CalcCorrectGraph ret{};
         for (size_t i = 0; i < 5; ++i)
         {
-            auto maxVal = assert_floating_is<long long>(row.at(std::format("stageMaxVal{}", i)));
+            auto maxVal = assert_float_is_llong(row.at(std::format("stageMaxVal{}", i)));
             auto maxGrowVal = row.at(std::format("stageMaxGrowVal{}", i)) / 100.;
             auto adjPt = row.at(std::format("adjPt_maxGrowVal{}", i));
             ret.at(i) = calculator::CalcCorrectGraphEntry{maxVal, maxGrowVal, adjPt};
@@ -258,11 +283,11 @@ namespace xml
     }
 
     std::array<std::pair<double, std::string>, 6> get_scaling_tiers(const std::filesystem::path& menu_text_file, const std::filesystem::path& menu_value_table_params_file) {
-        auto menu_text = read_fmg_xml(menu_text_file);
+        auto menu_text = xml::read_fmg_file(menu_text_file);
 
         std::array<std::pair<double, std::string>, 6> scaling_tiers{};
         size_t  i = 0;
-        for (auto &&[id, row] : read_param_xml<long long>(menu_value_table_params_file))
+        for (auto &&[id, row] : xml::read_param_file<long long>(menu_value_table_params_file))
             if (row.at("compareType") == 1 && id >= 100)
                 scaling_tiers.at(i++) = {row.at("value") / 100., menu_text.at(row.at("textId"))};
 
@@ -273,7 +298,7 @@ namespace xml
         constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
         
         calculator::AttackElementCorrectsById attack_element_corrects_by_id{};
-        for (auto &&[id, row] : read_param_xml<double>(attack_element_correct_param_file))
+        for (auto &&[id, row] : xml::read_param_file<double>(attack_element_correct_param_file))
         {
             auto&& inserted = (attack_element_corrects_by_id[id] = parse_attack_element_correct(row));
             inserted[std::to_underlying(calculator::AttackPowerType::POISON)] = default_;
@@ -291,12 +316,12 @@ namespace xml
         );
         auto attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml");
 
-        auto spEffectParams = read_param_xml<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml");
-        auto calcCorrectGraphs = read_param_xml<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml");
-        auto equipParamWeapons = read_param_xml<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml");
-        auto reinforceParamWeapons = read_param_xml<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml");
-        auto weaponNames = read_fmg_xml(xml_data_directory / witchy::WeaponNameFile += ".xml");
-        auto dlcWeaponNames = read_fmg_xml(xml_data_directory / witchy::WeaponName_dlc01File += ".xml");
+        auto spEffectParams = xml::read_param_file<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml");
+        auto calcCorrectGraphs = xml::read_param_file<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml");
+        auto equipParamWeapons = xml::read_param_file<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml");
+        auto reinforceParamWeapons = xml::read_param_file<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml");
+        auto weaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponNameFile += ".xml");
+        auto dlcWeaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponName_dlc01File += ".xml");
 
         std::map<long long, std::vector<calculator::ReinforceTypesDict>> reinforce_types;
         for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)
@@ -334,7 +359,7 @@ namespace xml
         weapons.reserve(equipParamWeapons.size());
         for (auto &&[k, row] : equipParamWeapons)
         {
-            auto row_id = assert_floating_is<long long>(row.at("id"));
+            auto row_id = assert_float_is_llong(row.at("id"));
 
             std::string name{};
             bool dlc{};
@@ -359,7 +384,7 @@ namespace xml
 
             const auto weaponType = weapon_type_overrides.contains(row_id)
                 ? std::to_underlying(weapon_type_overrides.at(row_id))
-                : assert_floating_is<long long>(row.at("wepType"));
+                : assert_float_is_llong(row.at("wepType"));
             if (!is_valid_enum_integral<calculator::Weapon::Type>(weaponType))
             {
                 if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
@@ -377,7 +402,7 @@ namespace xml
             if (!attackElementCorrectsById.contains(row.at("attackElementCorrectId")))
                 throw std::runtime_error(std::format("could not find attack element correct param for attackElementCorrectId: {}", std::to_string(row.at("attackElementCorrectId"))));
 
-            const auto affinityId = assert_floating_is<long long>((row_id % 10000) / 100.);
+            const auto affinityId = assert_float_is_llong((row_id % 10000) / 100.);
 
             const auto equipParamWeaponsId = row_id - 100 * affinityId;
             if (!equipParamWeapons.contains(equipParamWeaponsId))
@@ -392,7 +417,7 @@ namespace xml
             std::array<long long, 3> statusSpEffectParamIds{};
             for (size_t i = 0; i < 3; ++i)
             {
-                auto spEffectParamId = assert_floating_is<long long>(row.at(std::format("spEffectBehaviorId{}", i)));
+                auto spEffectParamId = assert_float_is_llong(row.at(std::format("spEffectBehaviorId{}", i)));
                 auto statusSpEffectParams = parse_status_sp_effect_params(spEffectParamId, spEffectParams);
                 if (!statusSpEffectParams.empty())
                 {
@@ -410,7 +435,7 @@ namespace xml
             for (auto damage_type : enumerators_of<calculator::DamageType>())
             {
                 auto apt = integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type));
-                auto attack_power = assert_floating_is<long long>(row.at(std::format("attackBase{}", attack_power_type_to_xml_string(apt))));
+                auto attack_power = assert_float_is_llong(row.at(std::format("attackBase{}", attack_power_type_to_xml_string(apt))));
 
                 if (attack_power != 0)
                 {
@@ -440,7 +465,7 @@ namespace xml
                             : default_status_calc_correct_graph_id;
                         if (row.contains(xml_str))
                         {
-                            auto calcCorrectGraphId = assert_floating_is<long long>(row.at(xml_str));
+                            auto calcCorrectGraphId = assert_float_is_llong(row.at(xml_str));
 
                             if (!calcCorrectGraphs.contains(calcCorrectGraphId))
                                 throw std::runtime_error(std::format("could not find calc correct graph for id: {}", calcCorrectGraphId));
@@ -459,7 +484,7 @@ namespace xml
                     unupgradedAttributeScaling.emplace_back(attribute, row.at(xml_str) / 100.);
             }
 
-            const auto &reinforceParams = reinforce_types.at(assert_floating_is<long long>(row.at("reinforceTypeId")));
+            const auto &reinforceParams = reinforce_types.at(assert_float_is_llong(row.at("reinforceTypeId")));
 
             std::array<calculator::ScalingCurve, enumerators_of<calculator::AttackPowerType>().size()> weaponCalcCorrectGraphs{};
             for (auto damage_type : enumerators_of<calculator::DamageType>())
@@ -516,7 +541,7 @@ namespace xml
 
             calculator::Stats required_stats{};
             for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
-                required_stats.at(std::to_underlying(attribute)) = assert_floating_is<int>(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
+                required_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
 
             calculator::Weapon w{
                 name,
@@ -531,7 +556,7 @@ namespace xml
                 required_stats,
                 attributeScaling,
                 attack,
-                attackElementCorrectsById.at(assert_floating_is<long long>(row.at("attackElementCorrectId"))),
+                attackElementCorrectsById.at(assert_float_is_llong(row.at("attackElementCorrectId"))),
                 weaponCalcCorrectGraphs,
                 scalingTiers
             };

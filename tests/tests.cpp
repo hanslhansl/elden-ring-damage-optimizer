@@ -6,6 +6,7 @@ import std;
 import BS.thread_pool;
 import erdo;
 
+using namespace erdo;
 
 const std::vector<calculator::Weapon>& get_weapons() {
     static std::once_flag flag;
@@ -13,7 +14,7 @@ const std::vector<calculator::Weapon>& get_weapons() {
 
     std::call_once(flag, [] {
         auto xml_data_directory = std::filesystem::current_path() / "test_xml_data";
-        data = xml::load_weapons(xml_data_directory);
+        data = parser::load_weapons(xml_data_directory);
     });
 
     return data;

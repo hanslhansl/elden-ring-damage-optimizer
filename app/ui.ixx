@@ -312,7 +312,7 @@ namespace erdo::ui
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
-            this->set_weapon_data(xml::load_weapons(xml_data_directory));
+            this->set_weapon_data(parser::load_weapons(xml_data_directory));
         }
 
         void set_weapon_data(std::vector<calculator::Weapon>&& weapons) {

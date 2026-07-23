@@ -3,11 +3,9 @@ export module erdo:witchy;
 import std;
 
 template <typename CharT>
-struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_string_view<CharT>, CharT>
-{
+struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_string_view<CharT>, CharT> {
     template <typename FormatContext>
-    auto format(const std::filesystem::path& p, FormatContext& ctx) const
-    {
+    auto format(const std::filesystem::path& p, FormatContext& ctx) const {
         if constexpr (std::same_as<CharT, char>)
         {
             auto s = p.string();
@@ -25,12 +23,11 @@ struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_
     }
 };
 
-std::string quote_path(const std::filesystem::path& p)
-{
+std::string quote_path(const std::filesystem::path& p) {
     return std::format("\"{}\"", p);
 }
 
-namespace witchy
+namespace erdo::witchy
 {
     const std::set<std::filesystem::path> needed_uxm_files = {
         "regulation.bin",
@@ -66,8 +63,7 @@ namespace witchy
         GR_MenuTextFile
     };
 
-    std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {})
-    {
+    std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {}) {
         auto s = std::format("\"{} --passive --parallel", quote_path(witchy_exe_path));
         if (!location.empty())
             s += std::format(" --location {}", quote_path(location));
@@ -80,12 +76,13 @@ namespace witchy
         );
     }
 
-    export void run_witchy(const std::filesystem::path& unpacked_uxm_files_directory, const std::filesystem::path& witchy_exe_path, const std::filesystem::path& save_to_directory)
-    {
+    export void run_witchy(const std::filesystem::path& unpacked_uxm_files_directory, const std::filesystem::path& witchy_exe_path, const std::filesystem::path& save_to_directory) {
 
+        // create temporary directory
         auto temp_dir = std::filesystem::temp_directory_path() / "elden-ring-damage-optimizer";
         std::filesystem::create_directory(temp_dir);
 
+        // copy needed uxm files to temporary directory
         auto copied_uxm_file_paths = needed_uxm_files
             | std::views::transform([&](const std::filesystem::path &uxm_file) {
                 auto uxm_file_path = unpacked_uxm_files_directory / uxm_file;
@@ -96,17 +93,18 @@ namespace witchy
             | std::ranges::to<std::vector>();
         std::println("copied needed uxm files to temporary directory {}", quote_path(temp_dir));
 
-        // unpack uxm files
+        // unpack uxm files inplace
         auto cmd1 = witchy_cmd(witchy_exe_path, copied_uxm_file_paths);
         auto result1 = std::system(cmd1.c_str());
         if (result1 != 0)
             throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result1));
         std::println("unpacked uxm files to temporary directory {}", quote_path(temp_dir));
             
+        // compute paths of needed unpacked files
         auto needed_unpacked_file_paths = copied_uxm_file_paths
             | std::views::transform([&](const std::filesystem::path& p){
                 auto filename = p.filename().string();
-                std::ranges::replace(filename,'.', '-');
+                std::ranges::replace(filename, '.', '-');
                 return std::filesystem::directory_iterator(temp_dir / filename);
             })
             | std::views::join
@@ -124,7 +122,7 @@ namespace witchy
             );
         std::println("found {} needed unpacked files in the temporary directory {}", needed_unpacked_file_paths.size(), quote_path(temp_dir));
 
-        // convert to xml
+        // convert needed unpacked files to xml
         auto xml_files_directory = temp_dir / "xml_data";
         std::filesystem::create_directory(xml_files_directory);
         auto cmd2 = witchy_cmd(witchy_exe_path, needed_unpacked_file_paths, xml_files_directory);
@@ -133,13 +131,16 @@ namespace witchy
             throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result2));
         std::println("converted needed unpacked files to xml in {}", quote_path(xml_files_directory));
 
+        // copy paths of needed xml files
         auto xml_file_paths = needed_unpacked_file_paths
             | std::views::transform([&](const std::filesystem::path& p){ return xml_files_directory / p.filename() += ".xml"; })
             | std::ranges::to<std::vector>();
 
+        // copy xml files to save_to_directory
         std::filesystem::copy(xml_files_directory, save_to_directory, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
         std::println("copied xml files to {}", quote_path(save_to_directory));
 
+        // remove temporary directory
         std::filesystem::remove_all(temp_dir);
         std::println("removed temporary directory {}", quote_path(temp_dir));
     }
