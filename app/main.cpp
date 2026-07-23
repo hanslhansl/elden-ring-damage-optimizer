@@ -1,17 +1,23 @@
 ﻿import std;
 
 import erdo.ui;
-
 int main(int argc, char *argv[])
 {
-    // std::cout << std::getenv("PATH") << std::endl;
-    // std::cout << std::getenv("Path") << std::endl;
-
-    // return 0;
     return erdo::ui::run_ui(argc, argv);
 }
 
 
+// import erdo;
+// int main (int argc, char *argv[])
+// {
+//     erdo::witchy::run_witchy(
+//         ".../Steam/steamapps/common/ELDEN RING/Game",
+//         ".../WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe",
+//         ".../elden-ring-damage-optimizer/xml_data"
+//     );
+
+//     return 0;
+// }
 
 
 
@@ -45,13 +51,6 @@ int main(int argc, char* argv[])
     //    return w.get_attack_rating(attack_options, stats).total_attack_power.at(2);
     //}) | std::ranges::to<std::vector>();
     //std::println("{}", total_attack_powers);
-
-
-    // witchy::run_witchy(
-    //     ".../Steam/steamapps/common/ELDEN RING/Game",
-    //     ".../WitchyBND-v3.0.0.1-win-x64/WitchyBND.exe",
-    //     xml_data_directory
-    // );
 
     return 0;
 }*/

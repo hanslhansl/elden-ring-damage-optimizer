@@ -18,12 +18,9 @@ function(configure_test_executable target erdo_core_library test_prefix)
     )
 
     # copy xml_data to build directory
-    add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_data
-            $<TARGET_FILE_DIR:${target}>/test_xml_data
-    )
+    copy_xml_data(${target})
 
+    # discover tests
     catch_discover_tests(${target} TEST_PREFIX "${test_prefix}.")
 endfunction()
 

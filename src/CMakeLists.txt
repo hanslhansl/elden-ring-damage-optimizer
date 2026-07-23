@@ -28,6 +28,7 @@ function(configure_erdo_core_library target)
             meta.ixx
             witchy.ixx
             xml.ixx
+            parser.ixx
             calculator.ixx
             optimizer.ixx
             erdo.ixx
@@ -41,13 +42,6 @@ function(configure_erdo_core_library target)
     if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
         target_link_libraries(${target} PRIVATE stdc++exp) 
     endif()
-
-    # copy xml_data to build directory
-    # add_custom_command(TARGET ${target} POST_BUILD
-    #     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    #         ${CMAKE_SOURCE_DIR}/xml_data
-    #         $<TARGET_FILE_DIR:${target}>/xml_data
-    # )
 endfunction()
 configure_erdo_core_library(erdo_core)
 configure_erdo_core_library(erdo_core_tests)

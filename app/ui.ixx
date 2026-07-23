@@ -45,7 +45,8 @@ namespace erdo::ui
     {
         Q_OBJECT
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
-        std::vector<calculator::Weapon> weapons{};
+        std::map<std::string, std::vector<calculator::Weapon>> weapon_data{};
+        std::string active_weapon_data_version{};
 
         std::vector<QSpinBox*> attribute_spinboxes{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
@@ -236,8 +237,10 @@ namespace erdo::ui
                         return;
                     auto base_weapon = current_item->text().toStdString();
 
-                    auto it = std::ranges::find(this->weapons, base_weapon, &calculator::Weapon::base_name);
-                    if (it == this->weapons.end())
+                    auto&& active_weapon_data = this->get_active_weapon_data();
+
+                    auto it = std::ranges::find(active_weapon_data, base_weapon, &calculator::Weapon::base_name);
+                    if (it == active_weapon_data.end())
                         throw std::runtime_error("base weapon not found in weapons list");
                     auto&& weapon = *it;
 
@@ -248,7 +251,7 @@ namespace erdo::ui
                     if (current_item)
                         previous_affinity_string = current_item->text();
 
-                    auto affinities = this->weapons
+                    auto affinities = active_weapon_data
                         | std::views::filter([&](const calculator::Weapon& w) { return w.base_name == weapon.base_name; })
                         | std::views::transform(&calculator::Weapon::affinity)
                         | std::ranges::to<std::vector>();
@@ -312,22 +315,38 @@ namespace erdo::ui
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
-            this->set_weapon_data(parser::load_weapons(xml_data_directory));
+
+            this->weapon_data = std::filesystem::directory_iterator(xml_data_directory)
+                | std::views::transform(&std::filesystem::directory_entry::path)
+                | std::views::transform([](const std::filesystem::path& dir) {
+                    return std::pair{
+                        dir.filename().string(),
+                        parser::load_weapons(dir)
+                    };
+                })
+                | std::ranges::to<std::map>();
+            this->set_active_weapon_data(this->weapon_data.begin()->first);
         }
 
-        void set_weapon_data(std::vector<calculator::Weapon>&& weapons) {
-            if (weapons.empty())
-                throw std::runtime_error("weapons list is empty");
+        void set_active_weapon_data(const std::string& version) {
+            auto&& weapon_data = this->weapon_data.at(version);
 
-            this->weapons = std::move(weapons);
+            if (weapon_data.empty())
+                throw std::runtime_error("weapon_data is empty");
 
-            auto weapon_base_names = this->weapons
+            this->active_weapon_data_version = version;
+
+
+            auto weapon_base_names = weapon_data
                 | std::views::transform([](const calculator::Weapon& w) { return QString::fromStdString(w.base_name); })
                 | std::ranges::to<std::set>()
                 | std::ranges::to<QList>();
             this->ui->weapon_base_name_list->clear();
             this->ui->weapon_base_name_list->addItems(weapon_base_names);
             this->ui->weapon_base_name_list->setCurrentRow(0);
+        }
+        const std::vector<calculator::Weapon>& get_active_weapon_data() const {
+            return this->weapon_data.at(this->active_weapon_data_version);
         }
 
         calculator::Stats get_character_stats() {
@@ -387,15 +406,16 @@ namespace erdo::ui
             this->ui->weapon_affinity_list->setCurrentItem(matches.first());
         }
 
-        calculator::Weapon& get_weapon() {
+        const calculator::Weapon& get_weapon() {
             auto weapon_base_name = this->get_base_weapon();
             auto weapon_affinity = this->get_affinity();
 
             // get weapon
-            auto it = std::ranges::find_if(this->weapons, [&](const calculator::Weapon& w) {
+            auto&& active_weapon_data = this->get_active_weapon_data();
+            auto it = std::ranges::find_if(active_weapon_data, [&](const calculator::Weapon& w) {
                 return w.base_name == weapon_base_name && w.affinity == weapon_affinity;
             });
-            if (it == this->weapons.end())
+            if (it == active_weapon_data.end())
                 throw std::runtime_error("weapon not found");
 
             return *it;
@@ -408,8 +428,7 @@ namespace erdo::ui
         }
     };
 
-    export int run_ui(int argc, char *argv[])
-    {
+    export int run_ui(int argc, char *argv[]) {
         QApplication app(argc, argv);
 
         MainWindow window{};

@@ -1,4 +1,5 @@
 export module erdo:witchy;
+import :xml;
 
 import std;
 
@@ -93,13 +94,19 @@ namespace erdo::witchy
             | std::ranges::to<std::vector>();
         std::println("copied needed uxm files to temporary directory {}", quote_path(temp_dir));
 
-        // unpack uxm files inplace
-        auto cmd1 = witchy_cmd(witchy_exe_path, copied_uxm_file_paths);
-        auto result1 = std::system(cmd1.c_str());
-        if (result1 != 0)
-            throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result1));
+        // unpack uxm files inplace (temporary directory)
+        auto result = std::system(witchy_cmd(witchy_exe_path, copied_uxm_file_paths).c_str());
+        if (result != 0)
+            throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result));
         std::println("unpacked uxm files to temporary directory {}", quote_path(temp_dir));
             
+        // get version from /regulation-bin/_witchy-bnd4.xml
+        auto version = xml::get_element_value<std::string>(
+            xml::load_file(temp_dir / "regulation-bin" / "_witchy-bnd4.xml"),
+            { "bnd4", "version" }
+        );
+        std::println("version {}", version);    
+
         // compute paths of needed unpacked files
         auto needed_unpacked_file_paths = copied_uxm_file_paths
             | std::views::transform([&](const std::filesystem::path& p){
@@ -125,10 +132,9 @@ namespace erdo::witchy
         // convert needed unpacked files to xml
         auto xml_files_directory = temp_dir / "xml_data";
         std::filesystem::create_directory(xml_files_directory);
-        auto cmd2 = witchy_cmd(witchy_exe_path, needed_unpacked_file_paths, xml_files_directory);
-        auto result2 = std::system(cmd2.c_str());
-        if (result2 != 0)
-            throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result2));
+        result = std::system(witchy_cmd(witchy_exe_path, needed_unpacked_file_paths, xml_files_directory).c_str());
+        if (result != 0)
+            throw std::runtime_error(std::format("WitchyBND failed with exit code {}", result));
         std::println("converted needed unpacked files to xml in {}", quote_path(xml_files_directory));
 
         // copy paths of needed xml files
@@ -137,8 +143,10 @@ namespace erdo::witchy
             | std::ranges::to<std::vector>();
 
         // copy xml files to save_to_directory
-        std::filesystem::copy(xml_files_directory, save_to_directory, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
-        std::println("copied xml files to {}", quote_path(save_to_directory));
+        auto full_save_to_directory = save_to_directory / version;
+        std::filesystem::create_directories(full_save_to_directory);
+        std::filesystem::copy(xml_files_directory, full_save_to_directory, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+        std::println("copied xml files to {}", quote_path(full_save_to_directory));
 
         // remove temporary directory
         std::filesystem::remove_all(temp_dir);

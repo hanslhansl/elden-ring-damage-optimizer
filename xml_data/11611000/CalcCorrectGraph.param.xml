@@ -28,8 +28,8 @@
 <field name="stageMaxGrowVal0" type="f32" arraylength="1" bitsize="-1" sortid="700" defaultValue="0" />
 <field name="stageMaxGrowVal1" type="f32" arraylength="1" bitsize="-1" sortid="800" defaultValue="0" />
 <field name="stageMaxGrowVal2" type="f32" arraylength="1" bitsize="-1" sortid="900" defaultValue="0" />
-<field name="stageMaxGrowVal3" type="f32" arraylength="1" bitsize="-1" sortid="1000" defaultValue="0" />
-<field name="stageMaxGrowVal4" type="f32" arraylength="1" bitsize="-1" sortid="1100" defaultValue="0" />
+<field name="stageMaxGrowVal3" type="f32" arraylength="1" bitsize="-1" sortid="1000" defaultValue="90" />
+<field name="stageMaxGrowVal4" type="f32" arraylength="1" bitsize="-1" sortid="1100" defaultValue="100" />
 <field name="adjPt_maxGrowVal0" type="f32" arraylength="1" bitsize="-1" sortid="1300" defaultValue="1" />
 <field name="adjPt_maxGrowVal1" type="f32" arraylength="1" bitsize="-1" sortid="1400" defaultValue="1" />
 <field name="adjPt_maxGrowVal2" type="f32" arraylength="1" bitsize="-1" sortid="1500" defaultValue="1" />
