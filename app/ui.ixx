@@ -1,12 +1,13 @@
 module;
 #include <QMainWindow>
 #include <QPainter>
- #include <QActionGroup>
- #include <QProgressDialog>
- #include <QFuture>
- #include <QtConcurrent>
+#include <QActionGroup>
+#include <QProgressDialog>
+#include <QFuture>
+#include <QtConcurrent>
 #include "ui_main_window.h"
 export module erdo.ui;
+export import erdo.ui.weapons_table;
 
 import erdo;
 import std;
@@ -353,6 +354,25 @@ namespace erdo::ui
                 this->ui->attribute_layout->addWidget(this->attribute_scaling_labels.emplace_back(new QLabel()), row, 1);
                 this->ui->attribute_layout->addWidget(this->attribute_requirements_labels.emplace_back(new QLabel()), row, 2);
             }
+
+
+
+            auto model = new RowModel(this);
+
+            model->set_rows({
+                {"Alpha", 10},
+                {"Bravo", 42},
+                {"Charlie", 5}
+            });
+
+            auto proxy = new RowFilterModel(this);
+            proxy->setSourceModel(model);
+
+            ui->tableView->setModel(model/*proxy*/);
+
+            ui->tableView->setSortingEnabled(true);
+            ui->tableView->horizontalHeader()->setStretchLastSection(true);
+
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());

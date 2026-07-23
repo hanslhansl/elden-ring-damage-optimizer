@@ -3,6 +3,9 @@
 import erdo.ui;
 int main(int argc, char *argv[])
 {
+
+    std::array<void(*)(int), 2> f{};
+
     return erdo::ui::run_ui(argc, argv);
 }
 

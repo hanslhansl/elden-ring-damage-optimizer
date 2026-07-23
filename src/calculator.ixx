@@ -4,7 +4,7 @@ import :meta;
 import std;
 
 
-export namespace calculator
+export namespace erdo::calculator
 {
     struct Weapon;
     using UpgradeLevels = std::array<int, 3>; // free handed, normal, somber
@@ -63,10 +63,12 @@ export namespace calculator
         MADNESS = std::to_underlying(AttackPowerType::MADNESS),
         DEATH_BLIGHT = std::to_underlying(AttackPowerType::DEATH_BLIGHT)
     };
-} // namespace calculator
+} // namespace erdo::calculator
+
+using namespace erdo;
 
 template<>
-constexpr std::array<std::pair<calculator::RelevantAttribute, std::string_view>, 5> enum_string_mapping<calculator::RelevantAttribute> = {
+constexpr std::array<std::pair<calculator::RelevantAttribute, std::string_view>, 5> enum_string_mapping<erdo::calculator::RelevantAttribute> = {
     std::pair{calculator::RelevantAttribute::STRENGTH, "STRENGTH"},
     std::pair{calculator::RelevantAttribute::DEXTERITY, "DEXTERITY"},
     std::pair{calculator::RelevantAttribute::INTELLIGENCE, "INTELLIGENCE"},
@@ -118,7 +120,7 @@ constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enu
     std::pair{calculator::StatusType::DEATH_BLIGHT, "DEATH_BLIGHT"}
 };
 
-export namespace calculator
+export namespace erdo::calculator
 {
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
     struct Stats : std::array<int, enumerators_of<RelevantAttribute>().size()> {
@@ -538,22 +540,8 @@ export namespace calculator
         return stat_variations;
     }
 
-} // namespace calculator
+} // namespace erdo::calculator
 
-
-// template<>
-// constexpr std::array<std::pair<calculator::Class, std::string_view>, 10> enum_string_mapping<calculator::Class> = {
-//     std::pair{calculator::Class::HERO, "HERO"},
-//     std::pair{calculator::Class::BANDIT, "BANDIT"},
-//     std::pair{calculator::Class::ASTROLOGER, "ASTROLOGER"},
-//     std::pair{calculator::Class::WARRIOR, "WARRIOR"},
-//     std::pair{calculator::Class::PRISONER, "PRISONER"},
-//     std::pair{calculator::Class::CONFESSOR, "CONFESSOR"},
-//     std::pair{calculator::Class::WRETCH, "WRETCH"},
-//     std::pair{calculator::Class::VAGABOND, "VAGABOND"},
-//     std::pair{calculator::Class::PROPHET, "PROPHET"},
-//     std::pair{calculator::Class::SAMURAI, "SAMURAI"}
-// };
 template<>
 constexpr std::array<std::pair<calculator::Weapon::Affinity, std::string_view>, 14> enum_string_mapping<calculator::Weapon::Affinity> = {
     std::pair{calculator::Weapon::Affinity::STANDARD, "STANDARD"},

@@ -6,7 +6,7 @@ import BS.thread_pool;
 
 
 
-namespace optimizer
+namespace erdo::optimizer
 {
     using namespace calculator;
 

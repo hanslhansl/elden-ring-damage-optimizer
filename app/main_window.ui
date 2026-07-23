@@ -352,6 +352,11 @@
         <string>optimize</string>
        </attribute>
       </widget>
+      <widget class="QWidget" name="plot">
+       <attribute name="title">
+        <string>plot</string>
+       </attribute>
+      </widget>
      </widget>
     </item>
    </layout>
