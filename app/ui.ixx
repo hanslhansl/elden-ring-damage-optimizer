@@ -1,6 +1,10 @@
 module;
 #include <QMainWindow>
 #include <QPainter>
+ #include <QActionGroup>
+ #include <QProgressDialog>
+ #include <QFuture>
+ #include <QtConcurrent>
 #include "ui_main_window.h"
 export module erdo.ui;
 
@@ -41,12 +45,50 @@ std::string format_float(double x) {
 
 namespace erdo::ui
 {
+    template<typename F>
+    auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation) {
+        using R = decltype(computation());
+
+        QProgressDialog dialog(label_text, nullptr, 0, 0, parent);
+        dialog.setWindowTitle(parent->windowTitle());
+        dialog.setWindowModality(Qt::ApplicationModal);
+        dialog.setMinimumDuration(0);
+        dialog.setCancelButton(nullptr);
+        dialog.show();
+
+        QFuture<R> future = QtConcurrent::run(std::forward<F>(computation));
+
+        QFutureWatcher<R> watcher;
+        QEventLoop loop;
+
+        QObject::connect(&watcher,
+                        &QFutureWatcher<R>::finished,
+                        &loop,
+                        &QEventLoop::quit);
+
+        watcher.setFuture(future);
+
+        // Blocks this function, but keeps Qt responsive
+        loop.exec();
+
+        dialog.close();
+
+        if constexpr (!std::is_void_v<R>)
+            return future.result();
+    }
+
     class MainWindow : public QMainWindow
     {
         Q_OBJECT
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
-        std::map<std::string, std::vector<calculator::Weapon>> weapon_data{};
-        std::string active_weapon_data_version{};
+        std::map<
+            std::filesystem::path,
+            std::optional<std::vector<calculator::Weapon>>,
+            decltype([](const std::filesystem::path& a, const std::filesystem::path& b) {
+                return std::stoll(a.filename().string()) > std::stoll(b.filename().string());
+            })
+        > weapon_data{};
+        std::filesystem::path active_weapon_data_directory{};
 
         std::vector<QSpinBox*> attribute_spinboxes{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
@@ -315,27 +357,46 @@ namespace erdo::ui
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
-
             this->weapon_data = std::filesystem::directory_iterator(xml_data_directory)
                 | std::views::transform(&std::filesystem::directory_entry::path)
-                | std::views::transform([](const std::filesystem::path& dir) {
-                    return std::pair{
-                        dir.filename().string(),
-                        parser::load_weapons(dir)
-                    };
-                })
-                | std::ranges::to<std::map>();
-            this->set_active_weapon_data(this->weapon_data.begin()->first);
+                | std::views::transform([](const std::filesystem::path& dir) { return std::pair{ dir, std::nullopt }; })
+                | std::ranges::to<decltype(this->weapon_data)>();
+
+            QMenu *weapon_menu = this->ui->menu_file->addMenu("choose weapon data");
+            QActionGroup *group = new QActionGroup(this);
+            group->setExclusive(true);
+            QAction *first_action = nullptr;
+            for (auto&& dir : this->weapon_data | std::views::keys)
+            {
+                QAction *action = weapon_menu->addAction(QString::fromStdString(dir.filename().string()));
+                action->setCheckable(true);
+                group->addAction(action);
+                connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
+                if (!first_action)
+                    (first_action = action)->trigger();
+            }
         }
 
-        void set_active_weapon_data(const std::string& version) {
-            auto&& weapon_data = this->weapon_data.at(version);
+        const std::vector<calculator::Weapon>& get_active_weapon_data() const {
+            return this->weapon_data.at(this->active_weapon_data_directory).value();
+        }
+        void set_active_weapon_data(const std::filesystem::path& dir) {
+            auto raii = calculate_weapon_stats_counter(this);
 
+            auto&& optional_weapon_data = this->weapon_data.at(dir);
+
+            if (!optional_weapon_data)
+                optional_weapon_data = blocking_progress_bar_dialog(
+                    this,
+                    "loading weapon data",
+                    [dir](){ return parser::load_weapons(dir); }
+                );
+
+            auto&& weapon_data = *optional_weapon_data;
             if (weapon_data.empty())
                 throw std::runtime_error("weapon_data is empty");
 
-            this->active_weapon_data_version = version;
-
+            this->active_weapon_data_directory = dir;
 
             auto weapon_base_names = weapon_data
                 | std::views::transform([](const calculator::Weapon& w) { return QString::fromStdString(w.base_name); })
@@ -344,9 +405,6 @@ namespace erdo::ui
             this->ui->weapon_base_name_list->clear();
             this->ui->weapon_base_name_list->addItems(weapon_base_names);
             this->ui->weapon_base_name_list->setCurrentRow(0);
-        }
-        const std::vector<calculator::Weapon>& get_active_weapon_data() const {
-            return this->weapon_data.at(this->active_weapon_data_version);
         }
 
         calculator::Stats get_character_stats() {

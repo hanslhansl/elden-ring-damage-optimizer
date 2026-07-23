@@ -473,7 +473,7 @@ namespace erdo::parser
         }
 
         std::ranges::sort(weapons, {}, &calculator::Weapon::full_name);
-        std::println("found {} weapons\n", weapons.size());
+        std::println("found {} weapons", weapons.size());
         return weapons;
     }
 }
