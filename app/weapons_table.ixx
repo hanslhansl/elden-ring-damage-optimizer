@@ -36,46 +36,10 @@ QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
     );
 }
 
-template <typename Tuple>
-std::expected<QVariant, std::size_t>
-tupleToVariant(const Tuple& tuple, std::size_t index)
-{
-    QVariant result;
-    bool found = false;
-
-    std::size_t current = 0;
-
-    std::apply([&](const auto&... args) {
-        (
-            [&] {
-                if (current == index) {
-                    result = QVariant::fromValue(args);
-                    found = true;
-                }
-                ++current;
-            }(),
-            ...
-        );
-    }, tuple);
-
-    if (!found)
-        return std::unexpected(index);
-
-    return result;
-}
-
 
 namespace erdo::ui
 {
-    using Row = std::tuple<QString, int>;
-
-    export enum class Column
-    {
-        Id,
-        Value,
-        Count
-    };
-
+    export using Row = std::tuple<QString, QString, QString, QString>;
 
     // Table Model
     export class RowModel : public QAbstractTableModel
@@ -90,7 +54,7 @@ namespace erdo::ui
             return parent.isValid() ? 0 : static_cast<int>(this->rows.size());
         }
         int columnCount(const QModelIndex& parent = {}) const override {
-            return parent.isValid() ? 0 : static_cast<int>(Column::Count);
+            return parent.isValid() ? 0 : std::tuple_size_v<Row>;
         }
 
         QVariant data( const QModelIndex& index, int role) const override {
@@ -120,10 +84,12 @@ namespace erdo::ui
                 {
                     case 0:
                         return "name";
-
                     case 1:
+                        return "affinity";
+                    case 2:
                         return "type";
-
+                    case 3:
+                        return "base game/dlc";
                     default:
                         return {};
                 }
@@ -140,33 +106,35 @@ namespace erdo::ui
 
         // Sorting
         void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override {
-            auto c = static_cast<Column>(column);
-
             emit layoutAboutToBeChanged();
 
-            std::sort(this->rows.begin(), this->rows.end(), [&](const Row& a, const Row& b) {
-                    bool result = visit_tuple(
-                        [](const auto& a_val, const auto& b_val) {
-                            return a_val < b_val;
-                        },
+            if (order == Qt::AscendingOrder)
+                std::ranges::sort(this->rows, [&](const Row& a, const Row& b) {
+                    return visit_tuple(
+                        [](const auto& a_val, const auto& b_val) { return a_val < b_val; },
                         column,
-                        a, b
+                        a,
+                        b
                     );
-
-                    return order == Qt::AscendingOrder ? result : !result;
-                }
-            );
+                });
+            else
+                std::ranges::sort(this->rows, [&](const Row& a, const Row& b) {
+                    return visit_tuple(
+                        [](const auto& a_val, const auto& b_val) { return a_val > b_val; },
+                        column,
+                        a,
+                        b
+                    );
+                });
 
             emit layoutChanged();
         }
 
-        void notifyColumnChanged(Column column) {
+        void notifyColumnChanged(int column) {
             if (rows.empty())
                 return;
 
-            int c = static_cast<int>(column);
-
-            emit dataChanged(index(0, c), index(rowCount() - 1, c));
+            emit dataChanged(index(0, column), index(rowCount() - 1, column));
         }
         void notifyAllChanged() {
             if (rows.empty())
@@ -181,6 +149,13 @@ namespace erdo::ui
     //============================================================
     // Filtering
     //============================================================
+
+    export enum class Column
+    {
+        Id,
+        Value,
+        Count
+    };
 
     export class RowFilterModel : public QSortFilterProxyModel
     {

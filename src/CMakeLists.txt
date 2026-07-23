@@ -12,7 +12,6 @@ target_sources(BS_thread_pool PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${BS_thread_
 target_include_directories(BS_thread_pool PRIVATE ${BS_thread_pool_SOURCE_DIR}/include)
 
 # add pugixml
-add_compile_definitions(PUGIXML_HEADER_ONLY)
 CPMAddPackage(
     NAME pugixml
     GITHUB_REPOSITORY zeux/pugixml
@@ -23,18 +22,22 @@ CPMAddPackage(
 function(configure_erdo_core_library target)
     add_library(${target} STATIC)
 
+    target_compile_definitions(${target} PRIVATE PUGIXML_HEADER_ONLY)
+
     target_sources(${target}
-        PUBLIC FILE_SET CXX_MODULES FILES
-            meta.ixx
-            witchy.ixx
-            xml.ixx
-            parser.ixx
-            calculator.ixx
-            optimizer.ixx
-            erdo.ixx
+        PUBLIC FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
+        FILES
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/meta.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/witchy.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/xml.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/parser.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/calculator.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/optimizer.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/erdo.ixx
         )
 
-    target_link_libraries(${target} PRIVATE
+    target_link_libraries(${target} PUBLIC
         BS_thread_pool
         pugixml::pugixml
     )
@@ -44,7 +47,6 @@ function(configure_erdo_core_library target)
     endif()
 endfunction()
 configure_erdo_core_library(erdo_core)
-configure_erdo_core_library(erdo_core_tests)
 
 function(copy_xml_data target)
     add_custom_command(TARGET ${target} POST_BUILD

@@ -50,8 +50,10 @@ namespace erdo::ui
     auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation) {
         using R = decltype(computation());
 
-        QProgressDialog dialog(label_text, nullptr, 0, 0, parent);
-        dialog.setWindowTitle(parent->windowTitle());
+        QProgressDialog dialog(nullptr/*label_text*/, nullptr, 0, 0, parent);
+        // auto title = parent->windowTitle();
+        dialog.setWindowTitle(label_text);
+        // dialog.setMinimumWidth(QFontMetrics(dialog.font()).horizontalAdvance(title) + 150);
         dialog.setWindowModality(Qt::ApplicationModal);
         dialog.setMinimumDuration(0);
         dialog.setCancelButton(nullptr);
@@ -97,6 +99,8 @@ namespace erdo::ui
         std::vector<QLabel*> attribute_scaling_labels{};
         std::vector<QLabel*> attribute_requirements_labels{};
 
+        std::unique_ptr<RowModel> weapon_table_model{};
+
 
         long long _calculate_weapon_stats_counter = 0;
         class calculate_weapon_stats_counter {
@@ -127,10 +131,7 @@ namespace erdo::ui
             // set weapon stats
             auto attack_rating = weapon.get_attack_rating(attack_options, stats);
 
-            auto full_name = QString::fromStdString(weapon.full_name);
-            if (upgrade_level != 0)
-                full_name += " +" + QString::number(upgrade_level);
-            this->ui->weapon_full_name_label->setText(full_name);
+            this->ui->weapon_full_name_label->setText(QString::fromStdString(weapon.qualified_name(upgrade_level)));
             this->ui->weapon_type_label->setText(string_to_display(enum_to_string(weapon.type)));
             this->ui->base_game_dlc_label->setText(string_to_display(weapon.dlc ? "dlc" : "base game"));
             this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
@@ -356,22 +357,12 @@ namespace erdo::ui
             }
 
 
-
-            auto model = new RowModel(this);
-
-            model->set_rows({
-                {"Alpha", 10},
-                {"Bravo", 42},
-                {"Charlie", 5}
-            });
-
-            auto proxy = new RowFilterModel(this);
-            proxy->setSourceModel(model);
-
-            ui->tableView->setModel(model/*proxy*/);
-
-            ui->tableView->setSortingEnabled(true);
-            ui->tableView->horizontalHeader()->setStretchLastSection(true);
+            this->weapon_table_model = std::make_unique<RowModel>(this);
+            // auto proxy = new RowFilterModel(this);
+            // proxy->setSourceModel(this->weapon_table_model);
+            this->ui->tableView->setModel(this->weapon_table_model.get()/*proxy*/);
+            this->ui->tableView->setSortingEnabled(true);
+            this->ui->tableView->horizontalHeader()->setStretchLastSection(true);
 
 
             // load weapon data
@@ -412,19 +403,28 @@ namespace erdo::ui
                     [dir](){ return parser::load_weapons(dir); }
                 );
 
-            auto&& weapon_data = *optional_weapon_data;
-            if (weapon_data.empty())
+            auto&& active_weapon_data = *optional_weapon_data;
+            if (active_weapon_data.empty())
                 throw std::runtime_error("weapon_data is empty");
 
             this->active_weapon_data_directory = dir;
 
-            auto weapon_base_names = weapon_data
+            auto weapon_base_names = active_weapon_data
                 | std::views::transform([](const calculator::Weapon& w) { return QString::fromStdString(w.base_name); })
                 | std::ranges::to<std::set>()
                 | std::ranges::to<QList>();
             this->ui->weapon_base_name_list->clear();
             this->ui->weapon_base_name_list->addItems(weapon_base_names);
             this->ui->weapon_base_name_list->setCurrentRow(0);
+
+            this->weapon_table_model->set_rows(active_weapon_data
+                | std::views::transform([this](const calculator::Weapon& w) { return Row{
+                    string_to_display(w.qualified_name(this->ui->upgrade_level_spinbox->value())),
+                    string_to_display(enum_to_string(w.affinity)),
+                    string_to_display(enum_to_string(w.type)),
+                    string_to_display(w.dlc ? "dlc" : "base game")
+                }; })
+                | std::ranges::to<std::vector>());
         }
 
         calculator::Stats get_character_stats() {

@@ -28,10 +28,11 @@ endfunction()
 configure_test_executable(tests erdo_core "normal")
 
 # tests with coverage instrumentation
-target_compile_options(erdo_core_tests PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
-target_compile_options(erdo_core_tests PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>")
-target_link_options(erdo_core_tests PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
-configure_test_executable(test_with_coverage erdo_core_tests "coverage")
+configure_erdo_core_library(erdo_core_with_coverage)
+target_compile_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
+target_compile_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>")
+target_link_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
+configure_test_executable(test_with_coverage erdo_core_with_coverage "coverage")
 
 # tests with benchmarks
 configure_test_executable(test_with_benchmarks erdo_core "benchmarks")

@@ -41,7 +41,6 @@ add_subdirectory(src)
 # add ui
 add_subdirectory(app)
 
-
 # add testing
 include(CTest)
 if(BUILD_TESTING)

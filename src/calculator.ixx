@@ -284,6 +284,12 @@ export namespace erdo::calculator
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
         std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
+        std::string qualified_name(int upgrade_level) const {
+            if (upgrade_level == 0)
+                return this->full_name;
+            return std::format("{} +{}", this->full_name, upgrade_level);
+        }
+
         // the index of the upgrade level for this weapon
         long long upgrade_level_index = calculate_upgrade_level_index(base_attack_power);
 
