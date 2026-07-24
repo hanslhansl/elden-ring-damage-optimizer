@@ -170,9 +170,8 @@ export namespace erdo::calculator
         AttackOptions attack_options;
         std::reference_wrapper<const Weapon> weapon;
 
-        std::array<double, 3> total_attack_power;                                             // a + b = c
-        std::array<std::array<double, 3>, enumerators_of<DamageType>().size()> attack_power;  // a + b = c
-        std::array<std::array<double, 3>, enumerators_of<StatusType>().size()> status_effect; // a + b = c
+        std::array<double, 3> total_attack_power;                                                   // a + b = c
+        std::array<std::array<double, 3>, enumerators_of<AttackPowerType>().size()> attack_power;   // a + b = c
         double spell_scaling;
         std::array<bool, enumerators_of<AttackPowerType>().size()> ineffective_attack_power_types;
         std::array<bool, enumerators_of<RelevantAttribute>().size()> ineffective_attributes;
@@ -371,24 +370,17 @@ export namespace erdo::calculator
                 {
                     auto res = base_attack_power * total_scaling;
 
+                    auto &&att_pwr = attack_rating.attack_power.at(std::to_underlying(attack_power_type));
+                    att_pwr[0] = base_attack_power;
+                    att_pwr[1] = res - base_attack_power;
+                    att_pwr[2] = res;
+
                     if (is_damage_type) // attack_power_type._to_integral() <= AttackPowerType::HOLY
                     {
-                        auto &&att_pwr = attack_rating.attack_power[std::to_underlying(attack_power_type)];
-                        att_pwr[0] = base_attack_power;
-                        att_pwr[1] = res - base_attack_power;
-                        att_pwr[2] = res;
                         attack_rating.total_attack_power[0] += base_attack_power;
                         attack_rating.total_attack_power[1] += res - base_attack_power;
                         attack_rating.total_attack_power[2] += res;
                     }
-                    else // attack_power_type._to__integral() > AttackPowerType::HOLY
-                    {
-                        auto &&att_pwr = attack_rating.status_effect.at(std::to_underlying(attack_power_type) - std::to_underlying(AttackPowerType::POISON));
-                        att_pwr[0] = base_attack_power;
-                        att_pwr[1] = res - base_attack_power;
-                        att_pwr[2] = res;
-                    }
-                    
                 }
 
                 if (attack_power_type == AttackPowerType::PHYSICAL && is_sorcery_or_incantation_tool)

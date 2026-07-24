@@ -12,42 +12,20 @@ export import erdo.ui.weapons_table;
 import erdo;
 import std;
 
-QString string_to_display(const QString& str) {
-    QStringList words = str.split(QRegularExpression("[_\\s]+"), Qt::SkipEmptyParts);
-
-    for (QString &word : words) {
-        word = word.toLower();
-        // if (!word.isEmpty())
-        //     word[0] = word[0].toUpper();
-    }
-
-    return words.join(' ');
-}
-QString string_to_display(const char* str) {
-    return string_to_display(QString::fromStdString(str));
-}
-QString string_to_display(std::string_view str) {
-    return string_to_display(QString::fromStdString(std::string(str)));
+template<typename T>
+bool contains_object(const std::vector<T>& vec, const T& obj) {
+    return std::any_of(vec.begin(), vec.end(),
+        [&](const T& element) {
+            return &element == &obj;
+        });
 }
 
-std::string format_float(double x) {
-    std::string s = std::format("{:.3f}", x);
-
-    // Remove trailing zeros
-    while (!s.empty() && s.back() == '0')
-        s.pop_back();
-
-    // Remove trailing decimal point
-    if (!s.empty() && s.back() == '.')
-        s.pop_back();
-
-    return s;
-}
 
 namespace erdo::ui
 {
     template<typename F>
-    auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation) {
+    auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation)
+    {
         using R = decltype(computation());
 
         QProgressDialog dialog(nullptr/*label_text*/, nullptr, 0, 0, parent);
@@ -64,10 +42,12 @@ namespace erdo::ui
         QFutureWatcher<R> watcher;
         QEventLoop loop;
 
-        QObject::connect(&watcher,
-                        &QFutureWatcher<R>::finished,
-                        &loop,
-                        &QEventLoop::quit);
+        QObject::connect(
+            &watcher,
+            &QFutureWatcher<R>::finished,
+            &loop,
+            &QEventLoop::quit
+        );
 
         watcher.setFuture(future);
 
@@ -77,121 +57,151 @@ namespace erdo::ui
         dialog.close();
 
         if constexpr (!std::is_void_v<R>)
-            return future.result();
+        {
+            if (!future.isValid())
+                throw std::runtime_error("future is not valid after computation");
+            return future.takeResult();
+        }
     }
 
     class MainWindow : public QMainWindow
     {
-        Q_OBJECT
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
-        std::map<
-            std::filesystem::path,
-            std::optional<std::vector<calculator::Weapon>>,
-            decltype([](const std::filesystem::path& a, const std::filesystem::path& b) {
-                return std::stoll(a.filename().string()) > std::stoll(b.filename().string());
-            })
-        > weapon_data{};
-        std::filesystem::path active_weapon_data_directory{};
-
         std::vector<QSpinBox*> attribute_spinboxes{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
         std::vector<std::array<QLabel*, 3>> status_effect_labels{};
         std::vector<QLabel*> attribute_scaling_labels{};
         std::vector<QLabel*> attribute_requirements_labels{};
+        WeaponTable* weapon_table{};
 
-        std::unique_ptr<RowModel> weapon_table_model{};
+        std::vector<calculator::Weapon> active_weapon_data{};
 
 
         long long _calculate_weapon_stats_counter = 0;
         class calculate_weapon_stats_counter {
             MainWindow* self;
+            std::filesystem::path new_path;
         public:
-            explicit calculate_weapon_stats_counter(MainWindow* self) : self{self} {
+            explicit calculate_weapon_stats_counter(MainWindow* self, const std::filesystem::path& new_path = {}) : self{self}, new_path{new_path} {
                 self->_calculate_weapon_stats_counter++;
             }
 
             ~calculate_weapon_stats_counter() {
                 if (--self->_calculate_weapon_stats_counter == 0)
-                    self->calculate_weapon_stats();
+                    self->calculate_weapon_stats(new_path);
             }
         };
 
-        void calculate_weapon_stats() {
-            // get weapon
-            auto&& weapon = this->get_weapon();
-
+        void calculate_weapon_stats(const std::filesystem::path& new_weapon_data_directory = {})
+        {
             // get character stats
             auto stats = this->get_character_stats();
 
             // get attack options
-            calculator::AttackOptions attack_options{};
-            attack_options.two_handing = this->ui->two_handing_checkbox->isChecked();
-            auto upgrade_level = attack_options.upgrade_levels.at(weapon.upgrade_level_index) = this->ui->upgrade_level_spinbox->value();
-
-            // set weapon stats
-            auto attack_rating = weapon.get_attack_rating(attack_options, stats);
-
-            this->ui->weapon_full_name_label->setText(QString::fromStdString(weapon.qualified_name(upgrade_level)));
-            this->ui->weapon_type_label->setText(string_to_display(enum_to_string(weapon.type)));
-            this->ui->base_game_dlc_label->setText(string_to_display(weapon.dlc ? "dlc" : "base game"));
-            this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
-
-            auto formatters = std::array<QString(*)(double, bool), 3>{
-                [](double value, bool is_ineffective){
-                    return QString::fromStdString(format_float(value));
-                },
-                [](double value, bool is_ineffective){
-                    auto text = format_float(value);
-                    if (value >= 0)
-                        text.insert(0, "+");
-                    if (is_ineffective)
-                        text = std::format("<font color='red'>{}</font>", text);
-                    return QString::fromStdString(text);
-                },
-                [](double value, bool is_ineffective){
-                    return "= " + QString::fromStdString(format_float(value));
-                }
+            calculator::AttackOptions attack_options{
+                this->get_upgrade_levels(),
+                this->get_two_handing()
             };
 
-            for (auto&& [formatter, label, value] : std::views::zip(
-                formatters,
-                std::array { this->ui->total_attack_power_label_0, this->ui->total_attack_power_label_1, this->ui->total_attack_power_label_2 },
-                attack_rating.total_attack_power
-            ))
-                label->setText(formatter(value, false));
 
-            for (auto&& [labels, values, is_ineffective] : std::views::zip(
-                std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{ this->attack_power_labels, this->status_effect_labels })),
-                std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{ attack_rating.attack_power, attack_rating.status_effect })),
-                attack_rating.ineffective_attack_power_types
-            ))
-                for (auto&& [formatter, label, value] : std::views::zip(formatters, labels, values))
-                    label->setText(formatter(value, is_ineffective));
-
-            // ineffective_attributes
-            for (auto&& [scaling_label, requirement_label, requirement, is_ineffective] : std::views::zip(
-                this->attribute_scaling_labels,
-                this->attribute_requirements_labels,
-                weapon.requirements,
-                attack_rating.ineffective_attributes
-            ))
+            if (new_weapon_data_directory.empty())
             {
-                std::string text = "\u2012";
-                if (requirement != 0)
-                {
-                    if (is_ineffective)
-                        text = std::format("<font color='red'>\u2265{}</font>", requirement);
-                    else
-                        text = std::format("\u2265{}", requirement);
-                }
-                requirement_label->setText(QString::fromStdString(text));
+                this->weapon_table->model->rows = this->get_active_weapon_data()
+                    | std::views::transform([&](const calculator::Weapon& w) { return w.get_attack_rating(attack_options, stats); })
+                    | std::ranges::to<std::vector>();
+                this->weapon_table->model->notifyAllChanged();
             }
+            else
+            {
+                auto&& [new_active_weapon_data, new_rows] = blocking_progress_bar_dialog(
+                    this,
+                    "loading weapon data",
+                    [&](){
+                        std::pair<std::vector<calculator::Weapon>, std::vector<calculator::AttackRating>> result {
+                            parser::load_weapons(new_weapon_data_directory),
+                            {}
+                        };
+                        
+                        if (result.first.empty())
+                            throw std::runtime_error("weapon_data is empty");
+
+                        result.second.reserve(result.first.size());
+                        result.second.append_range(result.first
+                            | std::views::transform([&](const calculator::Weapon& w) { return w.get_attack_rating(attack_options, stats); })
+                            | std::ranges::to<std::vector>()
+                        );
+
+                        return result;
+                    }
+                );
+
+                this->active_weapon_data = std::move(new_active_weapon_data);
+                this->weapon_table->model->set_rows(std::move(new_rows));
+            }
+
+
+            // set weapon stats
+            // auto attack_rating = weapon.get_attack_rating(attack_options, stats);
+
+            // this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
+
+            // auto formatters = std::array<QString(*)(double, bool), 3>{
+            //     [](double value, bool is_ineffective){
+            //         return QString::fromStdString(format_float(value));
+            //     },
+            //     [](double value, bool is_ineffective){
+            //         auto text = format_float(value);
+            //         if (value >= 0)
+            //             text.insert(0, "+");
+            //         if (is_ineffective)
+            //             text = std::format("<font color='red'>{}</font>", text);
+            //         return QString::fromStdString(text);
+            //     },
+            //     [](double value, bool is_ineffective){
+            //         return "= " + QString::fromStdString(format_float(value));
+            //     }
+            // };
+
+            // for (auto&& [formatter, label, value] : std::views::zip(
+            //     formatters,
+            //     std::array { this->ui->total_attack_power_label_0, this->ui->total_attack_power_label_1, this->ui->total_attack_power_label_2 },
+            //     attack_rating.total_attack_power
+            // ))
+            //     label->setText(formatter(value, false));
+
+            // for (auto&& [labels, values, is_ineffective] : std::views::zip(
+            //     std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{ this->attack_power_labels, this->status_effect_labels })),
+            //     std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{ attack_rating.attack_power, attack_rating.status_effect })),
+            //     attack_rating.ineffective_attack_power_types
+            // ))
+            //     for (auto&& [formatter, label, value] : std::views::zip(formatters, labels, values))
+            //         label->setText(formatter(value, is_ineffective));
+
+            // // ineffective_attributes
+            // for (auto&& [scaling_label, requirement_label, requirement, is_ineffective] : std::views::zip(
+            //     this->attribute_scaling_labels,
+            //     this->attribute_requirements_labels,
+            //     weapon.requirements,
+            //     attack_rating.ineffective_attributes
+            // ))
+            // {
+            //     std::string text = "\u2012";
+            //     if (requirement != 0)
+            //     {
+            //         if (is_ineffective)
+            //             text = std::format("<font color='red'>\u2265{}</font>", requirement);
+            //         else
+            //             text = std::format("\u2265{}", requirement);
+            //     }
+            //     requirement_label->setText(QString::fromStdString(text));
+            // }
 
             // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
         }
 
     public:
-        explicit MainWindow(QWidget *parent = nullptr) {
+        explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
+        {
             this->ui->setupUi(this);
 
             setWindowTitle(string_to_display(windowTitle()));
@@ -262,8 +272,11 @@ namespace erdo::ui
                 });
             }
 
-            // upgrade level spinbox
-            connect(this->ui->upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
+            // upgrade level spinboxes
+            connect(this->ui->normal_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
+                auto raii = calculate_weapon_stats_counter(this);
+            });
+            connect(this->ui->somber_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
                 auto raii = calculate_weapon_stats_counter(this);
             });
 
@@ -273,7 +286,7 @@ namespace erdo::ui
             });
 
             // weapon base name list widget
-            connect(this->ui->weapon_base_name_list, &QListWidget::currentItemChanged,
+            /*connect(this->ui->weapon_base_name_list, &QListWidget::currentItemChanged,
                 this, [this](QListWidgetItem *current_item, QListWidgetItem*) {
                     auto raii = calculate_weapon_stats_counter(this);
 
@@ -318,15 +331,15 @@ namespace erdo::ui
                     else
                         this->ui->weapon_affinity_list->setCurrentRow(0);
                 }
-            );
+            );*/
 
             // affinity list widget
-            connect(this->ui->weapon_affinity_list, &QListWidget::currentItemChanged, this, [this]() {
+            /*connect(this->ui->weapon_affinity_list, &QListWidget::currentItemChanged, this, [this]() {
                 auto raii = calculate_weapon_stats_counter(this);
-            });
+            });*/
 
             // attack power labels
-            for (auto&& [row, damage_type] : enumerators_of<calculator::DamageType>() | std::views::enumerate)
+            /*for (auto&& [row, damage_type] : enumerators_of<calculator::DamageType>() | std::views::enumerate)
             {
                 ++row;
 
@@ -354,86 +367,59 @@ namespace erdo::ui
 
                 this->ui->attribute_layout->addWidget(this->attribute_scaling_labels.emplace_back(new QLabel()), row, 1);
                 this->ui->attribute_layout->addWidget(this->attribute_requirements_labels.emplace_back(new QLabel()), row, 2);
-            }
+            }*/
 
-
-            this->weapon_table_model = std::make_unique<RowModel>(this);
-            // auto proxy = new RowFilterModel(this);
-            // proxy->setSourceModel(this->weapon_table_model);
-            this->ui->tableView->setModel(this->weapon_table_model.get()/*proxy*/);
-            this->ui->tableView->setSortingEnabled(true);
-            this->ui->tableView->horizontalHeader()->setStretchLastSection(true);
-
+            // weapon table view
+            this->weapon_table = new WeaponTable(this);
+            this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
             auto xml_data_directory = application_directory / "xml_data";
-            this->weapon_data = std::filesystem::directory_iterator(xml_data_directory)
+            auto weapon_data_directories = std::filesystem::directory_iterator(xml_data_directory)
                 | std::views::transform(&std::filesystem::directory_entry::path)
-                | std::views::transform([](const std::filesystem::path& dir) { return std::pair{ dir, std::nullopt }; })
-                | std::ranges::to<decltype(this->weapon_data)>();
+                | std::ranges::to<std::set<
+                    std::filesystem::path,
+                    decltype([](const std::filesystem::path& a, const std::filesystem::path& b) {
+                        return std::stoll(a.filename().string()) > std::stoll(b.filename().string());
+                    })
+                >>();
+            if (weapon_data_directories.empty())
+                throw std::runtime_error("no weapon data directories found in xml_data directory");
 
+            // weapon data menu
             QMenu *weapon_menu = this->ui->menu_file->addMenu("choose weapon data");
             QActionGroup *group = new QActionGroup(this);
             group->setExclusive(true);
-            QAction *first_action = nullptr;
-            for (auto&& dir : this->weapon_data | std::views::keys)
+            for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
                 QAction *action = weapon_menu->addAction(QString::fromStdString(dir.filename().string()));
                 action->setCheckable(true);
                 group->addAction(action);
                 connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
-                if (!first_action)
-                    (first_action = action)->trigger();
+                if (i == 0)
+                    QTimer::singleShot(0, action, &QAction::trigger);
             }
         }
 
-        const std::vector<calculator::Weapon>& get_active_weapon_data() const {
-            return this->weapon_data.at(this->active_weapon_data_directory).value();
+        const std::vector<calculator::Weapon>& get_active_weapon_data() const
+        {
+            return this->active_weapon_data;
         }
-        void set_active_weapon_data(const std::filesystem::path& dir) {
-            auto raii = calculate_weapon_stats_counter(this);
-
-            auto&& optional_weapon_data = this->weapon_data.at(dir);
-
-            if (!optional_weapon_data)
-                optional_weapon_data = blocking_progress_bar_dialog(
-                    this,
-                    "loading weapon data",
-                    [dir](){ return parser::load_weapons(dir); }
-                );
-
-            auto&& active_weapon_data = *optional_weapon_data;
-            if (active_weapon_data.empty())
-                throw std::runtime_error("weapon_data is empty");
-
-            this->active_weapon_data_directory = dir;
-
-            auto weapon_base_names = active_weapon_data
-                | std::views::transform([](const calculator::Weapon& w) { return QString::fromStdString(w.base_name); })
-                | std::ranges::to<std::set>()
-                | std::ranges::to<QList>();
-            this->ui->weapon_base_name_list->clear();
-            this->ui->weapon_base_name_list->addItems(weapon_base_names);
-            this->ui->weapon_base_name_list->setCurrentRow(0);
-
-            this->weapon_table_model->set_rows(active_weapon_data
-                | std::views::transform([this](const calculator::Weapon& w) { return Row{
-                    string_to_display(w.qualified_name(this->ui->upgrade_level_spinbox->value())),
-                    string_to_display(enum_to_string(w.affinity)),
-                    string_to_display(enum_to_string(w.type)),
-                    string_to_display(w.dlc ? "dlc" : "base game")
-                }; })
-                | std::ranges::to<std::vector>());
+        void set_active_weapon_data(const std::filesystem::path& dir)
+        {
+            auto raii = calculate_weapon_stats_counter(this, dir);
         }
 
-        calculator::Stats get_character_stats() {
+        calculator::Stats get_character_stats()
+        {
             calculator::Stats stats{};
             for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
                 stat = spinbox->value();
             return stats;
         }
-        void set_character_stats(const calculator::Stats& stats) {
+        void set_character_stats(const calculator::Stats& stats)
+        {
             auto raii = calculate_weapon_stats_counter(this);
 
             for (auto&& [spinbox, stat] : std::views::zip(attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
@@ -453,7 +439,29 @@ namespace erdo::ui
                 spinbox->setValue(stat);
         }
 
-        std::string get_base_weapon() {
+        calculator::UpgradeLevels get_upgrade_levels() {
+            calculator::UpgradeLevels upgrade_levels{};
+            upgrade_levels.at(1) = this->ui->normal_upgrade_level_spinbox->value();
+            upgrade_levels.at(2) = this->ui->somber_upgrade_level_spinbox->value();
+            return upgrade_levels;
+        }
+        void set_upgrade_levels(const calculator::UpgradeLevels& upgrade_levels) {
+            auto raii = calculate_weapon_stats_counter(this);
+
+            this->ui->normal_upgrade_level_spinbox->setValue(upgrade_levels.at(1));
+            this->ui->somber_upgrade_level_spinbox->setValue(upgrade_levels.at(2));
+        }
+
+        bool get_two_handing() {
+            return this->ui->two_handing_checkbox->isChecked();
+        }
+        void set_two_handing(bool two_handing) {
+            auto raii = calculate_weapon_stats_counter(this);
+
+            this->ui->two_handing_checkbox->setChecked(two_handing);
+        }
+
+        /*std::string get_base_weapon() {
             auto current_item = this->ui->weapon_base_name_list->currentItem();
             if (!current_item)
                 throw std::runtime_error("no weapon base name selected");
@@ -466,9 +474,9 @@ namespace erdo::ui
             if (matches.isEmpty())
                 throw std::runtime_error("weapon base name not found in list widget");
             this->ui->weapon_base_name_list->setCurrentItem(matches.first());
-        }
+        }*/
 
-        calculator::Weapon::Affinity get_affinity() {
+        /*calculator::Weapon::Affinity get_affinity() {
             auto current_item = this->ui->weapon_affinity_list->currentItem();
             if (!current_item)
                 throw std::runtime_error("no weapon affinity selected");
@@ -482,9 +490,9 @@ namespace erdo::ui
             if (matches.isEmpty())
                 throw std::runtime_error("weapon affinity not found in list widget");
             this->ui->weapon_affinity_list->setCurrentItem(matches.first());
-        }
+        }*/
 
-        const calculator::Weapon& get_weapon() {
+        /*const calculator::Weapon& get_weapon() {
             auto weapon_base_name = this->get_base_weapon();
             auto weapon_affinity = this->get_affinity();
 
@@ -503,7 +511,7 @@ namespace erdo::ui
 
             this->set_base_weapon(weapon.base_name);
             this->set_affinity(weapon.affinity);
-        }
+        }*/
     };
 
     export int run_ui(int argc, char *argv[]) {

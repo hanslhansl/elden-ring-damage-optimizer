@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>845</width>
+    <width>855</width>
     <height>606</height>
    </rect>
   </property>
@@ -24,7 +24,7 @@
        <attribute name="title">
         <string>weapon stats</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
+       <layout class="QVBoxLayout" name="weapon_stats_layout">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
           <item>
@@ -57,9 +57,6 @@
                 </property>
                </widget>
               </item>
-              <item row="0" column="1">
-               <widget class="QSpinBox" name="upgrade_level_spinbox"/>
-              </item>
               <item row="1" column="1">
                <widget class="QCheckBox" name="two_handing_checkbox">
                 <property name="text">
@@ -73,6 +70,24 @@
                  <string>two-handing</string>
                 </property>
                </widget>
+              </item>
+              <item row="0" column="1">
+               <layout class="QHBoxLayout" name="horizontalLayout">
+                <item>
+                 <widget class="QSpinBox" name="normal_upgrade_level_spinbox">
+                  <property name="maximum">
+                   <number>25</number>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="somber_upgrade_level_spinbox">
+                  <property name="maximum">
+                   <number>9</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
               </item>
              </layout>
             </item>
@@ -342,9 +357,6 @@
           </layout>
          </widget>
         </item>
-        <item>
-         <widget class="QTableView" name="tableView"/>
-        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="optimize_tab">
@@ -366,7 +378,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>845</width>
+     <width>855</width>
      <height>33</height>
     </rect>
    </property>
