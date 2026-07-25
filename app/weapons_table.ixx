@@ -77,14 +77,131 @@ namespace erdo::ui
         return string_to_display(QString::fromStdString(std::string(str)));
     }
 
+
+    export using Row = std::tuple<
+        std::array<QVariant, 4>,    // name, affinity, type, base game/dlc
+        std::array<std::array<QVariant, 3>, 13> // total, ...
+    >;
+    QString column_name(int column)
+    {
+        if (column == 0)
+            return string_to_display("name");
+        if (column == 1)
+            return string_to_display("affinity");
+        if (column == 2)
+            return string_to_display("type");
+        if (column == 3)
+            return string_to_display("base game/dlc");
+
+        if (column == 4)
+            return string_to_display("total");
+        if (5 <= column && column < 5 + enumerators_of<calculator::AttackPowerType>().size())
+            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 5)));;
+
+        throw std::out_of_range("Invalid column index");
+    }
+    export Row build_row(const calculator::AttackRating& attack_rating)
+    {
+        auto&& weapon = attack_rating.weapon.get();
+        auto&& attack_options = attack_rating.attack_options;
+        auto&& stats = attack_rating.stats;
+
+        Row row{
+            {
+                string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index))),
+                string_to_display(enum_to_string(weapon.affinity)),
+                string_to_display(enum_to_string(weapon.type)),
+                string_to_display(weapon.dlc ? "dlc" : "base game")
+            },
+            {
+                
+            }
+        };
+
+        auto is_any_ineffective = false;
+        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+            attack_rating.attack_power,
+            attack_rating.ineffective_attack_power_types,
+            std::get<1>(row) | std::views::drop(1)))
+        {
+            arr[0] = format_float(ap[2]);
+            arr[1] = ap[2];
+            if (is_ineffective)
+            {
+                arr[2] = QColor(Qt::red);
+                is_any_ineffective = true;
+            }
+        }
+        std::get<1>(row)[0][0] = format_float(attack_rating.total_attack_power[2]);
+        std::get<1>(row)[0][1] = attack_rating.total_attack_power[2];
+        if (is_any_ineffective)
+            std::get<1>(row)[0][2] = QColor(Qt::red);
+
+        return row;
+    }
+    export void update_row(Row& row, const calculator::AttackRating& attack_rating)
+    {
+        auto&& weapon = attack_rating.weapon.get();
+        auto&& attack_options = attack_rating.attack_options;
+        auto&& stats = attack_rating.stats;
+
+        std::get<0>(row)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
+
+        auto is_any_ineffective = false;
+        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+            attack_rating.attack_power,
+            attack_rating.ineffective_attack_power_types,
+            std::get<1>(row) | std::views::drop(1)))
+        {
+            arr[0] = format_float(ap[2]);
+            arr[1] = ap[2];
+            if (is_ineffective)
+            {
+                arr[2] = QColor(Qt::red);
+                is_any_ineffective = true;
+            }
+        }
+        std::get<1>(row)[0][0] = format_float(attack_rating.total_attack_power[2]);
+        std::get<1>(row)[0][1] = attack_rating.total_attack_power[2];
+        if (is_any_ineffective)
+            std::get<1>(row)[0][2] = QColor(Qt::red);
+    }
+    QVariant row_data(const Row& row, int column, int role)
+    {
+        if (0 <= column && column < 4)
+        {
+            if (role == Qt::DisplayRole || role == Qt::UserRole)
+            {
+                return std::get<0>(row)[column];
+            }
+        }
+        else if (4 <= column && column < 5 + enumerators_of<calculator::AttackPowerType>().size())
+        {
+            auto i = column - 4;
+
+            if (role == Qt::DisplayRole)
+            {
+                return std::get<1>(row)[i][0];
+            }
+            if (role == Qt::UserRole)
+            {
+                return std::get<1>(row)[i][1];
+            }
+            if (role == Qt::ForegroundRole)
+            {
+                return std::get<1>(row)[i][2];
+            }
+        }
+
+        return {};
+    }
+
     // Table Model
     export class RowModel : public QAbstractTableModel
     {
         Q_OBJECT
     public:
-        std::vector<calculator::AttackRating> rows;
-
-        size_t counter = 0;
+        std::vector<Row> rows;
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent) { }
 
@@ -95,104 +212,36 @@ namespace erdo::ui
             return parent.isValid() ? 0 : 17;
         }
 
-        QVariant data(const QModelIndex& index, int role) const override {
+
+        QVariant data(const QModelIndex& index, int role) const override
+        {
             if (!index.isValid())
                 return {};
 
-            const_cast<RowModel*>(this)->counter++;
-
-            auto column = index.column();
-            const auto& attack_rating = this->rows[index.row()];
-            auto&& weapon = attack_rating.weapon.get();
-            auto&& attack_options = attack_rating.attack_options;
-
-            auto special_format_float = [role](double x, bool is_ineffective) -> QVariant  {
-                // display data
-                if (role == Qt::DisplayRole)
-                {
-                    if (x == 0)
-                        return {};
-                    return format_float(x);
-                }
-
-                // sorting data, returning raw values here prevents string sorting bugs: "100" < "20"
-                if (role == Qt::UserRole)
-                {
-                    return x;
-                }
-
-                if (role == Qt::ForegroundRole)
-                {
-                    if (is_ineffective)
-                        return QColor(Qt::red);
-                    return {};
-                }
-
-                throw std::out_of_range("Invalid role");
-            };
-
-            if (role == Qt::DisplayRole || role == Qt::UserRole || role == Qt::ForegroundRole)
-            {
-                int i = 0;
-                if (column == i++)
-                    return string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
-                if (column == i++)
-                    return string_to_display(enum_to_string(weapon.affinity));
-                if (column == i++)
-                    return string_to_display(enum_to_string(weapon.type));
-
-                if (column == i++)
-                    return special_format_float(attack_rating.total_attack_power[2], false);
-                if (i <= column && column < i + enumerators_of<calculator::AttackPowerType>().size())
-                    return special_format_float(attack_rating.attack_power.at(column - i)[2], attack_rating.ineffective_attack_power_types[column - i]);
-                i += enumerators_of<calculator::AttackPowerType>().size();
-
-                if (column == i++)
-                    return string_to_display(weapon.dlc ? "dlc" : "base game");
-
-                throw std::out_of_range("Invalid column index");
-            }
-
-            return {};
+            return row_data(this->rows[index.row()], index.column(), role);
         }
 
-        QVariant headerData(int section, Qt::Orientation orientation, int role) const override {
+        QVariant headerData(int section, Qt::Orientation orientation, int role) const override
+        {
             if (role != Qt::DisplayRole)
                 return {};
 
             auto column = section;
             if (orientation == Qt::Horizontal)
-            {
-                int i = 0;
-                if (column == i++)
-                    return string_to_display("name");
-                if (column == i++)
-                    return string_to_display("affinity");
-                if (column == i++)
-                    return string_to_display("type");
-
-                if (column == i++)
-                    return string_to_display("total");
-                if (i <= column && column < i + enumerators_of<calculator::AttackPowerType>().size())
-                    return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - i)));
-                i += enumerators_of<calculator::AttackPowerType>().size();
-
-                if (column == i++)
-                    return string_to_display("base game/dlc");
-
-                throw std::out_of_range("Invalid column index");
-            }
+                return column_name(column);
 
             return {};
         }
 
-        void set_rows(std::vector<calculator::AttackRating>&& rows) {
+        void set_rows(std::vector<Row>&& rows)
+        {
             this->beginResetModel();
             this->rows = std::move(rows);
             this->endResetModel();
         }
 
-        void notifyAllChanged() {
+        void notifyAllChanged()
+        {
             if (rows.empty())
                 return;
 
@@ -288,13 +337,6 @@ namespace erdo::ui
 
 
     // Filtering
-    export enum class Column
-    {
-        Id,
-        Value,
-        Count
-    };
-
     export class RowFilterModel : public QSortFilterProxyModel
     {
         Q_OBJECT
@@ -345,7 +387,6 @@ namespace erdo::ui
     };
 
 
-
     export class WeaponTable : public QTableView
     {
     public:
@@ -358,7 +399,7 @@ namespace erdo::ui
 
             this->proxy_model->setSortRole(Qt::UserRole);
             this->proxy_model->setSourceModel(this->model);
-            this->setModel(this->proxy_model);
+            this->setModel(this->proxy_model); // proxy_model model
 
             this->setSortingEnabled(true);
 

@@ -106,18 +106,32 @@ namespace erdo::ui
 
             if (new_weapon_data_directory.empty())
             {
-                this->weapon_table->model->rows = this->get_active_weapon_data()
-                    | std::views::transform([&](const calculator::Weapon& w) { return w.get_attack_rating(attack_options, stats); })
-                    | std::ranges::to<std::vector>();
+                auto start = std::chrono::high_resolution_clock::now();
+
+                std::ranges::for_each(std::views::zip(this->get_active_weapon_data(), this->weapon_table->model->rows), [&](auto&& pair) {
+                    auto&& [w, row] = pair;
+                    update_row(row, w.get_attack_rating(attack_options, stats));
+                });
+                // this->weapon_table->model->rows.clear();
+                // this->weapon_table->model->rows.append_range(
+                //     this->get_active_weapon_data()
+                //         | std::views::transform([&](const calculator::Weapon& w) { return build_row(w.get_attack_rating(attack_options, stats)); })
+                // );
+
                 this->weapon_table->model->notifyAllChanged();
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = end - start;
+                std::println("calculate weapon data: {} seconds", elapsed.count());
             }
             else
             {
+                auto start = std::chrono::high_resolution_clock::now();
+
                 auto&& [new_active_weapon_data, new_rows] = blocking_progress_bar_dialog(
                     this,
                     "loading weapon data",
                     [&](){
-                        std::pair<std::vector<calculator::Weapon>, std::vector<calculator::AttackRating>> result {
+                        std::pair<std::vector<calculator::Weapon>, std::vector<Row>> result {
                             parser::load_weapons(new_weapon_data_directory),
                             {}
                         };
@@ -127,25 +141,21 @@ namespace erdo::ui
 
                         result.second.reserve(result.first.size());
                         result.second.append_range(result.first
-                            | std::views::transform([&](const calculator::Weapon& w) { return w.get_attack_rating(attack_options, stats); })
+                            | std::views::transform([&](const calculator::Weapon& w) { return build_row(w.get_attack_rating(attack_options, stats)); })
                             | std::ranges::to<std::vector>()
                         );
+
 
                         return result;
                     }
                 );
 
                 this->active_weapon_data = std::move(new_active_weapon_data);
-
-                std::println("this->weapon_table->model->counter: {}", this->weapon_table->model->counter);
-                
-                auto start = std::chrono::high_resolution_clock::now();
                 this->weapon_table->model->set_rows(std::move(new_rows));
+
                 auto end = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = end - start;
-                std::cout << "this->weapon_table->model->set_rows Execution time: " << elapsed.count() << " seconds\n";
-
-                std::println("this->weapon_table->model->counter: {}", this->weapon_table->model->counter);
+                std::println("load weapon data: {} seconds", elapsed.count());
             }
 
 
