@@ -80,7 +80,7 @@ namespace erdo::ui
 
     export using Row = std::tuple<
         std::array<QVariant, 4>,    // name, affinity, type, base game/dlc
-        std::array<std::array<QVariant, 3>, 13> // total, ...
+        std::array<std::array<QVariant, 3>, 14> // spell scaling, total, ...
     >;
     QString column_name(int column)
     {
@@ -94,11 +94,49 @@ namespace erdo::ui
             return string_to_display("base game/dlc");
 
         if (column == 4)
+            return string_to_display("spell scaling");
+
+        if (column == 5)
             return string_to_display("total");
-        if (5 <= column && column < 5 + enumerators_of<calculator::AttackPowerType>().size())
-            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 5)));;
+        if (6 <= column && column < 6 + enumerators_of<calculator::AttackPowerType>().size())
+            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 6)));;
 
         throw std::out_of_range("Invalid column index");
+    }
+    export void update_row_impl(Row& row, const calculator::AttackRating& attack_rating)
+    {
+        std::get<1>(row)[0][0] = format_float(attack_rating.spell_scaling);
+        std::get<1>(row)[0][1] = attack_rating.spell_scaling;
+        // std::get<1>(row)[0][2] = QColor(Qt::red);
+
+        auto is_any_ineffective = false;
+        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+            attack_rating.attack_power,
+            attack_rating.ineffective_attack_power_types,
+            std::get<1>(row) | std::views::drop(2)))
+        {
+            arr[0] = format_float(ap[2]);
+            arr[1] = ap[2];
+            if (is_ineffective)
+            {
+                arr[2] = QColor(Qt::red);
+                is_any_ineffective = true;
+            }
+        }
+        std::get<1>(row)[1][0] = format_float(attack_rating.total_attack_power[2]);
+        std::get<1>(row)[1][1] = attack_rating.total_attack_power[2];
+        if (is_any_ineffective)
+            std::get<1>(row)[1][2] = QColor(Qt::red);
+    }
+    export void update_row(Row& row, const calculator::AttackRating& attack_rating)
+    {
+        auto&& weapon = attack_rating.weapon.get();
+        auto&& attack_options = attack_rating.attack_options;
+        auto&& stats = attack_rating.stats;
+
+        std::get<0>(row)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
+
+        update_row_impl(row, attack_rating);
     }
     export Row build_row(const calculator::AttackRating& attack_rating)
     {
@@ -118,53 +156,9 @@ namespace erdo::ui
             }
         };
 
-        auto is_any_ineffective = false;
-        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-            attack_rating.attack_power,
-            attack_rating.ineffective_attack_power_types,
-            std::get<1>(row) | std::views::drop(1)))
-        {
-            arr[0] = format_float(ap[2]);
-            arr[1] = ap[2];
-            if (is_ineffective)
-            {
-                arr[2] = QColor(Qt::red);
-                is_any_ineffective = true;
-            }
-        }
-        std::get<1>(row)[0][0] = format_float(attack_rating.total_attack_power[2]);
-        std::get<1>(row)[0][1] = attack_rating.total_attack_power[2];
-        if (is_any_ineffective)
-            std::get<1>(row)[0][2] = QColor(Qt::red);
+        update_row_impl(row, attack_rating);
 
         return row;
-    }
-    export void update_row(Row& row, const calculator::AttackRating& attack_rating)
-    {
-        auto&& weapon = attack_rating.weapon.get();
-        auto&& attack_options = attack_rating.attack_options;
-        auto&& stats = attack_rating.stats;
-
-        std::get<0>(row)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
-
-        auto is_any_ineffective = false;
-        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-            attack_rating.attack_power,
-            attack_rating.ineffective_attack_power_types,
-            std::get<1>(row) | std::views::drop(1)))
-        {
-            arr[0] = format_float(ap[2]);
-            arr[1] = ap[2];
-            if (is_ineffective)
-            {
-                arr[2] = QColor(Qt::red);
-                is_any_ineffective = true;
-            }
-        }
-        std::get<1>(row)[0][0] = format_float(attack_rating.total_attack_power[2]);
-        std::get<1>(row)[0][1] = attack_rating.total_attack_power[2];
-        if (is_any_ineffective)
-            std::get<1>(row)[0][2] = QColor(Qt::red);
     }
     QVariant row_data(const Row& row, int column, int role)
     {
@@ -175,7 +169,7 @@ namespace erdo::ui
                 return std::get<0>(row)[column];
             }
         }
-        else if (4 <= column && column < 5 + enumerators_of<calculator::AttackPowerType>().size())
+        else if (4 <= column && column < 6 + enumerators_of<calculator::AttackPowerType>().size())
         {
             auto i = column - 4;
 
@@ -196,7 +190,6 @@ namespace erdo::ui
         return {};
     }
 
-    // Table Model
     export class RowModel : public QAbstractTableModel
     {
         Q_OBJECT
@@ -205,13 +198,14 @@ namespace erdo::ui
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent) { }
 
-        int rowCount(const QModelIndex& parent = {}) const override {
+        int rowCount(const QModelIndex& parent = {}) const override
+        {
             return parent.isValid() ? 0 : static_cast<int>(this->rows.size());
         }
-        int columnCount(const QModelIndex& parent = {}) const override {
-            return parent.isValid() ? 0 : 17;
+        int columnCount(const QModelIndex& parent = {}) const override
+        {
+            return parent.isValid() ? 0 : std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
         }
-
 
         QVariant data(const QModelIndex& index, int role) const override
         {
@@ -248,7 +242,6 @@ namespace erdo::ui
             emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
         }
     };
-
 
     export class RotatedHeaderView : public QHeaderView
     {
@@ -331,12 +324,10 @@ namespace erdo::ui
 
     private:
         Rotation rotation;
-        std::set<int> rotated_columns = std::views::iota(3, 3 + 1 + (int)enumerators_of<calculator::AttackPowerType>().size())
+        std::set<int> rotated_columns = std::views::iota(4, 4 + 2 + (int)enumerators_of<calculator::AttackPowerType>().size())
             | std::ranges::to<std::set>();
     };
 
-
-    // Filtering
     export class RowFilterModel : public QSortFilterProxyModel
     {
         Q_OBJECT
@@ -386,7 +377,6 @@ namespace erdo::ui
         // int minimumValue_ = std::numeric_limits<int>::min();
     };
 
-
     export class WeaponTable : public QTableView
     {
     public:
@@ -409,7 +399,6 @@ namespace erdo::ui
             this->header->setSectionsClickable(true);
         }
     };
-
 }
 
 #include "weapons_table.moc"
