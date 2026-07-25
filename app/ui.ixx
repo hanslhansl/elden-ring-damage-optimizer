@@ -136,7 +136,16 @@ namespace erdo::ui
                 );
 
                 this->active_weapon_data = std::move(new_active_weapon_data);
+
+                std::println("this->weapon_table->model->counter: {}", this->weapon_table->model->counter);
+                
+                auto start = std::chrono::high_resolution_clock::now();
                 this->weapon_table->model->set_rows(std::move(new_rows));
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = end - start;
+                std::cout << "this->weapon_table->model->set_rows Execution time: " << elapsed.count() << " seconds\n";
+
+                std::println("this->weapon_table->model->counter: {}", this->weapon_table->model->counter);
             }
 
 

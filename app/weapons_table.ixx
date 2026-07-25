@@ -84,6 +84,8 @@ namespace erdo::ui
     public:
         std::vector<calculator::AttackRating> rows;
 
+        size_t counter = 0;
+
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent) { }
 
         int rowCount(const QModelIndex& parent = {}) const override {
@@ -97,15 +99,39 @@ namespace erdo::ui
             if (!index.isValid())
                 return {};
 
+            const_cast<RowModel*>(this)->counter++;
+
             auto column = index.column();
             const auto& attack_rating = this->rows[index.row()];
             auto&& weapon = attack_rating.weapon.get();
             auto&& attack_options = attack_rating.attack_options;
 
-            
+            auto special_format_float = [role](double x, bool is_ineffective) -> QVariant  {
+                // display data
+                if (role == Qt::DisplayRole)
+                {
+                    if (x == 0)
+                        return {};
+                    return format_float(x);
+                }
 
-            // display text
-            if (role == Qt::DisplayRole || role == Qt::UserRole)
+                // sorting data, returning raw values here prevents string sorting bugs: "100" < "20"
+                if (role == Qt::UserRole)
+                {
+                    return x;
+                }
+
+                if (role == Qt::ForegroundRole)
+                {
+                    if (is_ineffective)
+                        return QColor(Qt::red);
+                    return {};
+                }
+
+                throw std::out_of_range("Invalid role");
+            };
+
+            if (role == Qt::DisplayRole || role == Qt::UserRole || role == Qt::ForegroundRole)
             {
                 int i = 0;
                 if (column == i++)
@@ -116,21 +142,17 @@ namespace erdo::ui
                     return string_to_display(enum_to_string(weapon.type));
 
                 if (column == i++)
-                    return format_float(attack_rating.total_attack_power[2]);
+                    return special_format_float(attack_rating.total_attack_power[2], false);
                 if (i <= column && column < i + enumerators_of<calculator::AttackPowerType>().size())
-                    return format_float(attack_rating.attack_power.at(column - i)[2]);
+                    return special_format_float(attack_rating.attack_power.at(column - i)[2], attack_rating.ineffective_attack_power_types[column - i]);
                 i += enumerators_of<calculator::AttackPowerType>().size();
 
                 if (column == i++)
-                    return "base game/dlc";
+                    return string_to_display(weapon.dlc ? "dlc" : "base game");
 
                 throw std::out_of_range("Invalid column index");
             }
 
-            // sorting data, returning raw values here prevents string sorting bugs: "100" < "20"
-            // if (role == Qt::UserRole)
-            //     return tuple_to_variant(r, index.column());
-            
             return {};
         }
 
@@ -334,6 +356,7 @@ namespace erdo::ui
 
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent) {
 
+            this->proxy_model->setSortRole(Qt::UserRole);
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
 
