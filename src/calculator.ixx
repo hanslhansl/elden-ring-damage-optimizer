@@ -158,6 +158,7 @@ export namespace erdo::calculator
     using BaseAttackPower = std::array<double, enumerators_of<AttackPowerType>().size()>;
     using AttackPower = std::array<double, 3>;  // a + b = c
     using AttackPowers = std::array<AttackPower, enumerators_of<AttackPowerType>().size()>;
+    using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
 
     constexpr auto ineffective_attribute_penalty = 0.4;
     constexpr auto defaultDamageCalcCorrectGraphId = 0;
@@ -177,6 +178,7 @@ export namespace erdo::calculator
         AttackPower total_attack_power;
         AttackPowers attack_powers;
         double spell_scaling;
+        AttributeScalings attribute_scalings;
         IneffectiveAttackPowerTypes ineffective_attack_power_types;
         IneffectiveAttributes ineffective_attributes;
     };
@@ -392,7 +394,7 @@ export namespace erdo::calculator
             }
 
             if (attack_power_type == AttackPowerType::PHYSICAL && this->is_sorcery_or_incantation_tool)
-                spell_scaling = 100. * total_scaling;
+                spell_scaling = total_scaling;
 
             return;
         }
@@ -448,6 +450,7 @@ export namespace erdo::calculator
                 );
 
             attack_rating.total_attack_power = this->get_total_attack_rating(attack_rating.attack_powers);
+            attack_rating.attribute_scalings = this->attribute_scalings[upgrade_level];
 
             return attack_rating;
         }

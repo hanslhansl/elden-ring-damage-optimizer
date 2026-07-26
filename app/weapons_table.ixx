@@ -43,6 +43,9 @@ QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
 namespace erdo::ui
 {
     export QString format_float(double x) {
+        if (x == 0)
+            return QString("\u2012");
+
         std::string s = std::format("{:.3f}", x);
 
         // Remove trailing zeros
@@ -80,10 +83,13 @@ namespace erdo::ui
 
     export using Row = std::tuple<
         std::array<QVariant, 4>,    // name, affinity, type, base game/dlc
-        std::array<std::array<QVariant, 3>, 14> // spell scaling, total, ...
+        std::array<std::array<QVariant, 3>, 2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 3> // spell scaling, total, ...
     >;
     QString column_name(int column)
     {
+        static constexpr auto apt_size = enumerators_of<calculator::AttackPowerType>().size();
+        static constexpr auto attr_size = enumerators_of<calculator::RelevantAttribute>().size();
+
         if (column == 0)
             return string_to_display("name");
         if (column == 1)
@@ -98,18 +104,36 @@ namespace erdo::ui
 
         if (column == 5)
             return string_to_display("total");
-        if (6 <= column && column < 6 + enumerators_of<calculator::AttackPowerType>().size())
-            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 6)));;
+        if (6 <= column && column < 6 + apt_size)
+            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 6)));
+        
+        if (6 + apt_size <= column && column < 6 + apt_size + attr_size)
+            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size)));
 
-        throw std::out_of_range("Invalid column index");
+        if (6 + apt_size + attr_size <= column && column < 6 + apt_size + attr_size * 2)
+            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size - attr_size)));
+        
+        if (6 + apt_size + attr_size * 2 <= column && column < 6 + apt_size + attr_size * 3)
+            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size - attr_size * 2)));
+
+        throw std::out_of_range(std::format("Invalid column index: {}", column));
     }
     export void update_row_impl(Row& row, const calculator::AttackRating& attack_rating)
     {
-        std::get<1>(row)[0][0] = format_float(attack_rating.spell_scaling);
-        std::get<1>(row)[0][1] = attack_rating.spell_scaling;
+        auto&& weapon = attack_rating.weapon.get();
+
+        // spell scaling
+        std::get<1>(row)[0][0] = format_float(attack_rating.spell_scaling * 100);
+        std::get<1>(row)[0][1] = attack_rating.spell_scaling * 100;
         // std::get<1>(row)[0][2] = QColor(Qt::red);
 
-        auto is_any_ineffective = false;
+        // total attack power
+        std::get<1>(row)[1][0] = format_float(attack_rating.total_attack_power[2]);
+        std::get<1>(row)[1][1] = attack_rating.total_attack_power[2];
+        if (true)
+            std::get<1>(row)[1][2] = QColor(Qt::red);
+
+        // attack powers
         for (auto&& [ap, is_ineffective, arr] : std::views::zip(
             attack_rating.attack_powers,
             attack_rating.ineffective_attack_power_types,
@@ -118,15 +142,40 @@ namespace erdo::ui
             arr[0] = format_float(ap[2]);
             arr[1] = ap[2];
             if (is_ineffective)
-            {
                 arr[2] = QColor(Qt::red);
-                is_any_ineffective = true;
-            }
         }
-        std::get<1>(row)[1][0] = format_float(attack_rating.total_attack_power[2]);
-        std::get<1>(row)[1][1] = attack_rating.total_attack_power[2];
-        if (is_any_ineffective)
-            std::get<1>(row)[1][2] = QColor(Qt::red);
+
+        // attribute scalings
+        for (auto&& [attribute_scaling, arr] : std::views::zip(
+            attack_rating.attribute_scalings,
+            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
+        {
+            arr[0] = format_float(attribute_scaling * 100);
+            arr[1] = attribute_scaling * 100;
+            // arr[2] = QColor(Qt::red);
+        }
+
+        // attribute requirements
+        for (auto&& [requirement, arr] : std::views::zip(
+            weapon.requirements,
+            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size())))
+        {
+            arr[0] = format_float(requirement);
+            arr[1] = requirement;
+            // arr[2] = QColor(Qt::red);
+        }
+
+        // stats
+        for (auto&& [stat, arr] : std::views::zip(
+            attack_rating.stats,
+            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 2)))
+        {
+            arr[0] = stat;
+            arr[1] = stat;
+            // arr[2] = QColor(Qt::red);
+        }
+
+        static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
     }
     export void update_row(Row& row, const calculator::AttackRating& attack_rating)
     {
@@ -162,16 +211,20 @@ namespace erdo::ui
     }
     QVariant row_data(const Row& row, int column, int role)
     {
-        if (0 <= column && column < 4)
+        static constexpr auto size_0 = std::tuple_size_v<std::tuple_element_t<0, Row>>;
+        static constexpr auto size_1 = std::tuple_size_v<std::tuple_element_t<1, Row>>;
+
+        if (0 <= column && column < size_0)
         {
             if (role == Qt::DisplayRole || role == Qt::UserRole)
             {
                 return std::get<0>(row)[column];
             }
+            return {};
         }
-        else if (4 <= column && column < 6 + enumerators_of<calculator::AttackPowerType>().size())
+        else if (size_0 <= column && column < size_0 + size_1)
         {
-            auto i = column - 4;
+            auto i = column - size_0;
 
             if (role == Qt::DisplayRole)
             {
@@ -185,9 +238,14 @@ namespace erdo::ui
             {
                 return std::get<1>(row)[i][2];
             }
+            if (role == Qt::TextAlignmentRole)
+            {
+                return QVariant::fromValue(Qt::AlignHCenter | Qt::AlignVCenter);
+            }
+            return {};
         }
 
-        return {};
+        throw std::out_of_range(std::format("Invalid column index: {}", column));
     }
 
     export struct RowModel : QAbstractTableModel
@@ -203,7 +261,6 @@ namespace erdo::ui
         int columnCount(const QModelIndex& parent = {}) const override
         {
             return std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
-            // return parent.isValid() ? 0 : std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
         }
 
         QVariant data(const QModelIndex& index, int role) const override
@@ -330,7 +387,7 @@ namespace erdo::ui
 
     private:
         Rotation rotation;
-        std::set<int> rotated_columns = std::views::iota(4, 4 + 2 + (int)enumerators_of<calculator::AttackPowerType>().size())
+        std::set<int> rotated_columns = std::views::iota(4, 4 + 2 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size()*3)
             | std::ranges::to<std::set>();
     };
 
@@ -400,6 +457,7 @@ namespace erdo::ui
             this->setHorizontalHeader(this->header);
 
             this->setSortingEnabled(true);
+            this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
 
             // this->header->moveSection(this->header->visualIndex(3), 17);
         }
@@ -422,10 +480,19 @@ namespace erdo::ui
             this->QTableView::paintEvent(event);
 
             QPainter painter(this->viewport());
-            painter.setPen(QPen(Qt::black, 1));   // 3-pixel separator
+            QPen pen(Qt::black, 1);
+            pen.setCosmetic(true);
+            painter.setPen(pen);
 
-            // Draw after columns 2 and 5
-            for (int col : {4, 5, 6 + (int)enumerators_of<calculator::DamageType>().size(), 7 + (int)enumerators_of<calculator::AttackPowerType>().size()})
+            // Draw before columns 2 and 5
+            for (auto col : {
+                4,
+                5,
+                6 + (int)enumerators_of<calculator::DamageType>().size(),
+                6 + (int)enumerators_of<calculator::AttackPowerType>().size(),
+                6 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size(),
+                6 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size() * 2,
+            })
             {
                 int x = this->columnViewportPosition(col) ; // + this->columnWidth(col)
                 painter.drawLine(x, 0, x, this->viewport()->height());

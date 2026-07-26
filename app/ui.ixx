@@ -158,64 +158,6 @@ namespace erdo::ui
                 std::println("load weapon data: {} seconds", elapsed.count());
             }
             this->weapon_table->resize_columns_to_contents();
-
-            // set weapon stats
-            // auto attack_rating = weapon.get_attack_rating(attack_options, stats);
-
-            // this->ui->spell_scaling_label->setText(QString::fromStdString(format_float(attack_rating.spell_scaling)));
-
-            // auto formatters = std::array<QString(*)(double, bool), 3>{
-            //     [](double value, bool is_ineffective){
-            //         return QString::fromStdString(format_float(value));
-            //     },
-            //     [](double value, bool is_ineffective){
-            //         auto text = format_float(value);
-            //         if (value >= 0)
-            //             text.insert(0, "+");
-            //         if (is_ineffective)
-            //             text = std::format("<font color='red'>{}</font>", text);
-            //         return QString::fromStdString(text);
-            //     },
-            //     [](double value, bool is_ineffective){
-            //         return "= " + QString::fromStdString(format_float(value));
-            //     }
-            // };
-
-            // for (auto&& [formatter, label, value] : std::views::zip(
-            //     formatters,
-            //     std::array { this->ui->total_attack_power_label_0, this->ui->total_attack_power_label_1, this->ui->total_attack_power_label_2 },
-            //     attack_rating.total_attack_power
-            // ))
-            //     label->setText(formatter(value, false));
-
-            // for (auto&& [labels, values, is_ineffective] : std::views::zip(
-            //     std::views::join(std::views::all(std::array<std::span<std::array<QLabel*, 3>>, 3>{ this->attack_power_labels, this->status_effect_labels })),
-            //     std::views::join(std::views::all(std::array<std::span<std::array<double, 3>>, 3>{ attack_rating.attack_power, attack_rating.status_effect })),
-            //     attack_rating.ineffective_attack_power_types
-            // ))
-            //     for (auto&& [formatter, label, value] : std::views::zip(formatters, labels, values))
-            //         label->setText(formatter(value, is_ineffective));
-
-            // // ineffective_attributes
-            // for (auto&& [scaling_label, requirement_label, requirement, is_ineffective] : std::views::zip(
-            //     this->attribute_scaling_labels,
-            //     this->attribute_requirements_labels,
-            //     weapon.requirements,
-            //     attack_rating.ineffective_attributes
-            // ))
-            // {
-            //     std::string text = "\u2012";
-            //     if (requirement != 0)
-            //     {
-            //         if (is_ineffective)
-            //             text = std::format("<font color='red'>\u2265{}</font>", requirement);
-            //         else
-            //             text = std::format("\u2265{}", requirement);
-            //     }
-            //     requirement_label->setText(QString::fromStdString(text));
-            // }
-
-            // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
         }
 
     public:
