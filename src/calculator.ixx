@@ -1,3 +1,5 @@
+module;
+#include <string>
 export module erdo:calculator;
 import :meta;
 
@@ -296,13 +298,15 @@ export namespace erdo::calculator
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
 
-        std::string qualified_name(int upgrade_level) const {
+        std::string qualified_name(int upgrade_level) const
+        {
             if (upgrade_level == 0)
                 return this->full_name;
             return std::format("{} +{}", this->full_name, upgrade_level);
         }
 
-        Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const {
+        Stats adjust_stats_for_two_handing(bool two_handing, Stats stats) const
+        {
             // Paired weapons do not get the two handing bonus
             if (this->paired)
                 two_handing = false;
@@ -318,12 +322,20 @@ export namespace erdo::calculator
             return stats;
         }
 
-        IneffectiveAttributes get_innefective_attributes(const Stats& adjusted_stats) const
+        std::string scaling_tier(double scaling) const
+        {
+            for (auto&& [threshold, tier] : this->scaling_tiers)
+                if (scaling >= threshold)
+                    return tier;
+            throw std::invalid_argument("scaling value is below all thresholds");
+        }
+
+        IneffectiveAttributes innefective_attributes(const Stats& adjusted_stats) const
         {
             IneffectiveAttributes ineffective_attributes{};
-            for (auto attribute : enumerators_of<RelevantAttribute>())
-                if (adjusted_stats[std::to_underlying(attribute)] < this->requirements[std::to_underlying(attribute)])
-                    ineffective_attributes.at(std::to_underlying(attribute)) = true;
+            for (auto attribute : integral_enumerators_of<RelevantAttribute>())
+                if (adjusted_stats[attribute] < this->requirements[attribute])
+                    ineffective_attributes[attribute] = true;
             return ineffective_attributes;
         }
 
@@ -348,11 +360,11 @@ export namespace erdo::calculator
             auto&& attribute_scaling_at_upgrade_level = this->attribute_scalings[upgrade_level];
 
             if (std::ranges::any_of(
-                    enumerators_of<RelevantAttribute>(),
-                    [&](RelevantAttribute attribute)
+                    integral_enumerators_of<RelevantAttribute>(),
+                    [&](auto attribute)
                     {
-                        return ineffective_attributes.at(std::to_underlying(attribute))
-                            && scaling_attributes.at(std::to_underlying(attribute)) != 0;
+                        return ineffective_attributes.at(attribute)
+                            && scaling_attributes.at(attribute) != 0;
                     }))
             {
                 total_scaling = 1. - ineffective_attribute_penalty;
@@ -362,23 +374,22 @@ export namespace erdo::calculator
             {
                 auto &effective_stats = (!disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
 
-                for (auto &&attribute : enumerators_of<RelevantAttribute>())
+                for (auto &&attribute : integral_enumerators_of<RelevantAttribute>())
                 {
-                    auto &&attribute_correct = scaling_attributes[std::to_underlying(attribute)];
+                    auto &&attribute_correct = scaling_attributes[attribute];
                     double scaling{};
 
                     if (attribute_correct != 0)
                     {
                         if (attribute_correct == 1)
-                            scaling = attribute_scaling_at_upgrade_level[std::to_underlying(attribute)];
+                            scaling = attribute_scaling_at_upgrade_level[attribute];
                         else
                             scaling = attribute_correct
-                                * attribute_scaling_at_upgrade_level[std::to_underlying(attribute)]
-                                / this->attribute_scalings[0][std::to_underlying(attribute)];
+                                * attribute_scaling_at_upgrade_level[attribute]
+                                / this->attribute_scalings[0][attribute];
 
                         if (scaling != 0.)
-                            total_scaling += scaling
-                                * this->attack_power_scaling_curves[attack_power_type_index][effective_stats[std::to_underlying(attribute)]];
+                            total_scaling += scaling * this->attack_power_scaling_curves[attack_power_type_index][effective_stats[attribute]];
                     }
                 }
             }
@@ -403,9 +414,9 @@ export namespace erdo::calculator
         {
             AttackPower total_attack_power{};
             
-            for (auto damage_type : enumerators_of<DamageType>())
+            for (auto damage_type : integral_enumerators_of<DamageType>())
             {
-                auto&& attack_power = attack_powers[std::to_underlying(damage_type)];
+                auto&& attack_power = attack_powers[damage_type];
 
                 total_attack_power[0] += attack_power[0];
                 total_attack_power[1] += attack_power[2] - attack_power[0];
@@ -430,7 +441,7 @@ export namespace erdo::calculator
                 .stats=stats,
                 .attack_options=attack_options,
                 .weapon=*this,
-                .ineffective_attributes=this->get_innefective_attributes(adjusted_stats),
+                .ineffective_attributes=this->innefective_attributes(adjusted_stats),
             };
 
             auto upgrade_level = attack_options.upgrade_levels[upgrade_level_index];

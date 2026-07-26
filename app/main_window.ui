@@ -43,7 +43,7 @@
              <item row="1" column="0">
               <widget class="QLabel" name="label_4">
                <property name="text">
-                <string>somber upgrade level</string>
+                <string>somber upgrade level:</string>
                </property>
               </widget>
              </item>

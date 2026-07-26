@@ -31,6 +31,17 @@ export {
         return r;
     }*/
 
+    template <typename E>
+        requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
+    consteval auto integral_enumerators_of()
+    {
+        std::array<std::underlying_type_t<E>, enumerators_of<E>().size()> r{};
+        for (auto&& [enumerator, integral] : std::views::zip(enumerators_of<E>(), r))
+            integral = std::to_underlying(enumerator);
+
+        return r;
+    }
+
     template <typename E, typename D = std::nullopt_t>
         requires(std::is_enum_v<E> && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
     constexpr std::string_view enum_to_string(E value, D default_ = std::nullopt)
@@ -116,8 +127,8 @@ export {
         requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
     constexpr bool is_valid_enum_integral(std::underlying_type_t<E> integral)
     {
-        for (auto e : enumerators_of<E>())
-            if (integral == std::to_underlying(e))
+        for (auto e : integral_enumerators_of<E>())
+            if (integral == e)
                 return true;
 
         return false;

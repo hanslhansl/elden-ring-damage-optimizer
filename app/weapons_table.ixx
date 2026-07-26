@@ -42,21 +42,19 @@ QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
 
 namespace erdo::ui
 {
-    export QString format_float(double x) {
-        if (x == 0)
-            return QString("\u2012");
-
-        std::string s = std::format("{:.3f}", x);
+    export QString format_float(double x)
+    {
+        auto s = QString::number(x, 'f', 3);
 
         // Remove trailing zeros
-        while (!s.empty() && s.back() == '0')
-            s.pop_back();
+        while (s.endsWith('0'))
+            s.chop(1);
 
         // Remove trailing decimal point
-        if (!s.empty() && s.back() == '.')
-            s.pop_back();
+        if (s.endsWith('.'))
+            s.chop(1);
 
-        return QString::fromStdString(s);
+        return s;
     }
 
     export QString string_to_display(const QString& str) {
@@ -120,18 +118,29 @@ namespace erdo::ui
     }
     export void update_row_impl(Row& row, const calculator::AttackRating& attack_rating)
     {
+        static auto format_number = []<typename T>(T x){
+            if (x == 0)
+                return QString("\u2012");
+            if constexpr (std::integral<T>)
+                return QString::number(x);
+            return format_float(x);
+        };
+
+        static auto foreground_color = [](bool is_ineffective) {
+            return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
+        };
+
         auto&& weapon = attack_rating.weapon.get();
 
         // spell scaling
-        std::get<1>(row)[0][0] = format_float(attack_rating.spell_scaling * 100);
+        std::get<1>(row)[0][0] = format_number(attack_rating.spell_scaling * 100);
         std::get<1>(row)[0][1] = attack_rating.spell_scaling * 100;
         // std::get<1>(row)[0][2] = QColor(Qt::red);
 
         // total attack power
-        std::get<1>(row)[1][0] = format_float(attack_rating.total_attack_power[2]);
+        std::get<1>(row)[1][0] = format_number(attack_rating.total_attack_power[2]);
         std::get<1>(row)[1][1] = attack_rating.total_attack_power[2];
-        if (true)
-            std::get<1>(row)[1][2] = QColor(Qt::red);
+        std::get<1>(row)[1][2] = foreground_color(true);
 
         // attack powers
         for (auto&& [ap, is_ineffective, arr] : std::views::zip(
@@ -139,10 +148,9 @@ namespace erdo::ui
             attack_rating.ineffective_attack_power_types,
             std::get<1>(row) | std::views::drop(2)))
         {
-            arr[0] = format_float(ap[2]);
+            arr[0] = format_number(ap[2]);
             arr[1] = ap[2];
-            if (is_ineffective)
-                arr[2] = QColor(Qt::red);
+            arr[2] = foreground_color(is_ineffective);
         }
 
         // attribute scalings
@@ -150,32 +158,37 @@ namespace erdo::ui
             attack_rating.attribute_scalings,
             std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
         {
-            arr[0] = format_float(attribute_scaling * 100);
+            if (attribute_scaling == 0)
+                arr[0] = format_number(attribute_scaling * 100);
+            else
+                arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(weapon.scaling_tier(attribute_scaling)) + ")";
             arr[1] = attribute_scaling * 100;
-            // arr[2] = QColor(Qt::red);
+            arr[2] = foreground_color(false);
         }
 
         // attribute requirements
-        for (auto&& [requirement, arr] : std::views::zip(
+        for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
             weapon.requirements,
+            attack_rating.ineffective_attributes,
             std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size())))
         {
-            arr[0] = format_float(requirement);
+            arr[0] = format_number(requirement);
             arr[1] = requirement;
-            // arr[2] = QColor(Qt::red);
+            arr[2] = foreground_color(is_ineffective);
         }
 
         // stats
-        for (auto&& [stat, arr] : std::views::zip(
+        for (auto&& [stat, is_ineffective, arr] : std::views::zip(
             attack_rating.stats,
+            attack_rating.ineffective_attributes,
             std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 2)))
         {
             arr[0] = stat;
             arr[1] = stat;
-            // arr[2] = QColor(Qt::red);
+            arr[2] = foreground_color(is_ineffective);
         }
 
-        static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
+        // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
     }
     export void update_row(Row& row, const calculator::AttackRating& attack_rating)
     {

@@ -13,7 +13,7 @@ const std::vector<calculator::Weapon>& get_weapons() {
     static std::vector<calculator::Weapon> data;
 
     std::call_once(flag, [] {
-        auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000"; // "test_xml_data"
+        auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
         data = parser::load_weapons(xml_data_directory);
     });
 
