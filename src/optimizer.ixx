@@ -28,7 +28,7 @@ namespace erdo::optimizer
     };
 
     export auto total_attack_power_projection(const AttackRating& attack_rating) {
-        return attack_rating.total_attack_power.at(2);
+        return attack_rating.total_attack_power[1];
     }
 
 

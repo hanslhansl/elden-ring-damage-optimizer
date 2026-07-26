@@ -73,7 +73,7 @@ TEST_CASE("verify total attack rating optimization correctness") {
     CHECK(attack_rating.stats == calculator::Stats{ 21, 10, 10, 10, 10 });
 
     auto expected = 734.8908832256299;
-    CHECK_THAT(attack_rating.total_attack_power.at(2), Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
+    CHECK_THAT(attack_rating.total_attack_power.at(1), Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
 TEST_CASE("verify total attack rating calculation correctness 1") {
@@ -83,7 +83,7 @@ TEST_CASE("verify total attack rating calculation correctness 1") {
     calculator::Stats stats{ 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(2); })
+        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(1); })
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_1.size());
@@ -99,7 +99,7 @@ TEST_CASE("verify total attack rating calculation correctness 2") {
     calculator::Stats stats{ 70, 70, 70, 70, 70 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(2); })
+        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(1); })
         | std::ranges::to<std::vector>();
 
     // std::println("{}", total_attack_powers);

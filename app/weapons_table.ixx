@@ -138,8 +138,8 @@ namespace erdo::ui
         // std::get<1>(row)[0][2] = QColor(Qt::red);
 
         // total attack power
-        std::get<1>(row)[1][0] = format_number(attack_rating.total_attack_power[2]);
-        std::get<1>(row)[1][1] = attack_rating.total_attack_power[2];
+        std::get<1>(row)[1][0] = format_number(attack_rating.total_attack_power[1]);
+        std::get<1>(row)[1][1] = attack_rating.total_attack_power[1];
         std::get<1>(row)[1][2] = foreground_color(true);
 
         // attack powers
@@ -148,8 +148,8 @@ namespace erdo::ui
             attack_rating.ineffective_attack_power_types,
             std::get<1>(row) | std::views::drop(2)))
         {
-            arr[0] = format_number(ap[2]);
-            arr[1] = ap[2];
+            arr[0] = format_number(ap[1]);
+            arr[1] = ap[1];
             arr[2] = foreground_color(is_ineffective);
         }
 

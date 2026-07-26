@@ -158,7 +158,7 @@ export namespace erdo::calculator
     using IneffectiveAttackPowerTypes = std::array<bool, enumerators_of<AttackPowerType>().size()>;
     using IneffectiveAttributes = std::array<bool, enumerators_of<RelevantAttribute>().size()>;
     using BaseAttackPower = std::array<double, enumerators_of<AttackPowerType>().size()>;
-    using AttackPower = std::array<double, 3>;  // a + b = c
+    using AttackPower = std::array<double, 2>;  // base / full
     using AttackPowers = std::array<AttackPower, enumerators_of<AttackPowerType>().size()>;
     using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
 
@@ -362,22 +362,6 @@ export namespace erdo::calculator
             return ineffective_attack_power_types;
         }
 
-        AttackPower calculate_total_attack_power(const AttackPowers attack_powers) const
-        {
-            AttackPower total_attack_power{};
-            
-            for (auto damage_type : integral_enumerators_of<DamageType>())
-            {
-                auto&& attack_power = attack_powers[damage_type];
-
-                total_attack_power[0] += attack_power[0];
-                total_attack_power[1] += attack_power[1];
-                total_attack_power[2] += attack_power[2];
-            }
-
-            return total_attack_power;
-        }
-
         double calculate_total_scaling(
             bool ineffective_attack_power_type,
             const Stats& effective_stats,
@@ -446,14 +430,28 @@ export namespace erdo::calculator
 
                 auto &&attack_power = attack_powers[attack_power_type_integral];
                 attack_power[0] = base_attack_power;
-                attack_power[1] = full_attack_power - base_attack_power;
-                attack_power[2] = full_attack_power;
+                attack_power[1] = full_attack_power;
             }
 
             if (attack_power_type == AttackPowerType::PHYSICAL && this->is_sorcery_or_incantation_tool)
                 spell_scaling = total_scaling;
 
             return;
+        }
+
+        AttackPower calculate_total_attack_power(const AttackPowers attack_powers) const
+        {
+            AttackPower total_attack_power{};
+            
+            for (auto damage_type : integral_enumerators_of<DamageType>())
+            {
+                auto&& attack_power = attack_powers[damage_type];
+
+                total_attack_power[0] += attack_power[0];
+                total_attack_power[1] += attack_power[1];
+            }
+
+            return total_attack_power;
         }
 
         AttackRating calculate_attack_rating(const AttackOptions &attack_options, const Stats &stats) const

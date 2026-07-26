@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
     //calculator::Stats stats{ 21, 10, 10, 10, 10 };
 
     //auto total_attack_powers = weapons | std::views::transform([&](const calculator::Weapon& w){
-    //    return w.get_attack_rating(attack_options, stats).total_attack_power.at(2);
+    //    return w.get_attack_rating(attack_options, stats).total_attack_power.at(1);
     //}) | std::ranges::to<std::vector>();
     //std::println("{}", total_attack_powers);
 
