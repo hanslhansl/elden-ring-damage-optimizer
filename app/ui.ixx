@@ -157,7 +157,7 @@ namespace erdo::ui
                 std::chrono::duration<double> elapsed = end - start;
                 std::println("load weapon data: {} seconds", elapsed.count());
             }
-
+            this->weapon_table->resize_columns_to_contents();
 
             // set weapon stats
             // auto attack_rating = weapon.get_attack_rating(attack_options, stats);
@@ -543,4 +543,4 @@ namespace erdo::ui
     }
 }
 
-#include "ui.moc"
+// #include "ui.moc"

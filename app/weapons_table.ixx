@@ -111,7 +111,7 @@ namespace erdo::ui
 
         auto is_any_ineffective = false;
         for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-            attack_rating.attack_power,
+            attack_rating.attack_powers,
             attack_rating.ineffective_attack_power_types,
             std::get<1>(row) | std::views::drop(2)))
         {
@@ -190,10 +190,8 @@ namespace erdo::ui
         return {};
     }
 
-    export class RowModel : public QAbstractTableModel
+    export struct RowModel : QAbstractTableModel
     {
-        Q_OBJECT
-    public:
         std::vector<Row> rows;
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent) { }
@@ -204,7 +202,8 @@ namespace erdo::ui
         }
         int columnCount(const QModelIndex& parent = {}) const override
         {
-            return parent.isValid() ? 0 : std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
+            return std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
+            // return parent.isValid() ? 0 : std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
         }
 
         QVariant data(const QModelIndex& index, int role) const override
@@ -251,7 +250,14 @@ namespace erdo::ui
             CounterClockwise
         };
 
-        explicit RotatedHeaderView(Qt::Orientation orientation, Rotation rotation = Rotation::CounterClockwise, QWidget *parent = nullptr) : QHeaderView(orientation, parent), rotation(rotation) { }
+        explicit RotatedHeaderView(Qt::Orientation orientation, Rotation rotation = Rotation::CounterClockwise, QWidget *parent = nullptr)
+            : QHeaderView(orientation, parent), rotation(rotation)
+        {
+            // this->setSectionResizeMode(QHeaderView::ResizeToContents);
+            // this->setStretchLastSection(true);
+            // this->setSectionsMovable(true);
+            this->setSectionsClickable(true);
+        }
 
     protected:
         void paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const override {
@@ -330,11 +336,12 @@ namespace erdo::ui
 
     export class RowFilterModel : public QSortFilterProxyModel
     {
-        Q_OBJECT
-
     public:
 
-        explicit RowFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent) { }
+        explicit RowFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
+        {
+            this->setSortRole(Qt::UserRole);
+        }
 
         // void setTextFilter(QString text)
         // {
@@ -385,20 +392,44 @@ namespace erdo::ui
         RowFilterModel* proxy_model = new RowFilterModel(this);
         RotatedHeaderView* header = new RotatedHeaderView(Qt::Horizontal, RotatedHeaderView::Rotation::Clockwise, this);
 
-        explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent) {
-
-            this->proxy_model->setSortRole(Qt::UserRole);
+        explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
+        {
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model); // proxy_model model
 
+            this->setHorizontalHeader(this->header);
+
             this->setSortingEnabled(true);
 
-            this->setHorizontalHeader(this->header);
-            this->header->setStretchLastSection(true);
-            this->header->setSectionsMovable(true);
-            this->header->setSectionsClickable(true);
+            // this->header->moveSection(this->header->visualIndex(3), 17);
+        }
+
+        void resize_columns_to_contents()
+        {
+            this->resizeColumnsToContents();
+            // this->header->setSectionResizeMode(2, QHeaderView::Stretch);
+            // this->header->setSectionResizeMode(3, QHeaderView::Stretch);
+
+            // this->resizeColumnsToContents();
+            // int extra = this->viewport()->width() - this->horizontalHeader()->length();
+            // if (extra > 0)
+            //     this->setColumnWidth(2, this->columnWidth(2) + extra);
+        }
+
+    protected:
+        void paintEvent(QPaintEvent *event) override
+        {
+            this->QTableView::paintEvent(event);
+
+            QPainter painter(this->viewport());
+            painter.setPen(QPen(Qt::black, 1));   // 3-pixel separator
+
+            // Draw after columns 2 and 5
+            for (int col : {4, 5, 6 + (int)enumerators_of<calculator::DamageType>().size(), 7 + (int)enumerators_of<calculator::AttackPowerType>().size()})
+            {
+                int x = this->columnViewportPosition(col) ; // + this->columnWidth(col)
+                painter.drawLine(x, 0, x, this->viewport()->height());
+            }
         }
     };
 }
-
-#include "weapons_table.moc"
