@@ -34,7 +34,7 @@ namespace erdo::optimizer
 
     export AttackRating optimize_weapon(const Weapon &weapon, const std::vector<Stats>& stat_variations, const AttackOptions& attack_options) {
         auto attack_ratings_view = stat_variations | std::views::transform([&](const Stats &stats) {
-                return weapon.get_attack_rating(attack_options, stats);
+                return weapon.calculate_attack_rating(attack_options, stats);
             }) | std::ranges::to<std::vector>();
 
         return std::ranges::max(attack_ratings_view, {}, total_attack_power_projection);
@@ -80,7 +80,7 @@ namespace erdo::optimizer
             auto &&weapon = weapons.at(i);
 
             auto attack_ratings_view = stat_variations | std::views::transform([&](const Stats &stats) {
-                return weapon.get_attack_rating(attack_options, stats);
+                return weapon.calculate_attack_rating(attack_options, stats);
             });
 
             auto max_element = std::ranges::max_element(attack_ratings_view, {}, total_attack_power_projection);

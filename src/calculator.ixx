@@ -291,7 +291,6 @@ export namespace erdo::calculator
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
         std::array<std::pair<double, std::string>, 6> scaling_tiers;
 
-        
         // the index of the upgrade level for this weapon
         long long upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers);
         // 
@@ -322,57 +321,78 @@ export namespace erdo::calculator
             return stats;
         }
 
-        std::string scaling_tier(double scaling) const
+        std::string calculate_scaling_tier(double scaling) const
         {
             for (auto&& [threshold, tier] : this->scaling_tiers)
                 if (scaling >= threshold)
                     return tier;
-            throw std::invalid_argument("scaling value is below all thresholds");
+            return {};
+            throw std::invalid_argument(std::format("scaling value {} is below all thresholds", scaling));
         }
 
-        IneffectiveAttributes innefective_attributes(const Stats& adjusted_stats) const
+        IneffectiveAttributes calculate_ineffective_attributes(const Stats& adjusted_stats) const
         {
             IneffectiveAttributes ineffective_attributes{};
-            for (auto attribute : integral_enumerators_of<RelevantAttribute>())
-                if (adjusted_stats[attribute] < this->requirements[attribute])
-                    ineffective_attributes[attribute] = true;
+            for (auto&& [ineffective_attribute, adjusted_stat, requirement] : std::views::zip(
+                ineffective_attributes,
+                adjusted_stats,
+                this->requirements
+            ))
+                if (adjusted_stat < requirement)
+                    ineffective_attribute = true;
             return ineffective_attributes;
         }
 
-        auto loop_cycle(
-            const Stats& stats,
-            const Stats& adjusted_stats,
-            const int upgrade_level,
-            const bool disable_two_handing_attack_power_bonus,
-            const AttackPowerType &attack_power_type,
-            const IneffectiveAttributes& ineffective_attributes,
-            IneffectiveAttackPowerTypes& ineffective_attack_power_types,
-            AttackPowers& attack_powers,
-            double& spell_scaling
+        IneffectiveAttackPowerTypes calculate_ineffective_attack_power_types(const IneffectiveAttributes& ineffective_attributes) const
+        {
+            IneffectiveAttackPowerTypes ineffective_attack_power_types{};
+
+            for(auto attack_power_type_index : integral_enumerators_of<AttackPowerType>())
+            {
+                auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_index];
+                if (std::ranges::any_of(
+                        integral_enumerators_of<RelevantAttribute>(),
+                        [&](auto attribute)
+                        {
+                            return ineffective_attributes[attribute] && scaling_attributes[attribute] != 0;
+                        }))
+                    ineffective_attack_power_types[attack_power_type_index] = true;
+            }
+
+            return ineffective_attack_power_types;
+        }
+
+        AttackPower calculate_total_attack_power(const AttackPowers attack_powers) const
+        {
+            AttackPower total_attack_power{};
+            
+            for (auto damage_type : integral_enumerators_of<DamageType>())
+            {
+                auto&& attack_power = attack_powers[damage_type];
+
+                total_attack_power[0] += attack_power[0];
+                total_attack_power[1] += attack_power[1];
+                total_attack_power[2] += attack_power[2];
+            }
+
+            return total_attack_power;
+        }
+
+        double calculate_total_scaling(
+            bool ineffective_attack_power_type,
+            const Stats& effective_stats,
+            const AttributeScaling& scaling_attributes,
+            const AttributeScaling& attribute_scaling_at_upgrade_level,
+            const ScalingCurve& scaling_curve
         ) const
         {
-            auto attack_power_type_index = std::to_underlying(attack_power_type);
-            auto base_attack_power = base_attack_powers[upgrade_level][attack_power_type_index];
-
-            auto is_damage_type = attack_power_type_index <= std::to_underlying(AttackPowerType::HOLY);
-            auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_index];
-            double total_scaling = 1.;
-            auto&& attribute_scaling_at_upgrade_level = this->attribute_scalings[upgrade_level];
-
-            if (std::ranges::any_of(
-                    integral_enumerators_of<RelevantAttribute>(),
-                    [&](auto attribute)
-                    {
-                        return ineffective_attributes.at(attribute)
-                            && scaling_attributes.at(attribute) != 0;
-                    }))
+            if (ineffective_attack_power_type)
             {
-                total_scaling = 1. - ineffective_attribute_penalty;
-                ineffective_attack_power_types[attack_power_type_index] = true;
+                return 1. - ineffective_attribute_penalty;
             }
             else
             {
-                auto &effective_stats = (!disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats;
+                double total_scaling = 1.;
 
                 for (auto &&attribute : integral_enumerators_of<RelevantAttribute>())
                 {
@@ -384,24 +404,50 @@ export namespace erdo::calculator
                         if (attribute_correct == 1)
                             scaling = attribute_scaling_at_upgrade_level[attribute];
                         else
-                            scaling = attribute_correct
-                                * attribute_scaling_at_upgrade_level[attribute]
-                                / this->attribute_scalings[0][attribute];
+                            scaling = attribute_correct * attribute_scaling_at_upgrade_level[attribute] / this->attribute_scalings[0][attribute];
 
                         if (scaling != 0.)
-                            total_scaling += scaling * this->attack_power_scaling_curves[attack_power_type_index][effective_stats[attribute]];
+                            total_scaling += scaling * scaling_curve[effective_stats[attribute]];
                     }
                 }
-            }
 
+                return total_scaling;
+            }
+        }
+
+        auto calculate_attack_powers(
+            const Stats& stats,
+            const Stats& adjusted_stats,
+            const bool disable_two_handing_attack_power_bonus,
+            const AttackPowerType &attack_power_type,
+            const IneffectiveAttributes& ineffective_attributes,
+            const IneffectiveAttackPowerTypes& ineffective_attack_power_types,
+            const BaseAttackPower& base_attack_powers,
+            const AttributeScaling& attribute_scaling_at_upgrade_level,
+            AttackPowers& attack_powers,
+            double& spell_scaling
+        ) const
+        {
+            auto attack_power_type_integral = std::to_underlying(attack_power_type);
+
+            auto is_damage_type = attack_power_type_integral <= std::to_underlying(AttackPowerType::HOLY);
+            auto total_scaling = this->calculate_total_scaling(
+                ineffective_attack_power_types[attack_power_type_integral],
+                (!disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats,
+                this->attack_power_attribute_scaling[attack_power_type_integral],
+                attribute_scaling_at_upgrade_level,
+                this->attack_power_scaling_curves[attack_power_type_integral]
+            );
+
+            auto base_attack_power = base_attack_powers[attack_power_type_integral];
             if (base_attack_power != 0)
             {
-                auto res = base_attack_power * total_scaling;
+                auto full_attack_power = base_attack_power * total_scaling;
 
-                auto &&attack_power = attack_powers[attack_power_type_index];
+                auto &&attack_power = attack_powers[attack_power_type_integral];
                 attack_power[0] = base_attack_power;
-                attack_power[1] = res - base_attack_power;
-                attack_power[2] = res;
+                attack_power[1] = full_attack_power - base_attack_power;
+                attack_power[2] = full_attack_power;
             }
 
             if (attack_power_type == AttackPowerType::PHYSICAL && this->is_sorcery_or_incantation_tool)
@@ -410,58 +456,37 @@ export namespace erdo::calculator
             return;
         }
 
-        AttackPower get_total_attack_rating(const AttackPowers attack_powers) const
-        {
-            AttackPower total_attack_power{};
-            
-            for (auto damage_type : integral_enumerators_of<DamageType>())
-            {
-                auto&& attack_power = attack_powers[damage_type];
-
-                total_attack_power[0] += attack_power[0];
-                total_attack_power[1] += attack_power[2] - attack_power[0];
-                total_attack_power[2] += attack_power[2];
-            }
-
-            return total_attack_power;
-        }
-
-        // double get_spell_scaling(const TotalScalings& total_scalings) const
-        // {
-        //     if (this->is_sorcery_or_incantation_tool)
-        //         return 100. * total_scalings[std::to_underlying(AttackPowerType::PHYSICAL)];
-        //     return 0;
-        // }
-
-        AttackRating get_attack_rating(const AttackOptions &attack_options, const Stats &stats) const
+        AttackRating calculate_attack_rating(const AttackOptions &attack_options, const Stats &stats) const
         {
             auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options.two_handing, stats);
+            auto upgrade_level = attack_options.upgrade_levels[upgrade_level_index];
 
             AttackRating attack_rating{
                 .stats=stats,
                 .attack_options=attack_options,
                 .weapon=*this,
-                .ineffective_attributes=this->innefective_attributes(adjusted_stats),
+                .attribute_scalings = this->attribute_scalings[upgrade_level],
+                .ineffective_attributes=this->calculate_ineffective_attributes(adjusted_stats),
             };
+            attack_rating.ineffective_attack_power_types = this->calculate_ineffective_attack_power_types(attack_rating.ineffective_attributes);
 
-            auto upgrade_level = attack_options.upgrade_levels[upgrade_level_index];
-            auto&& base_attack_power_at_upgrade_level = this->base_attack_powers[upgrade_level];
+            auto&& base_attack_powers = this->base_attack_powers[upgrade_level];
 
             for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
-                this->loop_cycle(
+                this->calculate_attack_powers(
                     stats,
                     adjusted_stats,
-                    upgrade_level,
                     attack_options.disable_two_handing_attack_power_bonus,
                     attack_power_type,
                     attack_rating.ineffective_attributes,
                     attack_rating.ineffective_attack_power_types,
+                    base_attack_powers,
+                    this->attribute_scalings[upgrade_level],
                     attack_rating.attack_powers,
                     attack_rating.spell_scaling
                 );
 
-            attack_rating.total_attack_power = this->get_total_attack_rating(attack_rating.attack_powers);
-            attack_rating.attribute_scalings = this->attribute_scalings[upgrade_level];
+            attack_rating.total_attack_power = this->calculate_total_attack_power(attack_rating.attack_powers);
 
             return attack_rating;
         }

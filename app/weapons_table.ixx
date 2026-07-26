@@ -158,10 +158,11 @@ namespace erdo::ui
             attack_rating.attribute_scalings,
             std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
         {
-            if (attribute_scaling == 0)
+            auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
+            if (scaling_tier.empty())
                 arr[0] = format_number(attribute_scaling * 100);
             else
-                arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(weapon.scaling_tier(attribute_scaling)) + ")";
+                arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
             arr[1] = attribute_scaling * 100;
             arr[2] = foreground_color(false);
         }
