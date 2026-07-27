@@ -110,12 +110,12 @@ namespace erdo::ui
 
                 std::ranges::for_each(std::views::zip(this->get_active_weapon_data(), this->weapon_table->model->rows), [&](auto&& pair) {
                     auto&& [w, row] = pair;
-                    update_row(row, w.calculate_attack_rating(attack_options, stats));
+                    row.update(w.calculate_attack_rating(attack_options, stats));
                 });
                 // this->weapon_table->model->rows.clear();
                 // this->weapon_table->model->rows.append_range(
                 //     this->get_active_weapon_data()
-                //         | std::views::transform([&](const calculator::Weapon& w) { return build_row(w.calculate_attack_rating(attack_options, stats)); })
+                //         | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, stats)); })
                 // );
 
                 this->weapon_table->model->notifyAllChanged();
@@ -141,7 +141,7 @@ namespace erdo::ui
 
                         result.second.reserve(result.first.size());
                         result.second.append_range(result.first
-                            | std::views::transform([&](const calculator::Weapon& w) { return build_row(w.calculate_attack_rating(attack_options, stats)); })
+                            | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, stats)); })
                             | std::ranges::to<std::vector>()
                         );
 

@@ -4,41 +4,61 @@ module;
 #include <QPainter.h>
 #include <qobject.h>
 #include <qtableview.h>
+#include <tuple>
 export module erdo.ui.weapons_table;
 
 import std;
 import erdo;
 
-template<typename F, std::size_t I, std::size_t...Is, typename...Tuples>
-decltype(auto) visit_tuple_impl(F&& f, std::size_t index, std::index_sequence<I, Is...>, Tuples&&...tuples) {
-    if (index == I)
-        return std::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuples>(tuples))...);
-    
-    if constexpr (sizeof...(Is) > 0)
-        return visit_tuple_impl(std::forward<F>(f), index, std::index_sequence<Is...>{}, std::forward<Tuples>(tuples)...);
-    else
-        throw std::out_of_range("Index out of range in visit_tuple");
-}
-template<typename F, typename...Ts>
-    requires ((std::tuple_size_v<std::remove_cvref_t<Ts...[0]>> == std::tuple_size_v<std::remove_cvref_t<Ts>>) && ...)
-decltype(auto) visit_tuple(F&& f, std::size_t index, Ts&&...ts) {
-    return visit_tuple_impl(
-        std::forward<F>(f),
-        index,
-        std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<Ts...[0]>>>{},
-        std::forward<Ts>(ts)...
-    );
+
+namespace erdo::ui
+{
+    template<typename F, std::size_t I, std::size_t...Is, typename...Tuples>
+    decltype(auto) visit_tuple_impl(F&& f, std::size_t index, std::index_sequence<I, Is...>, Tuples&&...tuples) {
+        if (index == I)
+            return std::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuples>(tuples))...);
+        
+        if constexpr (sizeof...(Is) > 0)
+            return visit_tuple_impl(std::forward<F>(f), index, std::index_sequence<Is...>{}, std::forward<Tuples>(tuples)...);
+        else
+            throw std::out_of_range("Index out of range in visit_tuple");
+    }
+    template<typename F, typename...Ts>
+        requires ((std::tuple_size_v<std::remove_cvref_t<Ts...[0]>> == std::tuple_size_v<std::remove_cvref_t<Ts>>) && ...)
+    decltype(auto) visit_tuple(F&& f, std::size_t index, Ts&&...ts) {
+        return visit_tuple_impl(
+            std::forward<F>(f),
+            index,
+            std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<Ts...[0]>>>{},
+            std::forward<Ts>(ts)...
+        );
+    }
+
+    template <typename...Args>
+    QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
+        return visit_tuple(
+            [](const auto& arg){ return QVariant::fromValue(arg); },
+            index,
+            tuple
+        );
+    }
+
+    struct __tuple_base
+    {
+
+    };
+    template<typename T>
+    struct _tuple_base : T, __tuple_base
+    {
+        using tuple_base = T;
+        using tuple_base::tuple_base;
+    };
 }
 
-template <typename...Args>
-QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
-    return visit_tuple(
-        [](const auto& arg){ return QVariant::fromValue(arg); },
-        index,
-        tuple
-    );
-}
-
+template<std::derived_from<erdo::ui::__tuple_base> T>
+struct std::tuple_size<T> : std::tuple_size<typename T::tuple_base> {};
+template<std::size_t I, std::derived_from<erdo::ui::__tuple_base> T>
+struct std::tuple_element<I, T> : std::tuple_element<I, typename T::tuple_base> {};
 
 namespace erdo::ui
 {
@@ -62,8 +82,6 @@ namespace erdo::ui
 
         for (QString &word : words) {
             word = word.toLower();
-            // if (!word.isEmpty())
-            //     word[0] = word[0].toUpper();
         }
 
         return words.join(' ');
@@ -78,189 +96,349 @@ namespace erdo::ui
         return string_to_display(QString::fromStdString(std::string(str)));
     }
 
-
-    export using Row = std::tuple<
-        std::array<QVariant, 4>,    // name, affinity, type, base game/dlc
-        std::array<std::array<QVariant, 3>, 2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 3> // spell scaling, total, ...
-    >;
-    QString column_name(int column)
+    template<typename T>
+    auto format_number(T x)
     {
-        static constexpr auto apt_size = enumerators_of<calculator::AttackPowerType>().size();
-        static constexpr auto attr_size = enumerators_of<calculator::RelevantAttribute>().size();
-
-        if (column == 0)
-            return string_to_display("name");
-        if (column == 1)
-            return string_to_display("affinity");
-        if (column == 2)
-            return string_to_display("type");
-        if (column == 3)
-            return string_to_display("base game/dlc");
-
-        if (column == 4)
-            return string_to_display("spell scaling");
-
-        if (column == 5)
-            return string_to_display("total");
-        if (6 <= column && column < 6 + apt_size)
-            return string_to_display(enum_to_string(enumerators_of<calculator::AttackPowerType>().at(column - 6)));
-        
-        if (6 + apt_size <= column && column < 6 + apt_size + attr_size)
-            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size)));
-
-        if (6 + apt_size + attr_size <= column && column < 6 + apt_size + attr_size * 2)
-            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size - attr_size)));
-        
-        if (6 + apt_size + attr_size * 2 <= column && column < 6 + apt_size + attr_size * 3)
-            return string_to_display(enum_to_string(enumerators_of<calculator::RelevantAttribute>().at(column - 6 - apt_size - attr_size * 2)));
-
-        throw std::out_of_range(std::format("Invalid column index: {}", column));
+        if (x == 0)
+            return QString("\u2012");
+        if constexpr (std::integral<T>)
+            return QString::number(x);
+        return format_float(x);
+    };
+    auto foreground_color(bool is_ineffective)
+    {
+        return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
-    export void update_row_impl(Row& row, const calculator::AttackRating& attack_rating)
+ 
+    struct TextColumns : _tuple_base<std::array<QVariant, 4>>
     {
-        static auto format_number = []<typename T>(T x){
-            if (x == 0)
-                return QString("\u2012");
-            if constexpr (std::integral<T>)
-                return QString::number(x);
-            return format_float(x);
+        using _tuple_base::_tuple_base;
+
+        inline const static std::vector<QString> column_names {
+            string_to_display("name"),
+            string_to_display("affinity"),
+            string_to_display("type"),
+            string_to_display("base game/dlc")
         };
 
-        static auto foreground_color = [](bool is_ineffective) {
-            return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
-        };
-
-        auto&& weapon = attack_rating.weapon.get();
-
-        // spell scaling
-        std::get<1>(row)[0][0] = format_number(attack_rating.spell_scaling * 100);
-        std::get<1>(row)[0][1] = attack_rating.spell_scaling * 100;
-        // std::get<1>(row)[0][2] = QColor(Qt::red);
-
-        // total attack power
-        std::get<1>(row)[1][0] = format_number(attack_rating.total_attack_power[1]);
-        std::get<1>(row)[1][1] = attack_rating.total_attack_power[1];
-        std::get<1>(row)[1][2] = foreground_color(true);
-
-        // attack powers
-        for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-            attack_rating.attack_powers,
-            attack_rating.ineffective_attack_power_types,
-            std::get<1>(row) | std::views::drop(2)))
+        explicit TextColumns(const calculator::AttackRating& attack_rating)
         {
-            arr[0] = format_number(ap[1]);
-            arr[1] = ap[1];
-            arr[2] = foreground_color(is_ineffective);
+            auto&& weapon = attack_rating.weapon.get();
+            auto&& attack_options = attack_rating.attack_options;
+
+            (*this)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels[weapon.upgrade_level_index]));
+            (*this)[1] = string_to_display(enum_to_string(weapon.affinity));
+            (*this)[2] = string_to_display(enum_to_string(weapon.type));
+            (*this)[3] = string_to_display(weapon.dlc ? "dlc" : "base game");
         }
 
-        // attribute scalings
-        for (auto&& [attribute_scaling, arr] : std::views::zip(
-            attack_rating.attribute_scalings,
-            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
+        void update(const calculator::AttackRating& attack_rating)
         {
-            auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
-            if (scaling_tier.empty())
-                arr[0] = format_number(attribute_scaling * 100);
-            else
-                arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
-            arr[1] = attribute_scaling * 100;
-            arr[2] = foreground_color(false);
+            auto&& weapon = attack_rating.weapon.get();
+            auto&& attack_options = attack_rating.attack_options;
+
+            (*this)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
         }
 
-        // attribute requirements
-        for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
-            weapon.requirements,
-            attack_rating.ineffective_attributes,
-            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size())))
-        {
-            arr[0] = format_number(requirement);
-            arr[1] = requirement;
-            arr[2] = foreground_color(is_ineffective);
-        }
-
-        // stats
-        for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-            attack_rating.stats,
-            attack_rating.ineffective_attributes,
-            std::get<1>(row) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 2)))
-        {
-            arr[0] = stat;
-            arr[1] = stat;
-            arr[2] = foreground_color(is_ineffective);
-        }
-
-        // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
-    }
-    export void update_row(Row& row, const calculator::AttackRating& attack_rating)
-    {
-        auto&& weapon = attack_rating.weapon.get();
-        auto&& attack_options = attack_rating.attack_options;
-        auto&& stats = attack_rating.stats;
-
-        std::get<0>(row)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
-
-        update_row_impl(row, attack_rating);
-    }
-    export Row build_row(const calculator::AttackRating& attack_rating)
-    {
-        auto&& weapon = attack_rating.weapon.get();
-        auto&& attack_options = attack_rating.attack_options;
-        auto&& stats = attack_rating.stats;
-
-        Row row{
-            {
-                string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index))),
-                string_to_display(enum_to_string(weapon.affinity)),
-                string_to_display(enum_to_string(weapon.type)),
-                string_to_display(weapon.dlc ? "dlc" : "base game")
-            },
-            {
-                
-            }
-        };
-
-        update_row_impl(row, attack_rating);
-
-        return row;
-    }
-    QVariant row_data(const Row& row, int column, int role)
-    {
-        static constexpr auto size_0 = std::tuple_size_v<std::tuple_element_t<0, Row>>;
-        static constexpr auto size_1 = std::tuple_size_v<std::tuple_element_t<1, Row>>;
-
-        if (0 <= column && column < size_0)
+        QVariant data(int column, int role) const
         {
             if (role == Qt::DisplayRole || role == Qt::UserRole)
             {
-                return std::get<0>(row)[column];
+                return this->at(column);
             }
             return {};
         }
-        else if (size_0 <= column && column < size_0 + size_1)
+    };
+
+    template<std::size_t I>
+    struct DataColumns : _tuple_base<std::array<std::array<QVariant, 3>, I>>
+    {
+        using _tuple_base = _tuple_base<std::array<std::array<QVariant, 3>, I>>;
+        using _tuple_base::_tuple_base;
+
+        QVariant data(int column, int role) const
         {
-            auto i = column - size_0;
-
             if (role == Qt::DisplayRole)
-            {
-                return std::get<1>(row)[i][0];
-            }
+                return this->at(column)[0];
+            
             if (role == Qt::UserRole)
-            {
-                return std::get<1>(row)[i][1];
-            }
+                return this->at(column)[1];
+            
             if (role == Qt::ForegroundRole)
-            {
-                return std::get<1>(row)[i][2];
-            }
+                return this->at(column)[2];
+            
             if (role == Qt::TextAlignmentRole)
-            {
                 return QVariant::fromValue(Qt::AlignHCenter | Qt::AlignVCenter);
-            }
+            
             return {};
         }
+    };
 
-        throw std::out_of_range(std::format("Invalid column index: {}", column));
-    }
+    struct TotalAttackPower : DataColumns<1>
+    {
+        inline const static std::vector<QString> column_names = { string_to_display("total") };
+
+        explicit TotalAttackPower(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            (*this)[0][0] = format_number(attack_rating.total_attack_power[1]);
+            (*this)[0][1] = attack_rating.total_attack_power[1];
+            (*this)[0][2] = foreground_color(true);
+        }
+    };
+
+    struct SpellScaling : DataColumns<1>
+    {
+        inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
+
+        explicit SpellScaling(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            (*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
+            (*this)[0][1] = attack_rating.spell_scaling * 100;
+            (*this)[0][2] = foreground_color(true);
+        }
+    };
+
+    template<typename E>
+    struct EnumDataColumns : DataColumns<enumerators_of<E>().size()>
+    {
+        inline const static std::vector<QString> column_names = enumerators_of<E>()
+            | std::views::transform([](E e){ return string_to_display(enum_to_string(e)); })
+            | std::ranges::to<std::vector>();
+    };
+
+    struct AttackPowers : EnumDataColumns<calculator::AttackPowerType>
+    {
+        explicit AttackPowers(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+                attack_rating.attack_powers,
+                attack_rating.ineffective_attack_power_types,
+                *this))
+            {
+                arr[0] = format_number(ap[1]);
+                arr[1] = ap[1];
+                arr[2] = foreground_color(is_ineffective);
+            }
+        }
+    };
+
+    struct AttributeScalings : EnumDataColumns<calculator::RelevantAttribute>
+    {
+        explicit AttributeScalings(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            auto&& weapon = attack_rating.weapon.get();
+
+            for (auto&& [attribute_scaling, arr] : std::views::zip(
+                attack_rating.attribute_scalings,
+                *this))
+            {
+                auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
+                if (scaling_tier.empty())
+                    arr[0] = format_number(attribute_scaling * 100);
+                else
+                    arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
+                arr[1] = attribute_scaling * 100;
+                arr[2] = foreground_color(false);
+            }
+        }
+    };
+
+    struct Requirements : EnumDataColumns<calculator::RelevantAttribute>
+    {
+        explicit Requirements(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            auto&& weapon = attack_rating.weapon.get();
+
+            for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
+                weapon.requirements,
+                attack_rating.ineffective_attributes,
+                *this))
+            {
+                arr[0] = format_number(requirement);
+                arr[1] = requirement;
+                arr[2] = foreground_color(is_ineffective);
+            }
+        }
+    };
+
+    struct Stats : EnumDataColumns<calculator::RelevantAttribute>
+    {
+        explicit Stats(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            for (auto&& [stat, is_ineffective, arr] : std::views::zip(
+                attack_rating.stats,
+                attack_rating.ineffective_attributes,
+                *this))
+            {
+                arr[0] = stat;
+                arr[1] = stat;
+                arr[2] = foreground_color(is_ineffective);
+            }
+        }
+    };
+
+    export template<typename...Args>
+    struct BasicRow : _tuple_base<std::tuple<Args...>>
+    {
+        using _tuple_base = _tuple_base<std::tuple<Args...>>;
+        using _tuple_base::_tuple_base;
+
+        static constexpr std::array element_sizes = { std::tuple_size_v<Args>... };
+        static constexpr std::array cumulative_element_sizes = []() {
+            std::array<std::size_t, sizeof...(Args)> result{};
+            std::partial_sum(element_sizes.begin(), element_sizes.end(), result.begin());
+            return result;
+        }();
+        static constexpr std::size_t total_size = std::accumulate(element_sizes.begin(), element_sizes.end(), 0);
+        inline const static std::vector<QString> column_names = [](){
+            std::vector<QString> result{};
+            result.reserve(total_size);
+            (result.insert(result.end(), Args::column_names.begin(), Args::column_names.end()), ...);
+            return result;
+        }();
+
+        explicit BasicRow(const calculator::AttackRating& attack_rating) : _tuple_base(Args(attack_rating)...) { }
+
+        /*void update_impl(const calculator::AttackRating& attack_rating)
+        {
+            static auto format_number = []<typename T>(T x){
+                if (x == 0)
+                    return QString("\u2012");
+                if constexpr (std::integral<T>)
+                    return QString::number(x);
+                return format_float(x);
+            };
+
+            static auto foreground_color = [](bool is_ineffective) {
+                return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
+            };
+
+            auto&& weapon = attack_rating.weapon.get();
+
+            // spell scaling
+            std::get<1>(*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
+            std::get<1>(*this)[0][1] = attack_rating.spell_scaling * 100;
+            // std::get<1>(*this)[0][2] = QColor(Qt::red);
+
+            // total attack power
+            std::get<1>(*this)[1][0] = format_number(attack_rating.total_attack_power[1]);
+            std::get<1>(*this)[1][1] = attack_rating.total_attack_power[1];
+            std::get<1>(*this)[1][2] = foreground_color(true);
+
+            // attack powers
+            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+                attack_rating.attack_powers,
+                attack_rating.ineffective_attack_power_types,
+                std::get<1>(*this) | std::views::drop(2)))
+            {
+                arr[0] = format_number(ap[1]);
+                arr[1] = ap[1];
+                arr[2] = foreground_color(is_ineffective);
+            }
+
+            // attribute scalings
+            for (auto&& [attribute_scaling, arr] : std::views::zip(
+                attack_rating.attribute_scalings,
+                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
+            {
+                auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
+                if (scaling_tier.empty())
+                    arr[0] = format_number(attribute_scaling * 100);
+                else
+                    arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
+                arr[1] = attribute_scaling * 100;
+                arr[2] = foreground_color(false);
+            }
+
+            // attribute requirements
+            for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
+                weapon.requirements,
+                attack_rating.ineffective_attributes,
+                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size())))
+            {
+                arr[0] = format_number(requirement);
+                arr[1] = requirement;
+                arr[2] = foreground_color(is_ineffective);
+            }
+
+            // stats
+            for (auto&& [stat, is_ineffective, arr] : std::views::zip(
+                attack_rating.stats,
+                attack_rating.ineffective_attributes,
+                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 2)))
+            {
+                arr[0] = stat;
+                arr[1] = stat;
+                arr[2] = foreground_color(is_ineffective);
+            }
+
+            // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
+        }*/
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            std::apply(
+                [&](auto&&...args) {
+                    (std::forward<decltype(args)>(args).update(attack_rating),...);
+                },
+                *this
+            );
+        }
+
+        QVariant data(int column, int role) const
+        {
+            return [&]<std::size_t I = 0>(this auto&& self, std::size_t index)->QVariant {
+                if constexpr (I < std::tuple_size_v<BasicRow>)
+                {
+                    if (index < element_sizes[I])
+                        return std::get<I>(*this).data(index, role);
+                    else
+                        return self.template operator()<I + 1>(index - element_sizes[I]);
+                }
+                throw std::out_of_range("index out of range");
+            }(column);
+        }
+    };
+
+    export using Row = BasicRow<
+        TextColumns,
+        AttackPowers,
+        TotalAttackPower,
+        SpellScaling,
+        AttributeScalings,
+        Requirements,
+        Stats
+    >;
 
     export struct RowModel : QAbstractTableModel
     {
@@ -274,7 +452,7 @@ namespace erdo::ui
         }
         int columnCount(const QModelIndex& parent = {}) const override
         {
-            return std::tuple_size_v<std::tuple_element_t<0, Row>> + std::tuple_size_v<std::tuple_element_t<1, Row>>;
+            return Row::total_size;
         }
 
         QVariant data(const QModelIndex& index, int role) const override
@@ -282,7 +460,7 @@ namespace erdo::ui
             if (!index.isValid())
                 return {};
 
-            return row_data(this->rows[index.row()], index.column(), role);
+            return this->rows[index.row()].data(index.column(), role);
         }
 
         QVariant headerData(int section, Qt::Orientation orientation, int role) const override
@@ -290,9 +468,8 @@ namespace erdo::ui
             if (role != Qt::DisplayRole)
                 return {};
 
-            auto column = section;
             if (orientation == Qt::Horizontal)
-                return column_name(column);
+                return Row::column_names.at(section);
 
             return {};
         }
@@ -324,10 +501,35 @@ namespace erdo::ui
         explicit RotatedHeaderView(Qt::Orientation orientation, Rotation rotation = Rotation::CounterClockwise, QWidget *parent = nullptr)
             : QHeaderView(orientation, parent), rotation(rotation)
         {
-            // this->setSectionResizeMode(QHeaderView::ResizeToContents);
-            // this->setStretchLastSection(true);
             // this->setSectionsMovable(true);
             this->setSectionsClickable(true);
+        }
+
+        template <typename PaintDevice>
+        static void drawColumnGroupSeparators(PaintDevice *device, const QHeaderView *header)
+        {
+            QPainter painter(device);
+
+            const QRect bounds = device->rect();
+
+            painter.save();
+
+            painter.setClipRect(bounds);
+            QPen pen(Qt::black, 1);
+            pen.setCosmetic(true);
+            painter.setPen(pen);
+
+            for (auto logicalColumn : Row::cumulative_element_sizes)
+            {
+                if (header->isSectionHidden(logicalColumn))
+                    continue;
+
+                const int x = header->sectionViewportPosition(logicalColumn);
+
+                painter.drawLine(x, bounds.top(), x, bounds.bottom());
+            }
+
+            painter.restore();
         }
 
     protected:
@@ -397,6 +599,13 @@ namespace erdo::ui
             }
 
             return size;
+        }
+
+        void paintEvent(QPaintEvent *e) override
+        {
+            QHeaderView::paintEvent(e);
+
+            drawColumnGroupSeparators(this->viewport(), this);
         }
 
     private:
@@ -478,39 +687,54 @@ namespace erdo::ui
 
         void resize_columns_to_contents()
         {
+            // Get Qt's idea of the content widths
+            this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
             this->resizeColumnsToContents();
-            // this->header->setSectionResizeMode(2, QHeaderView::Stretch);
-            // this->header->setSectionResizeMode(3, QHeaderView::Stretch);
 
-            // this->resizeColumnsToContents();
-            // int extra = this->viewport()->width() - this->horizontalHeader()->length();
-            // if (extra > 0)
-            //     this->setColumnWidth(2, this->columnWidth(2) + extra);
+            const int columns = this->model->columnCount();
+
+            QVector<int> widths(columns);
+            int total = 0;
+
+            for (int c = 0; c < columns; ++c) {
+                widths[c] = this->header->sectionSize(c);
+                total += widths[c];
+            }
+
+            // Switch back so the user can resize
+            this->header->setSectionResizeMode(QHeaderView::Interactive);
+
+            if (total <= 0)
+                return;
+
+            const int available = this->viewport()->width();
+
+            if (total < available) {
+                const double factor = double(available) / total;
+
+                int used = 0;
+                for (int c = 0; c < columns - 1; ++c) {
+                    int w = qRound(widths[c] * factor);
+                    this->header->resizeSection(c, w);
+                    used += w;
+                }
+
+                // absorb rounding error
+                this->header->resizeSection(columns - 1, available - used);
+            }
+            else
+            {
+                for (int c = 0; c < columns; ++c)
+                    this->header->resizeSection(c, widths[c]);
+            }
         }
 
     protected:
         void paintEvent(QPaintEvent *event) override
         {
-            this->QTableView::paintEvent(event);
+            QTableView::paintEvent(event);
 
-            QPainter painter(this->viewport());
-            QPen pen(Qt::black, 1);
-            pen.setCosmetic(true);
-            painter.setPen(pen);
-
-            // Draw before columns 2 and 5
-            for (auto col : {
-                4,
-                5,
-                6 + (int)enumerators_of<calculator::DamageType>().size(),
-                6 + (int)enumerators_of<calculator::AttackPowerType>().size(),
-                6 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size(),
-                6 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size() * 2,
-            })
-            {
-                int x = this->columnViewportPosition(col) ; // + this->columnWidth(col)
-                painter.drawLine(x, 0, x, this->viewport()->height());
-            }
+            RotatedHeaderView::drawColumnGroupSeparators(this->viewport(), this->horizontalHeader());
         }
     };
 }
