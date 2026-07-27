@@ -335,7 +335,7 @@ namespace erdo::ui
             this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data
-            auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString());
+            auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()).make_preferred();
             auto xml_data_directory = application_directory / "xml_data";
             auto weapon_data_directories = std::filesystem::directory_iterator(xml_data_directory)
                 | std::views::transform(&std::filesystem::directory_entry::path)
@@ -349,18 +349,25 @@ namespace erdo::ui
                 throw std::runtime_error("no weapon data directories found in xml_data directory");
 
             // weapon data menu
-            QMenu *weapon_menu = this->ui->menu_file->addMenu("choose weapon data");
             QActionGroup *group = new QActionGroup(this);
             group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
-                QAction *action = weapon_menu->addAction(QString::fromStdString(dir.filename().string()));
+                QAction *action = this->ui->menu_weapon_data->addAction(QString::fromStdString(dir.string()));
                 action->setCheckable(true);
                 group->addAction(action);
                 connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
+
+            this->ui->menu_weapon_data->addSeparator();
+
+            QAction* action = this->ui->menu_weapon_data->addAction("load weapon data from directory");
+            connect(action, &QAction::triggered, this, [this]() { std::println("not implemented"); });
+
+            action = this->ui->menu_weapon_data->addAction("generate weapon data from game data");
+            connect(action, &QAction::triggered, this, [this]() { std::println("not implemented"); });
         }
 
         const std::vector<calculator::Weapon>& get_active_weapon_data() const
