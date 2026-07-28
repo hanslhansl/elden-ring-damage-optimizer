@@ -216,7 +216,7 @@ namespace erdo::ui
             | std::ranges::to<std::vector>();
     };
 
-    struct AttackPowers : EnumDataColumns<calculator::AttackPowerType>
+    struct AttackPowers : EnumDataColumns<calculator::DamageType>
     {
         explicit AttackPowers(const calculator::AttackRating& attack_rating)
         {
@@ -226,8 +226,29 @@ namespace erdo::ui
         void update(const calculator::AttackRating& attack_rating)
         {
             for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                attack_rating.attack_powers,
-                attack_rating.ineffective_attack_power_types,
+                attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                *this))
+            {
+                arr[0] = format_number(ap[1]);
+                arr[1] = ap[1];
+                arr[2] = foreground_color(is_ineffective);
+            }
+        }
+    };
+
+    struct StatusEffects : EnumDataColumns<calculator::StatusEffectType>
+    {
+        explicit StatusEffects(const calculator::AttackRating& attack_rating)
+        {
+            this->update(attack_rating);
+        }
+
+        void update(const calculator::AttackRating& attack_rating)
+        {
+            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+                attack_rating.attack_powers | std::views::drop(enumerators_of<calculator::DamageType>().size()),
+                attack_rating.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
                 *this))
             {
                 arr[0] = format_number(ap[1]);
@@ -323,87 +344,11 @@ namespace erdo::ui
         inline const static std::vector<QString> column_names = [](){
             std::vector<QString> result{};
             result.reserve(total_size);
-            (result.insert(result.end(), Args::column_names.begin(), Args::column_names.end()), ...);
+            (result.append_range(Args::column_names), ...);
             return result;
         }();
 
         explicit BasicRow(const calculator::AttackRating& attack_rating) : _tuple_base(Args(attack_rating)...) { }
-
-        /*void update_impl(const calculator::AttackRating& attack_rating)
-        {
-            static auto format_number = []<typename T>(T x){
-                if (x == 0)
-                    return QString("\u2012");
-                if constexpr (std::integral<T>)
-                    return QString::number(x);
-                return format_float(x);
-            };
-
-            static auto foreground_color = [](bool is_ineffective) {
-                return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
-            };
-
-            auto&& weapon = attack_rating.weapon.get();
-
-            // spell scaling
-            std::get<1>(*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
-            std::get<1>(*this)[0][1] = attack_rating.spell_scaling * 100;
-            // std::get<1>(*this)[0][2] = QColor(Qt::red);
-
-            // total attack power
-            std::get<1>(*this)[1][0] = format_number(attack_rating.total_attack_power[1]);
-            std::get<1>(*this)[1][1] = attack_rating.total_attack_power[1];
-            std::get<1>(*this)[1][2] = foreground_color(true);
-
-            // attack powers
-            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                attack_rating.attack_powers,
-                attack_rating.ineffective_attack_power_types,
-                std::get<1>(*this) | std::views::drop(2)))
-            {
-                arr[0] = format_number(ap[1]);
-                arr[1] = ap[1];
-                arr[2] = foreground_color(is_ineffective);
-            }
-
-            // attribute scalings
-            for (auto&& [attribute_scaling, arr] : std::views::zip(
-                attack_rating.attribute_scalings,
-                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size())))
-            {
-                auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
-                if (scaling_tier.empty())
-                    arr[0] = format_number(attribute_scaling * 100);
-                else
-                    arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
-                arr[1] = attribute_scaling * 100;
-                arr[2] = foreground_color(false);
-            }
-
-            // attribute requirements
-            for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
-                weapon.requirements,
-                attack_rating.ineffective_attributes,
-                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size())))
-            {
-                arr[0] = format_number(requirement);
-                arr[1] = requirement;
-                arr[2] = foreground_color(is_ineffective);
-            }
-
-            // stats
-            for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-                attack_rating.stats,
-                attack_rating.ineffective_attributes,
-                std::get<1>(*this) | std::views::drop(2 + enumerators_of<calculator::AttackPowerType>().size() + enumerators_of<calculator::RelevantAttribute>().size() * 2)))
-            {
-                arr[0] = stat;
-                arr[1] = stat;
-                arr[2] = foreground_color(is_ineffective);
-            }
-
-            // static_assert(false, "add attribute scaling letter and number as well as list of ineffective attributes.");
-        }*/
 
         void update(const calculator::AttackRating& attack_rating)
         {
@@ -432,9 +377,10 @@ namespace erdo::ui
 
     export using Row = BasicRow<
         TextColumns,
+        SpellScaling,
         AttackPowers,
         TotalAttackPower,
-        SpellScaling,
+        StatusEffects,
         AttributeScalings,
         Requirements,
         Stats
@@ -493,7 +439,8 @@ namespace erdo::ui
     export class RotatedHeaderView : public QHeaderView
     {
     public:
-        enum class Rotation {
+        enum class Rotation
+        {
             Clockwise,
             CounterClockwise
         };
@@ -536,7 +483,7 @@ namespace erdo::ui
         void paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const override {
             painter->save();
 
-            bool rotate = rotated_columns.contains(logicalIndex);
+            bool rotate = std::ranges::contains(rotated_columns, logicalIndex);
 
             if (!rotate) {
                 // Default Qt rendering
@@ -591,12 +538,12 @@ namespace erdo::ui
         QSize sectionSizeFromContents(int logicalIndex) const override {
             QSize size = QHeaderView::sectionSizeFromContents(logicalIndex);
 
-            if (rotated_columns.contains(logicalIndex)) {
-                // Width becomes height after rotation
+            // Width becomes height after rotation
+            if (std::ranges::contains(rotated_columns, logicalIndex))
                 return QSize(
-                    40,                  // narrow column header width
-                    size.width() + 20);  // rotated text height
-            }
+                    size.height(),
+                    size.width()
+                );
 
             return size;
         }
@@ -610,8 +557,30 @@ namespace erdo::ui
 
     private:
         Rotation rotation;
-        std::set<int> rotated_columns = std::views::iota(4, 4 + 2 + (int)enumerators_of<calculator::AttackPowerType>().size() + (int)enumerators_of<calculator::RelevantAttribute>().size()*3)
-            | std::ranges::to<std::set>();
+        static const inline std::vector<std::size_t> rotated_columns = []<std::size_t I = 0>(
+            this auto&& self,
+            std::vector<std::size_t> indices = {},
+            std::size_t index = 0
+        ) -> std::vector<std::size_t> {
+            if constexpr (I == std::tuple_size_v<Row>)
+            {
+                return indices;
+            }
+            else
+            {
+                if constexpr (std::derived_from<std::tuple_element_t<I, Row>, DataColumns<Row::element_sizes[I]>>)
+                {
+                    if (index < Row::cumulative_element_sizes[I])
+                    {
+                        indices.push_back(index);
+                        return self.template operator()<I>(std::move(indices), index + 1);
+                    }
+                    return self.template operator()<I + 1>(std::move(indices), index);
+                }
+
+                return self.template operator()<I + 1>(std::move(indices), index + Row::element_sizes[I]);
+            }
+        }();
     };
 
     export class RowFilterModel : public QSortFilterProxyModel

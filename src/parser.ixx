@@ -403,7 +403,7 @@ namespace erdo::parser
                         default_damage_calc_correct_graph_id
                     )
                 );
-            for (auto status_type : enumerators_of<calculator::StatusType>())
+            for (auto status_type : enumerators_of<calculator::StatusEffectType>())
                 weaponCalcCorrectGraphs.at(std::to_underlying(status_type)) = get_calc_correct_graph_by_id(
                     map_get(
                         calcCorrectGraphIds,

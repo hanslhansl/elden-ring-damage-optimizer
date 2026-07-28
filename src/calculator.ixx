@@ -56,7 +56,7 @@ export namespace erdo::calculator
         HOLY = std::to_underlying(AttackPowerType::HOLY)
     };
 
-    enum class StatusType {
+    enum class StatusEffectType {
         POISON = std::to_underlying(AttackPowerType::POISON),
         SCARLET_ROT = std::to_underlying(AttackPowerType::SCARLET_ROT),
         BLEED = std::to_underlying(AttackPowerType::BLEED),
@@ -112,14 +112,14 @@ constexpr std::array<std::pair<calculator::DamageType, std::string_view>, 5> enu
     std::pair{calculator::DamageType::HOLY, "HOLY"}
 };
 template<>
-constexpr std::array<std::pair<calculator::StatusType, std::string_view>, 7> enum_string_mapping<calculator::StatusType> = {
-    std::pair{calculator::StatusType::POISON, "POISON"},
-    std::pair{calculator::StatusType::SCARLET_ROT, "SCARLET_ROT"},
-    std::pair{calculator::StatusType::BLEED, "BLEED"},
-    std::pair{calculator::StatusType::FROST, "FROST"},
-    std::pair{calculator::StatusType::SLEEP, "SLEEP"},
-    std::pair{calculator::StatusType::MADNESS, "MADNESS"},
-    std::pair{calculator::StatusType::DEATH_BLIGHT, "DEATH_BLIGHT"}
+constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 7> enum_string_mapping<calculator::StatusEffectType> = {
+    std::pair{calculator::StatusEffectType::POISON, "POISON"},
+    std::pair{calculator::StatusEffectType::SCARLET_ROT, "SCARLET_ROT"},
+    std::pair{calculator::StatusEffectType::BLEED, "BLEED"},
+    std::pair{calculator::StatusEffectType::FROST, "FROST"},
+    std::pair{calculator::StatusEffectType::SLEEP, "SLEEP"},
+    std::pair{calculator::StatusEffectType::MADNESS, "MADNESS"},
+    std::pair{calculator::StatusEffectType::DEATH_BLIGHT, "DEATH_BLIGHT"}
 };
 
 export namespace erdo::calculator
