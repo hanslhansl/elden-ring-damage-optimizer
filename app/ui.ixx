@@ -299,39 +299,9 @@ namespace erdo::ui
                 auto raii = calculate_weapon_stats_counter(this);
             });*/
 
-            // attack power labels
-            /*for (auto&& [row, damage_type] : enumerators_of<calculator::DamageType>() | std::views::enumerate)
-            {
-                ++row;
-
-                this->ui->attack_power_layout->addWidget(new QLabel(string_to_display(enum_to_string(damage_type))), row, 0);
-
-                for (auto&& [col, attack_power_label] : this->attack_power_labels.emplace_back() | std::views::enumerate)
-                    this->ui->attack_power_layout->addWidget(attack_power_label = new QLabel(), row, col + 1);
-            }
-
-            // status effect labels
-            for (auto&& [row, status_type] : enumerators_of<calculator::StatusType>() | std::views::enumerate)
-            {
-                this->ui->status_effect_layout->addWidget(new QLabel(string_to_display(enum_to_string(status_type))), row, 0);
-
-                for (auto&& [col, status_effect_label] : this->status_effect_labels.emplace_back() | std::views::enumerate)
-                    this->ui->status_effect_layout->addWidget(status_effect_label = new QLabel(), row, col + 1);
-            }
-
-            // attribute labels
-            for (auto&& [row, attribute] : enumerators_of<calculator::RelevantAttribute>() | std::views::enumerate)
-            {
-                row += 2;
-
-                this->ui->attribute_layout->addWidget(new QLabel(string_to_display(enum_to_string(attribute))), row, 0);
-
-                this->ui->attribute_layout->addWidget(this->attribute_scaling_labels.emplace_back(new QLabel()), row, 1);
-                this->ui->attribute_layout->addWidget(this->attribute_requirements_labels.emplace_back(new QLabel()), row, 2);
-            }*/
-
             // weapon table view
             this->weapon_table = new WeaponTable(this);
+            this->weapon_table->hide_section(7);
             this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data

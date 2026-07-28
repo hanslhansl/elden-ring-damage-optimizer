@@ -340,6 +340,11 @@ namespace erdo::ui
             std::partial_sum(element_sizes.begin(), element_sizes.end(), result.begin());
             return result;
         }();
+        static constexpr std::array element_index_offset = []() {
+            std::array<std::size_t, sizeof...(Args)> result{};
+            std::ranges::copy(cumulative_element_sizes | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
+            return result;
+        }();
         static constexpr std::size_t total_size = std::accumulate(element_sizes.begin(), element_sizes.end(), 0);
         inline const static std::vector<QString> column_names = [](){
             std::vector<QString> result{};
@@ -453,7 +458,7 @@ namespace erdo::ui
         }
 
         template <typename PaintDevice>
-        static void drawColumnGroupSeparators(PaintDevice *device, const QHeaderView *header)
+        static void draw_column_group_separators(PaintDevice *device, const QHeaderView *header)
         {
             QPainter painter(device);
 
@@ -552,16 +557,12 @@ namespace erdo::ui
         {
             QHeaderView::paintEvent(e);
 
-            drawColumnGroupSeparators(this->viewport(), this);
+            RotatedHeaderView::draw_column_group_separators(this->viewport(), this);
         }
 
     private:
         Rotation rotation;
-        static const inline std::vector<std::size_t> rotated_columns = []<std::size_t I = 0>(
-            this auto&& self,
-            std::vector<std::size_t> indices = {},
-            std::size_t index = 0
-        ) -> std::vector<std::size_t> {
+        static const inline std::vector<std::size_t> rotated_columns = []<std::size_t I = 0>(this auto&& self, std::vector<std::size_t> indices = {} ) -> std::vector<std::size_t> {
             if constexpr (I == std::tuple_size_v<Row>)
             {
                 return indices;
@@ -570,15 +571,15 @@ namespace erdo::ui
             {
                 if constexpr (std::derived_from<std::tuple_element_t<I, Row>, DataColumns<Row::element_sizes[I]>>)
                 {
-                    if (index < Row::cumulative_element_sizes[I])
-                    {
-                        indices.push_back(index);
-                        return self.template operator()<I>(std::move(indices), index + 1);
-                    }
-                    return self.template operator()<I + 1>(std::move(indices), index);
+                    indices.append_range(
+                        std::views::iota(
+                            Row::element_index_offset[I],
+                            Row::element_index_offset[I] + Row::element_sizes[I]
+                        )
+                    );
                 }
 
-                return self.template operator()<I + 1>(std::move(indices), index + Row::element_sizes[I]);
+                return self.template operator()<I + 1>(std::move(indices));
             }
         }();
     };
@@ -652,50 +653,83 @@ namespace erdo::ui
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
 
             // this->header->moveSection(this->header->visualIndex(3), 17);
+            // this->header->hideSection(3);
         }
 
         void resize_columns_to_contents()
         {
-            // Get Qt's idea of the content widths
+            const int columns = this->model->columnCount();
+
             this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
             this->resizeColumnsToContents();
 
-            const int columns = this->model->columnCount();
-
             QVector<int> widths(columns);
             int total = 0;
+            QVector<int> visibleColumns;
 
-            for (int c = 0; c < columns; ++c) {
+            for (int c = 0; c < columns; ++c)
+            {
+                if (this->header->isSectionHidden(c))
+                    continue;
+
                 widths[c] = this->header->sectionSize(c);
                 total += widths[c];
+                visibleColumns.append(c);
             }
 
-            // Switch back so the user can resize
             this->header->setSectionResizeMode(QHeaderView::Interactive);
 
-            if (total <= 0)
+            if (total <= 0 || visibleColumns.isEmpty())
                 return;
 
             const int available = this->viewport()->width();
 
-            if (total < available) {
+            if (total < available)
+            {
                 const double factor = double(available) / total;
 
                 int used = 0;
-                for (int c = 0; c < columns - 1; ++c) {
+
+                for (int i = 0; i < visibleColumns.size() - 1; ++i) {
+                    int c = visibleColumns[i];
                     int w = qRound(widths[c] * factor);
+
                     this->header->resizeSection(c, w);
                     used += w;
                 }
 
-                // absorb rounding error
-                this->header->resizeSection(columns - 1, available - used);
+                // Last visible column gets the remainder
+                int last = visibleColumns.back();
+                this->header->resizeSection(last, available - used);
             }
             else
             {
-                for (int c = 0; c < columns; ++c)
+                for (int c : visibleColumns)
                     this->header->resizeSection(c, widths[c]);
             }
+        }
+
+        void hide_section(std::size_t section)
+        {
+            [&]<std::size_t I = 0>(this auto&& self) -> void {
+                if constexpr (I == std::tuple_size_v<Row>)
+                {
+                    throw std::out_of_range("section index out of range");
+                }
+                else
+                {
+                    if (section == I)
+                    {
+                        for (auto && index : std::views::iota(
+                            Row::element_index_offset[I],
+                            Row::element_index_offset[I] + Row::element_sizes[I]
+                        ))
+                            this->header->hideSection(static_cast<int>(index));
+                        return;
+                    }
+                    return self.template operator()<I + 1>();
+                }
+            }();
         }
 
     protected:
@@ -703,7 +737,7 @@ namespace erdo::ui
         {
             QTableView::paintEvent(event);
 
-            RotatedHeaderView::drawColumnGroupSeparators(this->viewport(), this->horizontalHeader());
+            RotatedHeaderView::draw_column_group_separators(this->viewport(), this->horizontalHeader());
         }
     };
 }
