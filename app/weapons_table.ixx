@@ -557,7 +557,14 @@ namespace erdo::ui
         {
             QHeaderView::paintEvent(e);
 
-            RotatedHeaderView::draw_column_group_separators(this->viewport(), this);
+            auto viewport = this->viewport();
+
+            QPainter p(viewport);
+            QPen pen(Qt::black, 1);
+            p.setPen(pen);
+            p.drawLine(0, height() - 1, width(), height() - 1);
+
+            RotatedHeaderView::draw_column_group_separators(viewport, this);
         }
 
     private:
@@ -647,6 +654,7 @@ namespace erdo::ui
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model); // proxy_model model
 
+            this->setFrameStyle(QFrame::Box);
             this->setHorizontalHeader(this->header);
 
             this->setSortingEnabled(true);
