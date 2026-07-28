@@ -157,7 +157,7 @@ namespace erdo::ui
                 std::chrono::duration<double> elapsed = end - start;
                 std::println("load weapon data: {} seconds", elapsed.count());
             }
-            this->weapon_table->resize_columns_to_contents();
+            QTimer::singleShot(50, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
 
     public:
@@ -165,7 +165,7 @@ namespace erdo::ui
         {
             this->ui->setupUi(this);
 
-            setWindowTitle(string_to_display(windowTitle()));
+            this->setWindowTitle(string_to_display(windowTitle()));
             for (QWidget *w : findChildren<QWidget *>())
             {
                 if (auto tab = qobject_cast<QTabWidget *>(w)) {
@@ -301,7 +301,7 @@ namespace erdo::ui
 
             // weapon table view
             this->weapon_table = new WeaponTable(this);
-            this->weapon_table->hide_section(7);
+            this->weapon_table->hide_section<Stats>();
             this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data
@@ -328,7 +328,7 @@ namespace erdo::ui
                 group->addAction(action);
                 connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
                 if (i == 0)
-                    QTimer::singleShot(0, action, &QAction::trigger);
+                    QTimer::singleShot(50, action, &QAction::trigger);
             }
 
             this->ui->menu_weapon_data->addSeparator();
@@ -456,7 +456,7 @@ namespace erdo::ui
         QApplication app(argc, argv);
 
         MainWindow window{};
-        window.show();
+        window.showMaximized();
 
         return app.exec();
     }
