@@ -264,8 +264,8 @@ namespace erdo::ui
 
             // weapon type list widget
             this->ui->weapon_type_list->addItems(enumerators_of<calculator::Weapon::Type>()
-                | std::ranges::to<std::set>()
                 | std::views::transform(&enum_to_string<calculator::Weapon::Type>)
+                | std::ranges::to<std::set>()
                 | std::views::transform(static_cast<QString(*)(std::string_view)>(string_to_display))
                 | std::ranges::to<QList>());
             connect(

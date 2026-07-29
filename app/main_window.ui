@@ -132,7 +132,7 @@
           <item>
            <widget class="QGroupBox" name="affinity_box">
             <property name="title">
-             <string>affinity</string>
+             <string>weapon affinity</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>

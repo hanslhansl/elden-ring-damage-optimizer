@@ -445,18 +445,20 @@ namespace erdo::ui
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
         using _tuple_base::_tuple_base;
 
-        static constexpr std::array element_sizes = { std::tuple_size_v<Args>... };
-        static constexpr std::array cumulative_element_sizes = []() {
+        static constexpr std::array section_sizes = { std::tuple_size_v<Args>... };
+        static constexpr std::array cumulative_section_sizes = []() {
             std::array<std::size_t, sizeof...(Args)> result{};
-            std::partial_sum(element_sizes.begin(), element_sizes.end(), result.begin());
+            std::partial_sum(section_sizes.begin(), section_sizes.end(), result.begin());
             return result;
         }();
-        static constexpr std::array element_index_offset = []() {
+        static constexpr std::array section_index_offsets = []() {
             std::array<std::size_t, sizeof...(Args)> result{};
-            std::ranges::copy(cumulative_element_sizes | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
+            std::ranges::copy(cumulative_section_sizes | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
             return result;
         }();
-        static constexpr std::size_t total_size = std::accumulate(element_sizes.begin(), element_sizes.end(), 0);
+        static constexpr std::size_t total_size = std::accumulate(section_sizes.begin(), section_sizes.end(), 0);
+        static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
+        static constexpr std::array draw_header_labels_rotated = { Args::draw_header_labels_rotated... };
         inline const static std::vector<QString> column_names = [](){
             std::vector<QString> result{};
             result.reserve(total_size);
@@ -481,10 +483,10 @@ namespace erdo::ui
             return [&]<std::size_t I = 0>(this auto&& self, std::size_t index)->QVariant {
                 if constexpr (I < std::tuple_size_v<BasicRow>)
                 {
-                    if (index < element_sizes[I])
+                    if (index < section_sizes[I])
                         return std::get<I>(*this).data(index, role);
                     else
-                        return self.template operator()<I + 1>(index - element_sizes[I]);
+                        return self.template operator()<I + 1>(index - section_sizes[I]);
                 }
                 throw std::out_of_range("index out of range");
             }(column);
@@ -569,30 +571,26 @@ namespace erdo::ui
         pen.setCosmetic(true);
         painter.setPen(pen);
 
-        [&]<std::size_t I = 0>(this auto&& self) -> void
+        for (auto i = 0; i < std::tuple_size_v<Row>; ++i)
         {
-            if constexpr (I < std::tuple_size_v<Row>)
+            if (Row::draw_section_seperators[i])
             {
-                if constexpr (std::tuple_element_t<I, Row>::draw_section_seperators)
+                auto first_column = Row::section_index_offsets[i];
+                auto last_column = Row::cumulative_section_sizes[i] - 1;
+
+                if (!header->isSectionHidden(first_column))
                 {
-                    constexpr auto first_column = Row::element_index_offset[I];
-                    constexpr auto last_column = Row::cumulative_element_sizes[I] - 1;
-
-                    if (!header->isSectionHidden(first_column))
-                    {
-                        const int x = header->sectionViewportPosition(first_column);
-                        painter.drawLine(x, bounds.top(), x, bounds.bottom());
-                    }
-
-                    if (!header->isSectionHidden(last_column))
-                    {
-                        const int x = header->sectionViewportPosition(last_column) + header->sectionSize(last_column);
-                        painter.drawLine(x, bounds.top(), x, bounds.bottom());
-                    }
+                    const int x = header->sectionViewportPosition(first_column);
+                    painter.drawLine(x, bounds.top(), x, bounds.bottom());
                 }
-                return self.template operator()<I + 1>();
+
+                if (!header->isSectionHidden(last_column))
+                {
+                    const int x = header->sectionViewportPosition(last_column) + header->sectionSize(last_column);
+                    painter.drawLine(x, bounds.top(), x, bounds.bottom());
+                }
             }
-        }();
+        }
 
         painter.restore();
     }
@@ -721,8 +719,8 @@ namespace erdo::ui
                 {
                     if constexpr (std::tuple_element_t<I, Row>::has_header_section_title)
                     {
-                        constexpr auto first_column = Row::element_index_offset[I];
-                        constexpr auto last_column = Row::cumulative_element_sizes[I] - 1;
+                        constexpr auto first_column = Row::section_index_offsets[I];
+                        constexpr auto last_column = Row::cumulative_section_sizes[I] - 1;
 
                         auto left  = this->sectionViewportPosition(first_column);
                         auto right = this->sectionViewportPosition(last_column) + this->sectionSize(last_column);
@@ -752,27 +750,11 @@ namespace erdo::ui
         }
 
         Rotation rotation;
-        static const inline std::vector<std::size_t> rotated_columns = []<std::size_t I = 0>(this auto&& self, std::vector<std::size_t> indices = {}) -> std::vector<std::size_t>
-        {
-            if constexpr (I == std::tuple_size_v<Row>)
-            {
-                return indices;
-            }
-            else
-            {
-                if constexpr (std::tuple_element_t<I, Row>::draw_header_labels_rotated)
-                {
-                    indices.append_range(
-                        std::views::iota(
-                            Row::element_index_offset[I],
-                            Row::element_index_offset[I] + Row::element_sizes[I]
-                        )
-                    );
-                }
-
-                return self.template operator()<I + 1>(std::move(indices));
-            }
-        }();
+        static const inline auto rotated_columns = std::views::iota(std::size_t{}, std::tuple_size_v<Row>)
+            | std::views::filter([](std::size_t i) { return Row::draw_header_labels_rotated[i]; })
+            | std::views::transform([](std::size_t i) { return std::views::iota(Row::section_index_offsets[i], Row::cumulative_section_sizes[i]); })
+            | std::views::join
+            | std::ranges::to<std::vector>();
     };
 
     export class RowSortFilterModel : public QSortFilterProxyModel
@@ -813,7 +795,7 @@ namespace erdo::ui
 
                 auto index = source_model->index(
                     sourceRow,
-                    Row::element_index_offset[column],
+                    Row::section_index_offsets[column],
                     sourceParent
                 );
 
@@ -882,7 +864,7 @@ namespace erdo::ui
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-            this->setItemDelegateForColumn(Row::element_index_offset[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
+            this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
 
             this->hide_section<sections::BaseNameSection>();
         }
@@ -946,8 +928,8 @@ namespace erdo::ui
         {
             static constexpr auto I = tuple_index_v<ColumnType, Row>;
             for (auto && index : std::views::iota(
-                Row::element_index_offset[I],
-                Row::cumulative_element_sizes[I]
+                Row::section_index_offsets[I],
+                Row::cumulative_section_sizes[I]
             ))
                 this->header->hideSection(static_cast<int>(index));
         }
