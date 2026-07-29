@@ -301,7 +301,7 @@ namespace erdo::ui
 
             // weapon table view
             this->weapon_table = new WeaponTable(this);
-            this->weapon_table->hide_section<Stats>();
+            this->weapon_table->hide_section<sections::Stats>();
             this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data

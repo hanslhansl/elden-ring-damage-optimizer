@@ -1,10 +1,12 @@
 module;
 #include <QSortFilterProxyModel>
 #include <QHeaderView>
-#include <QPainter.h>
-#include <qobject.h>
-#include <qtableview.h>
-#include <tuple>
+#include <QPainter>
+#include <QTableView>
+#include <QStyledItemDelegate>
+#include <QEvent>
+#include <QDesktopServices>
+#include <QUrl>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -88,11 +90,10 @@ namespace erdo::ui
     }
 
     export QString string_to_display(const QString& str) {
-        QStringList words = str.split(QRegularExpression("[_\\s]+"), Qt::SkipEmptyParts);
+        QStringList words = str.split(QRegularExpression("[_ ]+"), Qt::SkipEmptyParts);
 
-        for (QString &word : words) {
+        for (QString &word : words)
             word = word.toLower();
-        }
 
         return words.join(' ');
     }
@@ -120,247 +121,295 @@ namespace erdo::ui
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
  
-    template<typename T>
-    struct ColumnsBase : _tuple_base<T>
+    namespace sections
     {
-        using _tuple_base<T>::_tuple_base;
+        template<typename T>
+        struct SectionBase : _tuple_base<T>
+        {
+            using _tuple_base<T>::_tuple_base;
 
-        static constexpr bool draw_header_labels_rotated = false;
-        static constexpr bool has_header_section_title = false;
-    };
-
-    struct TextColumns : ColumnsBase<std::array<QVariant, 4>>
-    {
-        using ColumnsBase::ColumnsBase;
-
-        inline const static std::vector<QString> column_names {
-            string_to_display("name"),
-            string_to_display("affinity"),
-            string_to_display("type"),
-            string_to_display("base game/dlc")
+            static constexpr bool draw_header_labels_rotated = false;
+            static constexpr bool has_header_section_title = false;
+            static constexpr bool draw_section_seperators = false;
         };
 
-        explicit TextColumns(const calculator::AttackRating& attack_rating)
+        export struct WeaponNameSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
-            auto&& weapon = attack_rating.weapon.get();
-            auto&& attack_options = attack_rating.attack_options;
+            using SectionBase<std::array<std::array<QVariant, 2>, 1>>::SectionBase;
 
-            (*this)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels[weapon.upgrade_level_index]));
-            (*this)[1] = string_to_display(enum_to_string(weapon.affinity));
-            (*this)[2] = string_to_display(enum_to_string(weapon.type));
-            (*this)[3] = string_to_display(weapon.dlc ? "dlc" : "base game");
-        }
+            inline const static std::vector<QString> column_names { string_to_display("name") };
 
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            auto&& weapon = attack_rating.weapon.get();
-            auto&& attack_options = attack_rating.attack_options;
-
-            (*this)[0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
-        }
-
-        QVariant data(int column, int role) const
-        {
-            if (role == Qt::DisplayRole || role == Qt::UserRole)
+            explicit WeaponNameSection(const calculator::AttackRating& attack_rating)
             {
-                return this->at(column);
+                this->update(attack_rating);
             }
-            return {};
-        }
-    };
 
-    template<std::size_t I>
-    struct DataColumns : ColumnsBase<std::array<std::array<QVariant, 3>, I>>
-    {
-        using ColumnsBase<std::array<std::array<QVariant, 3>, I>>::ColumnsBase;
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+                auto&& attack_options = attack_rating.attack_options;
 
-        static constexpr bool draw_header_labels_rotated = true;
+                (*this)[0][0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
+                (*this)[0][1] = QUrl(QString::fromStdString(weapon.url));
+            }
 
-        QVariant data(int column, int role) const
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole || role == Qt::UserRole)
+                    return (*this)[column][0];
+                
+                if (role == Qt::UserRole + 1)
+                    return (*this)[column][1];
+                
+                return {};
+            }
+        };
+
+        template<std::size_t I>
+        struct TextSection : SectionBase<std::array<QVariant, I>>
         {
-            if (role == Qt::DisplayRole)
-                return this->at(column)[0];
-            
-            if (role == Qt::UserRole)
-                return this->at(column)[1];
-            
-            if (role == Qt::ForegroundRole)
-                return this->at(column)[2];
-            
-            if (role == Qt::TextAlignmentRole)
-                return QVariant::fromValue(Qt::AlignHCenter | Qt::AlignVCenter);
-            
-            return {};
-        }
-    };
+            using SectionBase<std::array<QVariant, I>>::SectionBase;
 
-    struct SpellScaling : DataColumns<1>
-    {
-        static constexpr bool draw_header_labels_rotated = false;
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole || role == Qt::UserRole)
+                    return (*this)[column];
+                
+                return {};
+            }
+        };
 
-        inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
-
-        explicit SpellScaling(const calculator::AttackRating& attack_rating)
+        export struct WeaponTextSection : TextSection<2>
         {
-            this->update(attack_rating);
-        }
+            using TextSection::TextSection;
 
-        void update(const calculator::AttackRating& attack_rating)
+            inline const static std::vector<QString> column_names {
+                string_to_display("affinity"),
+                string_to_display("type")
+            };
+
+            explicit WeaponTextSection(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                (*this)[0] = string_to_display(enum_to_string(weapon.affinity));
+                (*this)[1] = string_to_display(enum_to_string(weapon.type));
+            }
+
+            void update(const calculator::AttackRating& attack_rating) { }
+        };
+
+        export struct BaseGameDLCSection : TextSection<1>
         {
-            (*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
-            (*this)[0][1] = attack_rating.spell_scaling * 100;
-            (*this)[0][2] = foreground_color(true);
-        }
-    };
+            using TextSection::TextSection;
 
-    struct AttackPowers : DataColumns<enumerators_of<calculator::DamageType>().size() + 1>
-    {
-        static constexpr bool has_header_section_title = true;
-        inline static const QString header_section_title = "attack power";
+            inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
 
-        inline const static std::vector<QString> column_names = [](){
-            auto result = enumerators_of<calculator::DamageType>()
-                | std::views::transform([](calculator::DamageType e){ return string_to_display(enum_to_string(e)); })
+            explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                (*this)[0] = string_to_display(weapon.dlc ? "dlc" : "base game");
+            }
+
+            void update(const calculator::AttackRating& attack_rating) { }
+        };
+
+        template<std::size_t I>
+        struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
+        {
+            using SectionBase<std::array<std::array<QVariant, 3>, I>>::SectionBase;
+
+            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_seperators = true;
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole)
+                    return this->at(column)[0];
+                
+                if (role == Qt::UserRole)
+                    return this->at(column)[1];
+                
+                if (role == Qt::ForegroundRole)
+                    return this->at(column)[2];
+                
+                static const auto alignment = QVariant::fromValue(Qt::AlignCenter);
+                if (role == Qt::TextAlignmentRole)
+                    return alignment;
+                
+                return {};
+            }
+        };
+
+        export struct SpellScaling : DataSection<1>
+        {
+            static constexpr bool draw_header_labels_rotated = false;
+
+            inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
+
+            explicit SpellScaling(const calculator::AttackRating& attack_rating)
+            {
+                this->update(attack_rating);
+            }
+
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                (*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
+                (*this)[0][1] = attack_rating.spell_scaling * 100;
+                (*this)[0][2] = foreground_color(true);
+            }
+        };
+
+        export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
+        {
+            static constexpr bool has_header_section_title = true;
+            inline static const QString header_section_title = "attack power";
+
+            inline const static std::vector<QString> column_names = [](){
+                auto result = enumerators_of<calculator::DamageType>()
+                    | std::views::transform([](calculator::DamageType e){ return string_to_display(enum_to_string(e)); })
+                    | std::ranges::to<std::vector>();
+                result.emplace_back("total");
+                return result;
+            }();
+
+            explicit AttackPowers(const calculator::AttackRating& attack_rating)
+            {
+                this->update(attack_rating);
+            }
+
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+                    attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                    attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                    *this))
+                {
+                    arr[0] = format_number(ap[1]);
+                    arr[1] = ap[1];
+                    arr[2] = foreground_color(is_ineffective);
+                }
+
+                (*this)[enumerators_of<calculator::DamageType>().size()][0] = format_number(attack_rating.total_attack_power[1]);
+                (*this)[enumerators_of<calculator::DamageType>().size()][1] = attack_rating.total_attack_power[1];
+                (*this)[enumerators_of<calculator::DamageType>().size()][2] = foreground_color(true);
+            }
+        };
+
+        template<typename E>
+        struct EnumDataSection : DataSection<enumerators_of<E>().size()>
+        {
+            using enum_type = E;
+
+            inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
+                | std::views::transform([](enum_type e){ return string_to_display(enum_to_string(e)); })
                 | std::ranges::to<std::vector>();
-            result.emplace_back("total");
-            return result;
-        }();
+        };
 
-        explicit AttackPowers(const calculator::AttackRating& attack_rating)
+        export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
-            this->update(attack_rating);
-        }
+            static constexpr bool has_header_section_title = true;
+            inline static const QString header_section_title = "status effects";
 
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
-                attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
-                *this))
+            explicit StatusEffects(const calculator::AttackRating& attack_rating)
             {
-                arr[0] = format_number(ap[1]);
-                arr[1] = ap[1];
-                arr[2] = foreground_color(is_ineffective);
+                this->update(attack_rating);
             }
 
-            (*this)[enumerators_of<calculator::DamageType>().size()][0] = format_number(attack_rating.total_attack_power[1]);
-            (*this)[enumerators_of<calculator::DamageType>().size()][1] = attack_rating.total_attack_power[1];
-            (*this)[enumerators_of<calculator::DamageType>().size()][2] = foreground_color(true);
-        }
-    };
-
-    template<typename E>
-    struct EnumDataColumns : DataColumns<enumerators_of<E>().size()>
-    {
-        using enum_type = E;
-
-        inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
-            | std::views::transform([](enum_type e){ return string_to_display(enum_to_string(e)); })
-            | std::ranges::to<std::vector>();
-    };
-
-    struct StatusEffects : EnumDataColumns<calculator::StatusEffectType>
-    {
-        static constexpr bool has_header_section_title = true;
-        inline static const QString header_section_title = "status effects";
-
-        explicit StatusEffects(const calculator::AttackRating& attack_rating)
-        {
-            this->update(attack_rating);
-        }
-
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                attack_rating.attack_powers | std::views::drop(enumerators_of<calculator::DamageType>().size()),
-                attack_rating.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
-                *this))
+            void update(const calculator::AttackRating& attack_rating)
             {
-                arr[0] = format_number(ap[1]);
-                arr[1] = ap[1];
-                arr[2] = foreground_color(is_ineffective);
+                for (auto&& [ap, is_ineffective, arr] : std::views::zip(
+                    attack_rating.attack_powers | std::views::drop(enumerators_of<calculator::DamageType>().size()),
+                    attack_rating.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
+                    *this))
+                {
+                    arr[0] = format_number(ap[1]);
+                    arr[1] = ap[1];
+                    arr[2] = foreground_color(is_ineffective);
+                }
             }
-        }
-    };
+        };
 
-    struct AttributeScalings : EnumDataColumns<calculator::RelevantAttribute>
-    {
-        static constexpr bool has_header_section_title = true;
-        inline static const QString header_section_title = "attribute scaling";
-
-        explicit AttributeScalings(const calculator::AttackRating& attack_rating)
+        export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
-            this->update(attack_rating);
-        }
+            static constexpr bool has_header_section_title = true;
+            inline static const QString header_section_title = "attribute scaling";
 
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            auto&& weapon = attack_rating.weapon.get();
-
-            for (auto&& [attribute_scaling, arr] : std::views::zip(
-                attack_rating.attribute_scalings,
-                *this))
+            explicit AttributeScalings(const calculator::AttackRating& attack_rating)
             {
-                auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
-                if (scaling_tier.empty())
-                    arr[0] = format_number(attribute_scaling * 100);
-                else
-                    arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
-                arr[1] = attribute_scaling * 100;
-                arr[2] = foreground_color(false);
+                this->update(attack_rating);
             }
-        }
-    };
 
-    struct Requirements : EnumDataColumns<calculator::RelevantAttribute>
-    {
-        static constexpr bool has_header_section_title = true;
-        inline static const QString header_section_title = "attribute requirements";
-
-        explicit Requirements(const calculator::AttackRating& attack_rating)
-        {
-            this->update(attack_rating);
-        }
-
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            auto&& weapon = attack_rating.weapon.get();
-
-            for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
-                weapon.requirements,
-                attack_rating.ineffective_attributes,
-                *this))
+            void update(const calculator::AttackRating& attack_rating)
             {
-                arr[0] = format_number(requirement);
-                arr[1] = requirement;
-                arr[2] = foreground_color(is_ineffective);
+                auto&& weapon = attack_rating.weapon.get();
+
+                for (auto&& [attribute_scaling, arr] : std::views::zip(
+                    attack_rating.attribute_scalings,
+                    *this))
+                {
+                    auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
+                    if (scaling_tier.empty())
+                        arr[0] = format_number(attribute_scaling * 100);
+                    else
+                        arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
+                    arr[1] = attribute_scaling * 100;
+                    arr[2] = foreground_color(false);
+                }
             }
-        }
-    };
+        };
 
-    export struct Stats : EnumDataColumns<calculator::RelevantAttribute>
-    {
-        static constexpr bool has_header_section_title = true;
-        inline static const QString header_section_title = "character stats";
-
-        explicit Stats(const calculator::AttackRating& attack_rating)
+        export struct Requirements : EnumDataSection<calculator::RelevantAttribute>
         {
-            this->update(attack_rating);
-        }
+            static constexpr bool has_header_section_title = true;
+            inline static const QString header_section_title = "attribute requirements";
 
-        void update(const calculator::AttackRating& attack_rating)
-        {
-            for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-                attack_rating.stats,
-                attack_rating.ineffective_attributes,
-                *this))
+            explicit Requirements(const calculator::AttackRating& attack_rating)
             {
-                arr[0] = stat;
-                arr[1] = stat;
-                arr[2] = foreground_color(is_ineffective);
+                this->update(attack_rating);
             }
-        }
-    };
+
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
+                    weapon.requirements,
+                    attack_rating.ineffective_attributes,
+                    *this))
+                {
+                    arr[0] = format_number(requirement);
+                    arr[1] = requirement;
+                    arr[2] = foreground_color(is_ineffective);
+                }
+            }
+        };
+
+        export struct Stats : EnumDataSection<calculator::RelevantAttribute>
+        {
+            static constexpr bool has_header_section_title = true;
+            inline static const QString header_section_title = "character stats";
+
+            explicit Stats(const calculator::AttackRating& attack_rating)
+            {
+                this->update(attack_rating);
+            }
+
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                for (auto&& [stat, is_ineffective, arr] : std::views::zip(
+                    attack_rating.stats,
+                    attack_rating.ineffective_attributes,
+                    *this))
+                {
+                    arr[0] = stat;
+                    arr[1] = stat;
+                    arr[2] = foreground_color(is_ineffective);
+                }
+            }
+        };
+    }
 
     export template<typename...Args>
     struct BasicRow : _tuple_base<std::tuple<Args...>>
@@ -415,13 +464,15 @@ namespace erdo::ui
     };
 
     export using Row = BasicRow<
-        TextColumns,
-        SpellScaling,
-        AttackPowers,
-        StatusEffects,
-        AttributeScalings,
-        Requirements,
-        Stats
+        sections::WeaponNameSection,
+        sections::WeaponTextSection,
+        sections::SpellScaling,
+        sections::AttackPowers,
+        sections::StatusEffects,
+        sections::AttributeScalings,
+        sections::Requirements,
+        sections::Stats,
+        sections::BaseGameDLCSection
     >;
 
     export struct RowModel : QAbstractTableModel
@@ -474,7 +525,47 @@ namespace erdo::ui
         }
     };
 
-    const int groupHeaderHeight = 25;
+    template <typename PaintDevice>
+    static void draw_column_group_separators(PaintDevice *device, const QHeaderView *header)
+    {
+        QPainter painter(device);
+
+        const QRect bounds = device->rect();
+
+        painter.save();
+
+        painter.setClipRect(bounds);
+        QPen pen(Qt::black, 1);
+        pen.setCosmetic(true);
+        painter.setPen(pen);
+
+        [&]<std::size_t I = 0>(this auto&& self) -> void
+        {
+            if constexpr (I < std::tuple_size_v<Row>)
+            {
+                if constexpr (std::tuple_element_t<I, Row>::draw_section_seperators)
+                {
+                    constexpr auto first_column = Row::element_index_offset[I];
+                    constexpr auto last_column = Row::cumulative_element_sizes[I] - 1;
+
+                    if (!header->isSectionHidden(first_column))
+                    {
+                        const int x = header->sectionViewportPosition(first_column);
+                        painter.drawLine(x, bounds.top(), x, bounds.bottom());
+                    }
+
+                    if (!header->isSectionHidden(last_column))
+                    {
+                        const int x = header->sectionViewportPosition(last_column) + header->sectionSize(last_column);
+                        painter.drawLine(x, bounds.top(), x, bounds.bottom());
+                    }
+                }
+                return self.template operator()<I + 1>();
+            }
+        }();
+
+        painter.restore();
+    }
 
     export class RotatedHeaderView : public QHeaderView
     {
@@ -492,53 +583,27 @@ namespace erdo::ui
             this->setSectionsClickable(true);
         }
 
-        template <typename PaintDevice>
-        static void draw_column_group_separators(PaintDevice *device, const QHeaderView *header)
-        {
-            QPainter painter(device);
-
-            const QRect bounds = device->rect();
-
-            painter.save();
-
-            painter.setClipRect(bounds);
-            QPen pen(Qt::black, 1);
-            pen.setCosmetic(true);
-            painter.setPen(pen);
-
-            for (auto logicalColumn : Row::cumulative_element_sizes)
-            {
-                if (header->isSectionHidden(logicalColumn))
-                    continue;
-
-                const int x = header->sectionViewportPosition(logicalColumn);
-
-                painter.drawLine(x, bounds.top(), x, bounds.bottom());
-            }
-
-            painter.restore();
-        }
-
     protected:
         void paintSection(QPainter *painter, const QRect &rect_, int logicalIndex) const override
         {
             QRect rect = rect_;
 
             // Move your normal section contents down
-            rect.translate(0, groupHeaderHeight);
+            rect.translate(0, this->group_header_height());
 
             painter->save();
 
             bool rotate = std::ranges::contains(rotated_columns, logicalIndex);
 
-            if (!rotate) {
-                QHeaderView::paintSection(painter, rect, logicalIndex);
+            if (!rotate)
+            {
+                this->QHeaderView::paintSection(painter, rect, logicalIndex);
                 painter->restore();
                 return;
             }
 
             QStyleOptionHeader option;
-            initStyleOption(&option);
+            this->initStyleOption(&option);
             option.rect = rect;
             option.text.clear();   // prevent normal text drawing
 
@@ -549,11 +614,11 @@ namespace erdo::ui
                     : QStyleOptionHeader::SortUp;
             }
 
-            style()->drawControl(QStyle::CE_Header, &option, painter, this);
+            this->style()->drawControl(QStyle::CE_Header, &option, painter, this);
 
-            QString text = model()->headerData(
+            QString text = this->model()->headerData(
                 logicalIndex,
-                orientation(),
+                this->orientation(),
                 Qt::DisplayRole).toString();
 
             painter->setPen(option.palette.color(QPalette::Text));
@@ -567,7 +632,7 @@ namespace erdo::ui
             // Leave room for the indicator
             QRect textRect(0, 0, rect.height(), rect.width());
 
-            int indicatorSize = style()->pixelMetric(
+            int indicatorSize = this->style()->pixelMetric(
                 QStyle::PM_HeaderMarkSize, &option, this);
 
             textRect.adjust(0, 0, -indicatorSize, 0);
@@ -596,7 +661,7 @@ namespace erdo::ui
             QSize s = QHeaderView::sizeHint();
 
             // Preserve your sectionSizeFromContents() height
-            s.setHeight(s.height() + groupHeaderHeight);
+            s.setHeight(s.height() + this->group_header_height());
 
             return s;
         }
@@ -605,10 +670,19 @@ namespace erdo::ui
         {
             this->QHeaderView::paintEvent(e);
 
-            QPainter p(this->viewport());
+            auto viewport = this->viewport();
+            QPainter p(viewport);
             p.save();
 
+            auto height = this->group_header_height();
+            const QRect bounds = viewport->rect();
             QPen pen(Qt::black, 1);
+            pen.setCosmetic(true);
+            p.setPen(pen);
+            p.drawLine(bounds.left(), height, bounds.right(), height);
+            p.drawLine(bounds.left(), this->height() - 1, bounds.right(), this->height() - 1);
+
+            pen.setCosmetic(false);
             p.setPen(pen);
 
             [&]<std::size_t I = 0>(this auto&& self) -> void
@@ -617,8 +691,8 @@ namespace erdo::ui
                 {
                     if constexpr (std::tuple_element_t<I, Row>::has_header_section_title)
                     {
-                        auto first_column = Row::element_index_offset[I];
-                        auto last_column = Row::cumulative_element_sizes[I] - 1;
+                        constexpr auto first_column = Row::element_index_offset[I];
+                        constexpr auto last_column = Row::cumulative_element_sizes[I] - 1;
 
                         auto left  = this->sectionViewportPosition(first_column);
                         auto right = this->sectionViewportPosition(last_column) + this->sectionSize(last_column);
@@ -627,24 +701,26 @@ namespace erdo::ui
                             left,
                             0,
                             right - left,
-                            groupHeaderHeight
+                            height
                         );
 
                         p.drawText(r, Qt::AlignCenter, std::tuple_element_t<I, Row>::header_section_title);
-
-                        p.drawLine(left, groupHeaderHeight, right, groupHeaderHeight);
                     }
                     return self.template operator()<I + 1>();
                 }
             }();
 
-            p.drawLine(0, this->height() - 1, this->width(), this->height() - 1);
-            this->draw_column_group_separators(this->viewport(), this);
+            draw_column_group_separators(this->viewport(), this);
 
             p.restore();
         }
 
     private:
+        int group_header_height() const
+        {
+            return this->fontMetrics().height() + 8;
+        }
+
         Rotation rotation;
         static const inline std::vector<std::size_t> rotated_columns = []<std::size_t I = 0>(this auto&& self, std::vector<std::size_t> indices = {}) -> std::vector<std::size_t>
         {
@@ -719,6 +795,37 @@ namespace erdo::ui
         // int minimumValue_ = std::numeric_limits<int>::min();
     };
 
+    class LinkDelegate : public QStyledItemDelegate
+    {
+    public:
+        using QStyledItemDelegate::QStyledItemDelegate;
+
+        void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+        {
+            QStyleOptionViewItem opt(option);
+            initStyleOption(&opt, index);
+
+            opt.palette.setColor(QPalette::Text, Qt::blue);
+            opt.font.setUnderline(true);
+
+            QStyledItemDelegate::paint(painter, opt, index);
+        }
+
+        bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &, const QModelIndex &index) override
+        {
+            if (event->type() == QEvent::MouseButtonRelease)
+            {
+                const QString url = index.data(Qt::UserRole + 1).toString();
+                if (!url.isEmpty())
+                {
+                    QDesktopServices::openUrl(QUrl(url));
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
     export class WeaponTable : public QTableView
     {
     public:
@@ -730,13 +837,14 @@ namespace erdo::ui
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
         {
             this->proxy_model->setSourceModel(this->model);
-            this->setModel(this->proxy_model); // proxy_model model
+            this->setModel(this->proxy_model);
 
-            this->setFrameStyle(QFrame::Box);
             this->setHorizontalHeader(this->header);
 
+            this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+            this->setItemDelegateForColumn(0, new LinkDelegate(this));
 
             // this->header->moveSection(this->header->visualIndex(3), 17);
             // this->header->hideSection(3);
@@ -795,32 +903,15 @@ namespace erdo::ui
             }
         }
 
-        void hide_section(std::size_t section)
-        {
-            [&]<std::size_t I = 0>(this auto&& self) -> void {
-                if constexpr (I == std::tuple_size_v<Row>)
-                {
-                    throw std::out_of_range("section index out of range");
-                }
-                else
-                {
-                    if (section == I)
-                    {
-                        for (auto && index : std::views::iota(
-                            Row::element_index_offset[I],
-                            Row::element_index_offset[I] + Row::element_sizes[I]
-                        ))
-                            this->header->hideSection(static_cast<int>(index));
-                        return;
-                    }
-                    return self.template operator()<I + 1>();
-                }
-            }();
-        }
         template<typename ColumnType>
         void hide_section()
         {
-            this->hide_section(tuple_index_v<ColumnType, Row>);
+            static constexpr auto I = tuple_index_v<ColumnType, Row>;
+            for (auto && index : std::views::iota(
+                Row::element_index_offset[I],
+                Row::cumulative_element_sizes[I]
+            ))
+                this->header->hideSection(static_cast<int>(index));
         }
 
     protected:
@@ -828,7 +919,7 @@ namespace erdo::ui
         {
             QTableView::paintEvent(event);
 
-            RotatedHeaderView::draw_column_group_separators(this->viewport(), this->horizontalHeader());
+            draw_column_group_separators(this->viewport(), this->horizontalHeader());
         }
     };
 }
