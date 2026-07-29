@@ -286,7 +286,7 @@ namespace erdo::ui
                     attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    arr[0] = format_number(ap[1]);
+                    arr[0] = format_number(ap[0]) + "/" + format_number(ap[1]);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }
@@ -345,8 +345,9 @@ namespace erdo::ui
             {
                 auto&& weapon = attack_rating.weapon.get();
 
-                for (auto&& [attribute_scaling, arr] : std::views::zip(
+                for (auto&& [attribute_scaling, is_ineffective, arr] : std::views::zip(
                     attack_rating.attribute_scalings,
+                    attack_rating.ineffective_attributes,
                     *this))
                 {
                     auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
@@ -355,7 +356,7 @@ namespace erdo::ui
                     else
                         arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
                     arr[1] = attribute_scaling * 100;
-                    arr[2] = foreground_color(false);
+                    arr[2] = foreground_color(is_ineffective);
                 }
             }
         };

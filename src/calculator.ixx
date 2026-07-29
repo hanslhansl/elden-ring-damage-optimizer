@@ -293,7 +293,7 @@ export namespace erdo::calculator
 
         // the index of the upgrade level for this weapon
         long long upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers);
-        // 
+        // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
 
@@ -343,20 +343,27 @@ export namespace erdo::calculator
             return ineffective_attributes;
         }
 
-        IneffectiveAttackPowerTypes calculate_ineffective_attack_power_types(const IneffectiveAttributes& ineffective_attributes) const
+        IneffectiveAttackPowerTypes calculate_ineffective_attack_power_types(const IneffectiveAttributes& ineffective_attributes, const BaseAttackPower& base_attack_powers) const
         {
             IneffectiveAttackPowerTypes ineffective_attack_power_types{};
 
-            for(auto attack_power_type_index : integral_enumerators_of<AttackPowerType>())
+            for(auto attack_power_type_integral : integral_enumerators_of<AttackPowerType>())
             {
-                auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_index];
-                if (std::ranges::any_of(
-                        integral_enumerators_of<RelevantAttribute>(),
-                        [&](auto attribute)
+                auto base_attack_power = base_attack_powers[attack_power_type_integral];
+
+                if (base_attack_power || this->is_sorcery_or_incantation_tool)
+                {
+                    auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_integral];
+
+                    for (auto attribute : integral_enumerators_of<RelevantAttribute>())
+                    {
+                        if (ineffective_attributes[attribute] && scaling_attributes[attribute])
                         {
-                            return ineffective_attributes[attribute] && scaling_attributes[attribute] != 0;
-                        }))
-                    ineffective_attack_power_types[attack_power_type_index] = true;
+                            ineffective_attack_power_types[attack_power_type_integral] = true;
+                            break;
+                        }
+                    }
+                }
             }
 
             return ineffective_attack_power_types;
@@ -466,9 +473,12 @@ export namespace erdo::calculator
                 .attribute_scalings = this->attribute_scalings[upgrade_level],
                 .ineffective_attributes=this->calculate_ineffective_attributes(adjusted_stats),
             };
-            attack_rating.ineffective_attack_power_types = this->calculate_ineffective_attack_power_types(attack_rating.ineffective_attributes);
-
             auto&& base_attack_powers = this->base_attack_powers[upgrade_level];
+            attack_rating.ineffective_attack_power_types = this->calculate_ineffective_attack_power_types(
+                attack_rating.ineffective_attributes,
+                base_attack_powers
+            );
+
 
             for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
                 this->calculate_attack_powers(
