@@ -42,29 +42,24 @@ export {
         return r;
     }
 
-    template <typename E, typename D = std::nullopt_t>
-        requires(std::is_enum_v<E> && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
-    constexpr std::string_view enum_to_string(E value, D default_ = std::nullopt)
+    template <typename E>
+        requires std::is_enum_v<E>
+    constexpr std::string_view enum_to_string(E value)
     {
         for (auto e : enum_string_mapping<E>)
             if (value == e.first)
                 return e.second;
 
-        if constexpr (std::same_as<D, std::nullopt_t>)
-            throw std::invalid_argument(std::format("'{}' is not a valid enumerator", std::to_underlying(value)));
-        else
-            return default_;
+        throw std::invalid_argument(std::format("'{}' is not a valid enumerator", std::to_underlying(value)));
     }
-    /*template <typename E, typename D = std::nullopt_t>
-        requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E) && (std::same_as<D, std::nullopt_t> || std::convertible_to<D, std::string_view>))
-    constexpr std::string_view enum_to_string(E value, D default_ = std::nullopt)
+    /*template <typename E>
+        requires(std::is_enum_v<E> && std::meta::is_enumerable_type(^^E))
+    constexpr std::string_view enum_to_string(E value)
     {
-        template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) if (value == [:e:]) return std::meta::identifier_of(e);
+        template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) if (value == [:e:])
+            return std::meta::identifier_of(e);
 
-        if constexpr (std::same_as<D, std::nullopt_t>)
-            throw std::invalid_argument(std::format("'{}' is not a valid enumerator of enum {}", std::to_underlying(value), std::meta::display_string_of(^^E)));
-        else
-            return default_;
+        throw std::invalid_argument(std::format("'{}' is not a valid enumerator of enum {}", std::to_underlying(value), std::meta::display_string_of(^^E)));
     }*/
 
     template <typename E, typename D = std::nullopt_t>

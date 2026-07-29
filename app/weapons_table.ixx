@@ -53,10 +53,11 @@ namespace erdo::ui
         for (std::size_t i = 0; i < sizeof...(Is); ++i)
             if (matches[i])
                 return i;
+
+        throw std::out_of_range("Type not found in tuple");
     }
     template<typename T, typename Tuple>
     constexpr std::size_t tuple_index_v = tuple_index_impl<T, Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
-
 
     struct __tuple_base { };
     template<typename T>
@@ -89,7 +90,8 @@ namespace erdo::ui
         return s;
     }
 
-    export QString string_to_display(const QString& str) {
+    export QString string_to_display(const QString& str)
+    {
         QStringList words = str.split(QRegularExpression("[_ ]+"), Qt::SkipEmptyParts);
 
         for (QString &word : words)
@@ -97,14 +99,17 @@ namespace erdo::ui
 
         return words.join(' ');
     }
-    export QString string_to_display(const char* str) {
+    export QString string_to_display(const char* str)
+    {
         return string_to_display(QString(str));
     }
-    export QString string_to_display(const std::string& str) {
+    export QString string_to_display(const std::string& str)
+    {
         return string_to_display(QString::fromStdString(str));
     }
-    export QString string_to_display(std::string_view str) {
-        return string_to_display(QString::fromStdString(std::string(str)));
+    export QString string_to_display(std::string_view str)
+    {
+        return string_to_display(std::string(str));
     }
 
     template<typename T>
@@ -133,13 +138,13 @@ namespace erdo::ui
             static constexpr bool draw_section_seperators = false;
         };
 
-        export struct WeaponNameSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
+        export struct NameSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
             using SectionBase<std::array<std::array<QVariant, 2>, 1>>::SectionBase;
 
             inline const static std::vector<QString> column_names { string_to_display("name") };
 
-            explicit WeaponNameSection(const calculator::AttackRating& attack_rating)
+            explicit NameSection(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
             }
@@ -179,21 +184,43 @@ namespace erdo::ui
             }
         };
 
-        export struct WeaponTextSection : TextSection<2>
+        export struct BaseNameSection : TextSection<1>
         {
             using TextSection::TextSection;
 
-            inline const static std::vector<QString> column_names {
-                string_to_display("affinity"),
-                string_to_display("type")
-            };
+            inline const static std::vector<QString> column_names { string_to_display("base name") };
 
-            explicit WeaponTextSection(const calculator::AttackRating& attack_rating)
+            explicit BaseNameSection(const calculator::AttackRating& attack_rating)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
+            }
 
-                (*this)[0] = string_to_display(enum_to_string(weapon.affinity));
-                (*this)[1] = string_to_display(enum_to_string(weapon.type));
+            void update(const calculator::AttackRating& attack_rating) { }
+        };
+
+        export struct AffinitySection : TextSection<1>
+        {
+            using TextSection::TextSection;
+
+            inline const static std::vector<QString> column_names { string_to_display("affinity") };
+
+            explicit AffinitySection(const calculator::AttackRating& attack_rating)
+            {
+                (*this)[0] = string_to_display(enum_to_string(attack_rating.weapon.get().affinity));
+            }
+
+            void update(const calculator::AttackRating& attack_rating) { }
+        };
+
+        export struct TypeSection : TextSection<1>
+        {
+            using TextSection::TextSection;
+
+            inline const static std::vector<QString> column_names { string_to_display("type") };
+
+            explicit TypeSection(const calculator::AttackRating& attack_rating)
+            {
+                (*this)[0] = string_to_display(enum_to_string(attack_rating.weapon.get().type));
             }
 
             void update(const calculator::AttackRating& attack_rating) { }
@@ -465,8 +492,10 @@ namespace erdo::ui
     };
 
     export using Row = BasicRow<
-        sections::WeaponNameSection,
-        sections::WeaponTextSection,
+        sections::TypeSection,
+        sections::BaseNameSection,
+        sections::NameSection,
+        sections::AffinitySection,
         sections::SpellScaling,
         sections::AttackPowers,
         sections::StatusEffects,
@@ -746,54 +775,62 @@ namespace erdo::ui
         }();
     };
 
-    export class RowFilterModel : public QSortFilterProxyModel
+    export class RowSortFilterModel : public QSortFilterProxyModel
     {
     public:
-
-        explicit RowFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
+        explicit RowSortFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
         {
             this->setSortRole(Qt::UserRole);
         }
 
-        // void setTextFilter(QString text)
-        // {
-        //     this->text_ = std::move(text);
-        //     invalidateFilter();
-        // }
-
-        // void setMinimumValue(int value)
-        // {
-        //     this->minimumValue_ = value;
-        //     invalidateFilter();
-        // }
+        void set_selected_types(QSet<QString>&& types)
+        {
+            this->beginFilterChange();
+            this->types = std::move(types);
+            this->endFilterChange();
+        }
+        void set_selected_base_names(QSet<QString>&& base_names)
+        {
+            this->beginFilterChange();
+            this->base_names = std::move(base_names);
+            this->endFilterChange();
+        }
+        void set_selected_affinities(QSet<QString>&& affinities)
+        {
+            this->beginFilterChange();
+            this->affinities = std::move(affinities);
+            this->endFilterChange();
+        }
 
     protected:
+        bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override
+        {
+            auto source_model = this->sourceModel();
 
-        // bool filterAcceptsRow(int row, const QModelIndex& parent) const override
-        // {
-        //     QModelIndex idIndex =  sourceModel()->index(row,  static_cast<int>(Column::Id),  parent);
+            auto check_filter = [&](std::size_t column, const QSet<QString>& set){
+                if (set.isEmpty())
+                    return true;
 
-        //     QModelIndex valueIndex = sourceModel()->index( row,  static_cast<int>(Column::Value),  parent);
+                auto index = source_model->index(
+                    sourceRow,
+                    Row::element_index_offset[column],
+                    sourceParent
+                );
 
-        //     QString id = sourceModel()->data(idIndex) .toString();
+                auto value = index.data(Qt::UserRole).toString();
 
-        //     int value = sourceModel()->data(valueIndex) .toInt();
+                return set.contains(value);
+            };
 
-        //     if (!this->text_.isEmpty() && !id.contains(this->text_, Qt::CaseInsensitive))
-        //         return false;
-
-        //     if (value < this->minimumValue_)
-        //         return false;
-
-        //     return true;
-        // }
-
+            return check_filter(tuple_index_v<sections::TypeSection, Row>, this->types)
+                && check_filter(tuple_index_v<sections::BaseNameSection, Row>, this->base_names)
+                && check_filter(tuple_index_v<sections::AffinitySection, Row>, this->affinities);
+        }
 
     private:
-
-        // QString text_;
-
-        // int minimumValue_ = std::numeric_limits<int>::min();
+        QSet<QString> types;
+        QSet<QString> base_names;
+        QSet<QString> affinities;
     };
 
     class LinkDelegate : public QStyledItemDelegate
@@ -832,7 +869,7 @@ namespace erdo::ui
     public:
 
         RowModel* model = new RowModel(this);
-        RowFilterModel* proxy_model = new RowFilterModel(this);
+        RowSortFilterModel* proxy_model = new RowSortFilterModel(this);
         RotatedHeaderView* header = new RotatedHeaderView(Qt::Horizontal, RotatedHeaderView::Rotation::Clockwise, this);
 
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
@@ -845,10 +882,9 @@ namespace erdo::ui
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-            this->setItemDelegateForColumn(0, new LinkDelegate(this));
+            this->setItemDelegateForColumn(Row::element_index_offset[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
 
-            // this->header->moveSection(this->header->visualIndex(3), 17);
-            // this->header->hideSection(3);
+            this->hide_section<sections::BaseNameSection>();
         }
 
         void resize_columns_to_contents()

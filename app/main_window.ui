@@ -87,12 +87,28 @@
              <item row="0" column="0">
               <widget class="QLabel" name="label_3">
                <property name="text">
-                <string>starting class</string>
+                <string>starting class:</string>
                </property>
               </widget>
              </item>
              <item row="0" column="1">
               <widget class="QComboBox" name="starting_class_combobox"/>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_2">
+            <property name="title">
+             <string>weapon type</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_2">
+             <item>
+              <widget class="QListWidget" name="weapon_type_list">
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -104,7 +120,11 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_4">
              <item>
-              <widget class="QListWidget" name="weapon_base_name_list"/>
+              <widget class="QListWidget" name="weapon_base_name_list">
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -116,7 +136,11 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>
-              <widget class="QListWidget" name="weapon_affinity_list"/>
+              <widget class="QListWidget" name="weapon_affinity_list">
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>

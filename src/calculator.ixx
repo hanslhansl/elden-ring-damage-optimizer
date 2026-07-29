@@ -125,15 +125,19 @@ constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 
 export namespace erdo::calculator
 {
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
-    struct Stats : std::array<int, enumerators_of<RelevantAttribute>().size()> {
-
-    };
+    struct Stats : std::array<int, enumerators_of<RelevantAttribute>().size()> { };
     struct FullStats : std::array<int, enumerators_of<Attribute>().size()> {
-        constexpr Stats to_stats() const {
+        constexpr Stats to_stats() const
+        {
             Stats stats{};
             for (auto attribute : enumerators_of<RelevantAttribute>())
                 stats.at(std::to_underlying(attribute)) = this->at(std::to_underlying(attribute) + irrelevant_attribute_count);
             return stats;
+        }
+
+        constexpr int character_level() const
+        {
+            return std::ranges::fold_left(*this, 0, std::plus<>{}) - 79;
         }
     };
     const std::map<std::string, FullStats> character_class_stats{
@@ -663,7 +667,7 @@ constexpr std::array<std::pair<calculator::Weapon::Affinity, std::string_view>, 
     std::pair{calculator::Weapon::Affinity::UNIQUE, "UNIQUE"}
 };
 template<>
-constexpr std::array<std::pair<calculator::Weapon::Type, std::string_view>, 47> enum_string_mapping<calculator::Weapon::Type> = {
+constexpr std::array<std::pair<calculator::Weapon::Type, std::string_view>, 43> enum_string_mapping<calculator::Weapon::Type> = {
     std::pair{calculator::Weapon::Type::DAGGER, "DAGGER"},
     std::pair{calculator::Weapon::Type::STRAIGHT_SWORD, "STRAIGHT_SWORD"},
     std::pair{calculator::Weapon::Type::GREATSWORD, "GREATSWORD"},

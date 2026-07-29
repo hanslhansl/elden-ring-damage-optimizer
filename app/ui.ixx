@@ -5,6 +5,8 @@ module;
 #include <QProgressDialog>
 #include <QFuture>
 #include <QtConcurrent>
+#include <algorithm>
+#include <ranges>
 #include "ui_main_window.h"
 export module erdo.ui;
 export import erdo.ui.weapons_table;
@@ -68,6 +70,7 @@ namespace erdo::ui
     {
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
         std::vector<QSpinBox*> attribute_spinboxes{};
+        QLabel* character_level_label{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
         std::vector<std::array<QLabel*, 3>> status_effect_labels{};
         std::vector<QLabel*> attribute_scaling_labels{};
@@ -95,7 +98,8 @@ namespace erdo::ui
         void calculate_weapon_stats(const std::filesystem::path& new_weapon_data_directory = {})
         {
             // get character stats
-            auto stats = this->get_character_stats();
+            auto full_stats = this->get_character_full_stats();
+            auto stats = full_stats.to_stats();
 
             // get attack options
             calculator::AttackOptions attack_options{
@@ -103,6 +107,7 @@ namespace erdo::ui
                 this->get_two_handing()
             };
 
+            this->character_level_label->setText(QString::number(full_stats.character_level()));
 
             if (new_weapon_data_directory.empty())
             {
@@ -150,6 +155,13 @@ namespace erdo::ui
                     }
                 );
 
+                this->ui->weapon_base_name_list->clear();
+                this->ui->weapon_base_name_list->addItems(new_active_weapon_data
+                    | std::views::transform(&calculator::Weapon::base_name)
+                    | std::ranges::to<std::set>()
+                    | std::views::transform(static_cast<QString(*)(const std::string&)>(string_to_display))
+                    | std::ranges::to<QList>());
+                
                 this->active_weapon_data = std::move(new_active_weapon_data);
                 this->weapon_table->model->set_rows(std::move(new_rows));
 
@@ -232,6 +244,10 @@ namespace erdo::ui
                     std::ranges::for_each(attribute_spinboxes, [](QSpinBox* spinbox) { spinbox->blockSignals(false); });
                 });
             }
+            this->ui->character_stats_layout->addRow(
+                string_to_display("character level:"),
+                this->character_level_label = new QLabel()
+            );
 
             // upgrade level spinboxes
             connect(this->ui->normal_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
@@ -246,58 +262,59 @@ namespace erdo::ui
                 auto raii = calculate_weapon_stats_counter(this);
             });
 
-            // weapon base name list widget
-            /*connect(this->ui->weapon_base_name_list, &QListWidget::currentItemChanged,
-                this, [this](QListWidgetItem *current_item, QListWidgetItem*) {
-                    auto raii = calculate_weapon_stats_counter(this);
+            // weapon type list widget
+            this->ui->weapon_type_list->addItems(enumerators_of<calculator::Weapon::Type>()
+                | std::ranges::to<std::set>()
+                | std::views::transform(&enum_to_string<calculator::Weapon::Type>)
+                | std::views::transform(static_cast<QString(*)(std::string_view)>(string_to_display))
+                | std::ranges::to<QList>());
+            connect(
+                this->ui->weapon_type_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<QString> selected;
 
-                    if (!current_item)
-                        return;
-                    auto base_weapon = current_item->text().toStdString();
+                    for (QListWidgetItem *item : this->ui->weapon_type_list->selectedItems())
+                        selected.insert(item->text());
 
-                    auto&& active_weapon_data = this->get_active_weapon_data();
-
-                    auto it = std::ranges::find(active_weapon_data, base_weapon, &calculator::Weapon::base_name);
-                    if (it == active_weapon_data.end())
-                        throw std::runtime_error("base weapon not found in weapons list");
-                    auto&& weapon = *it;
-
-                    this->ui->upgrade_level_spinbox->setMaximum(weapon.base_attack_power.size() - 1);
-
-                    QString previous_affinity_string{};
-                    current_item = this->ui->weapon_affinity_list->currentItem();
-                    if (current_item)
-                        previous_affinity_string = current_item->text();
-
-                    auto affinities = active_weapon_data
-                        | std::views::filter([&](const calculator::Weapon& w) { return w.base_name == weapon.base_name; })
-                        | std::views::transform(&calculator::Weapon::affinity)
-                        | std::ranges::to<std::vector>();
-                    if (affinities.empty())
-                        throw std::runtime_error("no affinities found for base weapon");
-                    constexpr auto all_affinities = enumerators_of<calculator::Weapon::Affinity>();
-                    std::ranges::sort(affinities, [&](auto a, auto b) {
-                        return std::ranges::find(all_affinities, a) < std::ranges::find(all_affinities, b);
-                    });
-                    this->ui->weapon_affinity_list->clear();
-                    this->ui->weapon_affinity_list->addItems(
-                        affinities
-                        | std::views::transform([](const calculator::Weapon::Affinity& a) { return QString::fromStdString(std::string(enum_to_string(a))); })
-                        | std::ranges::to<QList>()
-                    );
-
-                    auto matches = this->ui->weapon_affinity_list->findItems(previous_affinity_string, Qt::MatchExactly);
-                    if (!matches.isEmpty())
-                        this->ui->weapon_affinity_list->setCurrentItem(matches.first());
-                    else
-                        this->ui->weapon_affinity_list->setCurrentRow(0);
+                    this->weapon_table->proxy_model->set_selected_types(std::move(selected));
                 }
-            );*/
+            );
 
-            // affinity list widget
-            /*connect(this->ui->weapon_affinity_list, &QListWidget::currentItemChanged, this, [this]() {
-                auto raii = calculate_weapon_stats_counter(this);
-            });*/
+            // weapon base name list widget
+            connect(
+                this->ui->weapon_base_name_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<QString> selected;
+
+                    for (QListWidgetItem *item : this->ui->weapon_base_name_list->selectedItems())
+                        selected.insert(item->text());
+
+                    this->weapon_table->proxy_model->set_selected_base_names(std::move(selected));
+                }
+            );
+
+            // weapon affinity list widget
+            this->ui->weapon_affinity_list->addItems(enumerators_of<calculator::Weapon::Affinity>()
+                | std::views::transform(&enum_to_string<calculator::Weapon::Affinity>)
+                | std::views::transform(static_cast<QString(*)(std::string_view)>(string_to_display))
+                | std::ranges::to<QList>());
+            connect(
+                this->ui->weapon_affinity_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<QString> selected;
+
+                    for (QListWidgetItem *item : this->ui->weapon_affinity_list->selectedItems())
+                        selected.insert(item->text());
+
+                    this->weapon_table->proxy_model->set_selected_affinities(std::move(selected));
+                }
+            );
 
             // weapon table view
             this->weapon_table = new WeaponTable(this);
