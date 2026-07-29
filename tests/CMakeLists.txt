@@ -6,7 +6,6 @@ CPMAddPackage(
 list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 include(Catch)
 
-
 function(configure_test_executable target erdo_core_library test_prefix)
     # add an executable for the test
     add_executable(${target} tests.cpp)

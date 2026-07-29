@@ -2,6 +2,7 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
+
 import std;
 import BS.thread_pool;
 import erdo;
@@ -27,140 +28,6 @@ const std::vector<double> expected_total_attack_powers_1 {
 const std::vector<double> expected_total_attack_powers_2 {
     #include "excpected_total_attack_powers_2.inc"
 };
-
-
-
-static std::vector<std::string> make_universe()
-{
-    auto&& weapons = get_weapons();
-
-    return weapons | std::views::transform([](const calculator::Weapon& w){ return w.base_name; })
-        | std::ranges::to<std::vector>();
-}
-
-
-static std::vector<std::string> make_needles(
-    const std::vector<std::string>& universe,
-    const std::vector<bool>& in_haystack,
-    double hit_rate,
-    size_t count)
-{
-    std::vector<size_t> hits;
-    std::vector<size_t> misses;
-
-    for (size_t i = 0; i < universe.size(); ++i) {
-        if (in_haystack[i])
-            hits.push_back(i);
-        else
-            misses.push_back(i);
-    }
-
-    std::mt19937 rng(42);
-
-    std::bernoulli_distribution hit(hit_rate);
-
-    std::uniform_int_distribution<size_t> hit_dist(
-        0, hits.size() - 1);
-
-    std::uniform_int_distribution<size_t> miss_dist(
-        0, misses.size() - 1);
-
-    std::vector<std::string> needles;
-    needles.reserve(count);
-
-    for (size_t i = 0; i < count; ++i) {
-        if (hit(rng))
-            needles.push_back(universe[hits[hit_dist(rng)]]);
-        else
-            needles.push_back(universe[misses[miss_dist(rng)]]);
-    }
-
-    return needles;
-}
-
-TEST_CASE("contains_lookup")
-{
-    auto universe = make_universe();
-
-    size_t haystack_size = universe.size() / 2;
-
-    std::vector<bool> present(universe.size());
-    for (size_t i = 0; i < haystack_size; ++i)
-        present[i] = true;
-
-
-    auto needles = make_needles(
-        universe,
-        present,
-        0.5,       // 50% hits
-        1000000
-    );
-
-    std::println("universe size: {}, haystack size: {}, needles size: {}", universe.size(), haystack_size, needles.size());
-
-    std::vector<std::string> haystack_vector(universe.begin(), universe.begin() + haystack_size);
-    BENCHMARK("vector")
-    {
-        size_t found = 0;
-
-        for (auto& needle : needles)
-            found += std::find( haystack_vector.begin(), haystack_vector.end(), needle) != haystack_vector.end();
-
-        return found;
-    };
-
-    std::set<std::string> haystack_set(universe.begin(), universe.begin() + haystack_size);
-    BENCHMARK("set")
-    {
-        size_t found = 0;
-
-        for (auto& needle : needles)
-            found += haystack_set.contains(needle);
-
-        return found;
-    };
-
-    std::unordered_set<std::string> haystack_unordered_set(universe.begin(), universe.begin() + haystack_size);
-    BENCHMARK("unordered_set")
-    {
-        size_t found = 0;
-
-        for (auto& needle : needles)
-            found += haystack_unordered_set.contains(needle);
-
-        return found;
-    };
-
-    auto haystack_vector_binary_search = std::vector<std::string>(universe.begin(), universe.begin() + haystack_size);
-    std::sort(haystack_vector_binary_search.begin(), haystack_vector_binary_search.end());
-
-    BENCHMARK("vector binary_search")
-    {
-        size_t found = 0;
-
-        for (const auto& needle : needles) {
-            found += std::binary_search(haystack_vector_binary_search.begin(), haystack_vector_binary_search.end(), needle);
-        }
-
-        return found;
-    };
-
-    std::flat_set<std::string> haystack_flat_set(haystack_vector_binary_search.begin(), haystack_vector_binary_search.end());
-    BENCHMARK("flat_set")
-    {
-        size_t found = 0;
-
-        for (const auto& needle : needles) {
-            found += haystack_flat_set.contains(needle);
-        }
-
-        return found;
-    };
-
-
-
-}
-
 
 
 TEST_CASE("verify stat variations correctness") {

@@ -15,36 +15,6 @@ import erdo;
 
 namespace erdo::ui
 {
-    template<typename F, std::size_t I, std::size_t...Is, typename...Tuples>
-    decltype(auto) visit_tuple_impl(F&& f, std::size_t index, std::index_sequence<I, Is...>, Tuples&&...tuples) {
-        if (index == I)
-            return std::invoke(std::forward<F>(f), std::get<I>(std::forward<Tuples>(tuples))...);
-        
-        if constexpr (sizeof...(Is) > 0)
-            return visit_tuple_impl(std::forward<F>(f), index, std::index_sequence<Is...>{}, std::forward<Tuples>(tuples)...);
-        else
-            throw std::out_of_range("Index out of range in visit_tuple");
-    }
-    template<typename F, typename...Ts>
-        requires ((std::tuple_size_v<std::remove_cvref_t<Ts...[0]>> == std::tuple_size_v<std::remove_cvref_t<Ts>>) && ...)
-    decltype(auto) visit_tuple(F&& f, std::size_t index, Ts&&...ts) {
-        return visit_tuple_impl(
-            std::forward<F>(f),
-            index,
-            std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<Ts...[0]>>>{},
-            std::forward<Ts>(ts)...
-        );
-    }
-
-    template <typename...Args>
-    QVariant tuple_to_variant(const std::tuple<Args...>& tuple, std::size_t index) {
-        return visit_tuple(
-            [](const auto& arg){ return QVariant::fromValue(arg); },
-            index,
-            tuple
-        );
-    }
-
     template<typename T, typename Tuple, std::size_t... Is>
     constexpr std::size_t tuple_index_impl(std::index_sequence<Is...>)
     {
