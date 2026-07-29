@@ -286,7 +286,7 @@ namespace erdo::ui
                     attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    arr[0] = format_number(ap[0]) + "/" + format_number(ap[1]);
+                    arr[0] = /*format_number(ap[0]) + "/" +*/ format_number(ap[1]);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }
@@ -885,7 +885,8 @@ namespace erdo::ui
 
                 int used = 0;
 
-                for (int i = 0; i < visibleColumns.size() - 1; ++i) {
+                for (int i = 0; i < visibleColumns.size() - 1; ++i)
+                {
                     int c = visibleColumns[i];
                     int w = qRound(widths[c] * factor);
 
