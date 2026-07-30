@@ -8,19 +8,14 @@ module;
 #include <algorithm>
 #include <ranges>
 #include "ui_main_window.h"
+#include "ui_stats_tab.h"
+#include "ui_optimize_tab.h"
+#include "ui_plot_tab.h"
 export module erdo.ui;
 export import erdo.ui.weapons_table;
 
 import erdo;
 import std;
-
-template<typename T>
-bool contains_object(const std::vector<T>& vec, const T& obj) {
-    return std::any_of(vec.begin(), vec.end(),
-        [&](const T& element) {
-            return &element == &obj;
-        });
-}
 
 
 namespace erdo::ui
@@ -66,9 +61,37 @@ namespace erdo::ui
         }
     }
 
+    struct StatsTab : public QWidget, Ui::StatsTab
+    {
+        explicit StatsTab(QWidget *parent = nullptr) : QWidget(parent)
+        {
+            this->setupUi(this);
+        };
+    };
+
+    struct OptimizeTab : public QWidget, Ui::OptimizeTab
+    {
+        explicit OptimizeTab(QWidget *parent = nullptr) : QWidget(parent)
+        {
+            this->setupUi(this);
+        };
+    };
+
+    struct PlotTab : QWidget, Ui::PlotTab
+    {
+        explicit PlotTab(QWidget *parent = nullptr) : QWidget(parent)
+        {
+            this->setupUi(this);
+        };
+    };
+
     class MainWindow : public QMainWindow
     {
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
+        StatsTab* stats = new StatsTab();
+        OptimizeTab* optimize = new OptimizeTab();
+        PlotTab* plot = new PlotTab();
+
         std::vector<QSpinBox*> attribute_spinboxes{};
         QLabel* character_level_label{};
         std::vector<std::array<QLabel*, 3>> attack_power_labels{};
@@ -155,8 +178,8 @@ namespace erdo::ui
                     }
                 );
 
-                this->ui->weapon_base_name_list->clear();
-                this->ui->weapon_base_name_list->addItems(new_active_weapon_data
+                this->stats->base_name_list->clear();
+                this->stats->base_name_list->addItems(new_active_weapon_data
                     | std::views::transform(&calculator::Weapon::base_name)
                     | std::ranges::to<std::set>()
                     | std::views::transform(static_cast<QString(*)(const std::string&)>(string_to_display))
@@ -176,6 +199,9 @@ namespace erdo::ui
         explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
         {
             this->ui->setupUi(this);
+            this->ui->tab_widget->addTab(stats, string_to_display("stats"));
+            this->ui->tab_widget->addTab(optimize, string_to_display("optimize"));
+            this->ui->tab_widget->addTab(plot, string_to_display("plot"));
 
             this->setWindowTitle(string_to_display(windowTitle()));
             for (QWidget *w : findChildren<QWidget *>())
@@ -201,18 +227,18 @@ namespace erdo::ui
 
             // starting class combobox
             for (const auto& [class_name, _] : calculator::character_class_stats)
-                this->ui->starting_class_combobox->addItem(QString::fromStdString(class_name));
-            this->ui->starting_class_combobox->setCurrentIndex(-1);
-            connect(this->ui->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
+                this->stats->starting_class_combobox->addItem(QString::fromStdString(class_name));
+            this->stats->starting_class_combobox->setCurrentIndex(-1);
+            connect(this->stats->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
                 auto raii = calculate_weapon_stats_counter(this);
 
                 if (text.isEmpty())
                     return;
 
                 auto full_stats = calculator::character_class_stats.at(text.toStdString());
-                this->ui->starting_class_combobox->blockSignals(true);
+                this->stats->starting_class_combobox->blockSignals(true);
                 this->set_character_full_stats(full_stats);
-                this->ui->starting_class_combobox->blockSignals(false);
+                this->stats->starting_class_combobox->blockSignals(false);
             });
             
             // character stats spinboxes
@@ -221,7 +247,7 @@ namespace erdo::ui
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(1);
                 attribute_spinbox->setMaximum(99);
-                this->ui->character_stats_layout->addRow(
+                this->stats->character_stats_layout->addRow(
                     string_to_display(enum_to_string(attribute)),
                     attribute_spinbox
                 );
@@ -237,45 +263,45 @@ namespace erdo::ui
                     std::ranges::for_each(attribute_spinboxes, [](QSpinBox* spinbox) { spinbox->blockSignals(true); });
 
                     if (it != calculator::character_class_stats.end()) 
-                        this->ui->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
+                        this->stats->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
                     else
-                        this->ui->starting_class_combobox->setCurrentIndex(-1);
+                        this->stats->starting_class_combobox->setCurrentIndex(-1);
 
                     std::ranges::for_each(attribute_spinboxes, [](QSpinBox* spinbox) { spinbox->blockSignals(false); });
                 });
             }
-            this->ui->character_stats_layout->addRow(
+            this->stats->character_stats_layout->addRow(
                 string_to_display("character level:"),
                 this->character_level_label = new QLabel()
             );
 
             // upgrade level spinboxes
-            connect(this->ui->normal_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
+            connect(this->stats->normal_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
                 auto raii = calculate_weapon_stats_counter(this);
             });
-            connect(this->ui->somber_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
+            connect(this->stats->somber_upgrade_level_spinbox, &QSpinBox::valueChanged, this, [this]() {
                 auto raii = calculate_weapon_stats_counter(this);
             });
 
             // two-handing checkbox
-            connect(this->ui->two_handing_checkbox, &QCheckBox::checkStateChanged, this, [this]() {
+            connect(this->stats->two_handing_checkbox, &QCheckBox::checkStateChanged, this, [this]() {
                 auto raii = calculate_weapon_stats_counter(this);
             });
 
             // base game / dlc
             for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"base game", "dlc"}))
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->ui->base_game_dlc_list);
+                auto item = new QListWidgetItem(string_to_display(str), this->stats->base_game_dlc_list);
                 item->setData(Qt::UserRole, val);
             }
             connect(
-                this->ui->base_game_dlc_list,
+                this->stats->base_game_dlc_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
                     QSet<bool> selected;
 
-                    for (QListWidgetItem *item : this->ui->base_game_dlc_list->selectedItems())
+                    for (QListWidgetItem *item : this->stats->base_game_dlc_list->selectedItems())
                         selected.insert(item->data(Qt::UserRole).toBool());
 
                     this->weapon_table->proxy_model->set_selected_base_game_dlc(std::move(selected));
@@ -285,17 +311,17 @@ namespace erdo::ui
             // weapon type list widget
             for (auto&& [type, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Type>(), enumerator_strings_of<calculator::Weapon::Type>()))
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->ui->weapon_type_list);
+                auto item = new QListWidgetItem(string_to_display(str), this->stats->type_list);
                 item->setData(Qt::UserRole, type);
             }
             connect(
-                this->ui->weapon_type_list,
+                this->stats->type_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
                     QSet<int> selected;
 
-                    for (QListWidgetItem *item : this->ui->weapon_type_list->selectedItems())
+                    for (QListWidgetItem *item : this->stats->type_list->selectedItems())
                         selected.insert(item->data(Qt::UserRole).toInt());
 
                     this->weapon_table->proxy_model->set_selected_types(std::move(selected));
@@ -304,13 +330,13 @@ namespace erdo::ui
 
             // weapon base name list widget
             connect(
-                this->ui->weapon_base_name_list,
+                this->stats->base_name_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
                     QSet<QString> selected;
 
-                    for (QListWidgetItem *item : this->ui->weapon_base_name_list->selectedItems())
+                    for (QListWidgetItem *item : this->stats->base_name_list->selectedItems())
                         selected.insert(item->text());
 
                     this->weapon_table->proxy_model->set_selected_base_names(std::move(selected));
@@ -320,17 +346,17 @@ namespace erdo::ui
             // weapon affinity list widget
             for (auto&& [affinity, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Affinity>(), enumerator_strings_of<calculator::Weapon::Affinity>()))
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->ui->weapon_affinity_list);
+                auto item = new QListWidgetItem(string_to_display(str), this->stats->affinity_list);
                 item->setData(Qt::UserRole, affinity);
             }
             connect(
-                this->ui->weapon_affinity_list,
+                this->stats->affinity_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
                     QSet<int> selected;
 
-                    for (QListWidgetItem *item : this->ui->weapon_affinity_list->selectedItems())
+                    for (QListWidgetItem *item : this->stats->affinity_list->selectedItems())
                         selected.insert(item->data(Qt::UserRole).toInt());
 
                     this->weapon_table->proxy_model->set_selected_affinities(std::move(selected));
@@ -340,7 +366,7 @@ namespace erdo::ui
             // weapon table view
             this->weapon_table = new WeaponTable(this);
             this->weapon_table->hide_section<sections::Stats>();
-            this->ui->weapon_stats_layout->addWidget(this->weapon_table, 1);
+            this->stats->main_layout->addWidget(this->weapon_table, 1);
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()).make_preferred();
@@ -417,77 +443,25 @@ namespace erdo::ui
 
         calculator::UpgradeLevels get_upgrade_levels() {
             calculator::UpgradeLevels upgrade_levels{};
-            upgrade_levels.at(1) = this->ui->normal_upgrade_level_spinbox->value();
-            upgrade_levels.at(2) = this->ui->somber_upgrade_level_spinbox->value();
+            upgrade_levels.at(1) = this->stats->normal_upgrade_level_spinbox->value();
+            upgrade_levels.at(2) = this->stats->somber_upgrade_level_spinbox->value();
             return upgrade_levels;
         }
         void set_upgrade_levels(const calculator::UpgradeLevels& upgrade_levels) {
             auto raii = calculate_weapon_stats_counter(this);
 
-            this->ui->normal_upgrade_level_spinbox->setValue(upgrade_levels.at(1));
-            this->ui->somber_upgrade_level_spinbox->setValue(upgrade_levels.at(2));
+            this->stats->normal_upgrade_level_spinbox->setValue(upgrade_levels.at(1));
+            this->stats->somber_upgrade_level_spinbox->setValue(upgrade_levels.at(2));
         }
 
         bool get_two_handing() {
-            return this->ui->two_handing_checkbox->isChecked();
+            return this->stats->two_handing_checkbox->isChecked();
         }
         void set_two_handing(bool two_handing) {
             auto raii = calculate_weapon_stats_counter(this);
 
-            this->ui->two_handing_checkbox->setChecked(two_handing);
+            this->stats->two_handing_checkbox->setChecked(two_handing);
         }
-
-        /*std::string get_base_weapon() {
-            auto current_item = this->ui->weapon_base_name_list->currentItem();
-            if (!current_item)
-                throw std::runtime_error("no weapon base name selected");
-            return current_item->text().toStdString();
-        }
-        void set_base_weapon(const std::string& base_weapon) {
-            auto raii = calculate_weapon_stats_counter(this);
-
-            auto matches = this->ui->weapon_base_name_list->findItems(QString::fromStdString(base_weapon), Qt::MatchExactly);
-            if (matches.isEmpty())
-                throw std::runtime_error("weapon base name not found in list widget");
-            this->ui->weapon_base_name_list->setCurrentItem(matches.first());
-        }*/
-
-        /*calculator::Weapon::Affinity get_affinity() {
-            auto current_item = this->ui->weapon_affinity_list->currentItem();
-            if (!current_item)
-                throw std::runtime_error("no weapon affinity selected");
-            return string_to_enum<calculator::Weapon::Affinity>(current_item->text().toStdString());
-        }
-        void set_affinity(calculator::Weapon::Affinity affinity) {
-            auto raii = calculate_weapon_stats_counter(this);
-
-            auto affinity_string = QString::fromStdString(std::string(enum_to_string(affinity)));
-            auto matches = this->ui->weapon_affinity_list->findItems(affinity_string, Qt::MatchExactly);
-            if (matches.isEmpty())
-                throw std::runtime_error("weapon affinity not found in list widget");
-            this->ui->weapon_affinity_list->setCurrentItem(matches.first());
-        }*/
-
-        /*const calculator::Weapon& get_weapon() {
-            auto weapon_base_name = this->get_base_weapon();
-            auto weapon_affinity = this->get_affinity();
-
-            // get weapon
-            auto&& active_weapon_data = this->get_active_weapon_data();
-            auto it = std::ranges::find_if(active_weapon_data, [&](const calculator::Weapon& w) {
-                return w.base_name == weapon_base_name && w.affinity == weapon_affinity;
-            });
-            if (it == active_weapon_data.end())
-                throw std::runtime_error("weapon not found");
-
-            return *it;
-        }
-        void set_weapon(const calculator::Weapon& weapon) {
-            auto raii = calculate_weapon_stats_counter(this);
-
-            this->set_base_weapon(weapon.base_name);
-            this->set_affinity(weapon.affinity);
-        }*/
     };
 
     export int run_ui(int argc, char *argv[]) {
