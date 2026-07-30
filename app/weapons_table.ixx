@@ -272,6 +272,7 @@ namespace erdo::ui
 
             void update(const calculator::AttackRating& attack_rating)
             {
+                bool any_ineffective = false;
                 for (auto&& [ap, is_ineffective, arr] : std::views::zip(
                     attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
@@ -280,11 +281,12 @@ namespace erdo::ui
                     arr[0] = /*format_number(ap[0]) + "/" +*/ format_number(ap[1]);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
+                    any_ineffective |= is_ineffective;
                 }
 
-                (*this)[enumerators_of<calculator::DamageType>().size()][0] = format_number(attack_rating.total_attack_power[1]);
-                (*this)[enumerators_of<calculator::DamageType>().size()][1] = attack_rating.total_attack_power[1];
-                (*this)[enumerators_of<calculator::DamageType>().size()][2] = foreground_color(true);
+                this->back()[0] = format_number(attack_rating.total_attack_power[1]);
+                this->back()[1] = attack_rating.total_attack_power[1];
+                this->back()[2] = foreground_color(any_ineffective);
             }
         };
 
@@ -456,17 +458,18 @@ namespace erdo::ui
     };
 
     export using Row = BasicRow<
-        sections::TypeSection,
-        sections::BaseNameSection,
         sections::NameSection,
         sections::AffinitySection,
+        sections::TypeSection,
         sections::SpellScaling,
         sections::AttackPowers,
         sections::StatusEffects,
         sections::AttributeScalings,
         sections::Requirements,
         sections::Stats,
-        sections::BaseGameDLCSection
+        sections::BaseGameDLCSection,
+
+        sections::BaseNameSection
     >;
 
     export struct RowModel : QAbstractTableModel
