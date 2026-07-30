@@ -106,12 +106,14 @@ namespace erdo::ui
             static constexpr bool draw_header_labels_rotated = false;
             static constexpr bool has_header_section_title = false;
             static constexpr bool draw_section_seperators = false;
+
+            explicit SectionBase(const calculator::AttackRating& attack_rating) { }
+
+            void update(const calculator::AttackRating& attack_rating) { }
         };
 
         export struct NameSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
-            using SectionBase<std::array<std::array<QVariant, 2>, 1>>::SectionBase;
-
             inline const static std::vector<QString> column_names { string_to_display("name") };
 
             explicit NameSection(const calculator::AttackRating& attack_rating)
@@ -140,11 +142,58 @@ namespace erdo::ui
             }
         };
 
-        template<std::size_t I>
-        struct TextSection : SectionBase<std::array<QVariant, I>>
+        export struct BinaryTextSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
-            using SectionBase<std::array<QVariant, I>>::SectionBase;
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole)
+                    return (*this)[column][0];
 
+                if (role == Qt::UserRole)
+                    return (*this)[column][1];
+                
+                return {};
+            }
+        };
+        export struct AffinitySection : BinaryTextSection
+        {
+            inline const static std::vector<QString> column_names { string_to_display("affinity") };
+
+            explicit AffinitySection(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                (*this)[0][0] = string_to_display(enum_to_string(weapon.affinity));
+                (*this)[0][1] = std::to_underlying(weapon.affinity);
+            }
+        };
+        export struct TypeSection : BinaryTextSection
+        {
+            inline const static std::vector<QString> column_names { string_to_display("type") };
+
+            explicit TypeSection(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                (*this)[0][0] = string_to_display(enum_to_string(weapon.type));
+                (*this)[0][1] = std::to_underlying(weapon.type);
+            }
+        };
+        export struct BaseGameDLCSection : BinaryTextSection
+        {
+            inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
+
+            explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
+            {
+                auto&& weapon = attack_rating.weapon.get();
+
+                (*this)[0][0] = string_to_display(weapon.dlc ? "dlc" : "base game");
+                (*this)[0][1] = weapon.dlc;
+            }
+        };
+
+        struct UnaryTextSection : SectionBase<std::array<QVariant, 1>>
+        {
             QVariant data(int column, int role) const
             {
                 if (role == Qt::DisplayRole || role == Qt::UserRole)
@@ -153,70 +202,19 @@ namespace erdo::ui
                 return {};
             }
         };
-
-        export struct BaseNameSection : TextSection<1>
+        export struct BaseNameSection : UnaryTextSection
         {
-            using TextSection::TextSection;
-
             inline const static std::vector<QString> column_names { string_to_display("base name") };
 
             explicit BaseNameSection(const calculator::AttackRating& attack_rating)
             {
                 (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
             }
-
-            void update(const calculator::AttackRating& attack_rating) { }
-        };
-
-        export struct AffinitySection : TextSection<1>
-        {
-            using TextSection::TextSection;
-
-            inline const static std::vector<QString> column_names { string_to_display("affinity") };
-
-            explicit AffinitySection(const calculator::AttackRating& attack_rating)
-            {
-                (*this)[0] = string_to_display(enum_to_string(attack_rating.weapon.get().affinity));
-            }
-
-            void update(const calculator::AttackRating& attack_rating) { }
-        };
-
-        export struct TypeSection : TextSection<1>
-        {
-            using TextSection::TextSection;
-
-            inline const static std::vector<QString> column_names { string_to_display("type") };
-
-            explicit TypeSection(const calculator::AttackRating& attack_rating)
-            {
-                (*this)[0] = string_to_display(enum_to_string(attack_rating.weapon.get().type));
-            }
-
-            void update(const calculator::AttackRating& attack_rating) { }
-        };
-
-        export struct BaseGameDLCSection : TextSection<1>
-        {
-            using TextSection::TextSection;
-
-            inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
-
-            explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
-            {
-                auto&& weapon = attack_rating.weapon.get();
-
-                (*this)[0] = string_to_display(weapon.dlc ? "dlc" : "base game");
-            }
-
-            void update(const calculator::AttackRating& attack_rating) { }
         };
 
         template<std::size_t I>
         struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
         {
-            using SectionBase<std::array<std::array<QVariant, 3>, I>>::SectionBase;
-
             static constexpr bool draw_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
@@ -238,11 +236,9 @@ namespace erdo::ui
                 return {};
             }
         };
-
         export struct SpellScaling : DataSection<1>
         {
             static constexpr bool draw_header_labels_rotated = false;
-
             inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
 
             explicit SpellScaling(const calculator::AttackRating& attack_rating)
@@ -257,12 +253,10 @@ namespace erdo::ui
                 (*this)[0][2] = foreground_color(true);
             }
         };
-
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
         {
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attack power";
-
             inline const static std::vector<QString> column_names = [](){
                 auto result = enumerators_of<calculator::DamageType>()
                     | std::views::transform([](calculator::DamageType e){ return string_to_display(enum_to_string(e)); })
@@ -303,9 +297,10 @@ namespace erdo::ui
                 | std::views::transform([](enum_type e){ return string_to_display(enum_to_string(e)); })
                 | std::ranges::to<std::vector>();
         };
-
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
+            using EnumDataSection::EnumDataSection;
+
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "status effects";
 
@@ -327,7 +322,6 @@ namespace erdo::ui
                 }
             }
         };
-
         export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
             static constexpr bool has_header_section_title = true;
@@ -357,7 +351,6 @@ namespace erdo::ui
                 }
             }
         };
-
         export struct Requirements : EnumDataSection<calculator::RelevantAttribute>
         {
             static constexpr bool has_header_section_title = true;
@@ -383,7 +376,6 @@ namespace erdo::ui
                 }
             }
         };
-
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
             static constexpr bool has_header_section_title = true;
@@ -735,7 +727,13 @@ namespace erdo::ui
             this->setSortRole(Qt::UserRole);
         }
 
-        void set_selected_types(QSet<QString>&& types)
+        void set_selected_base_game_dlc(QSet<bool>&& base_game_dlc)
+        {
+            this->beginFilterChange();
+            this->base_game_dlc = std::move(base_game_dlc);
+            this->endFilterChange();
+        }
+        void set_selected_types(QSet<int>&& types)
         {
             this->beginFilterChange();
             this->types = std::move(types);
@@ -747,7 +745,7 @@ namespace erdo::ui
             this->base_names = std::move(base_names);
             this->endFilterChange();
         }
-        void set_selected_affinities(QSet<QString>&& affinities)
+        void set_selected_affinities(QSet<int>&& affinities)
         {
             this->beginFilterChange();
             this->affinities = std::move(affinities);
@@ -759,7 +757,7 @@ namespace erdo::ui
         {
             auto source_model = this->sourceModel();
 
-            auto check_filter = [&](std::size_t column, const QSet<QString>& set){
+            auto check_filter = [&]<typename T>(std::size_t column, const QSet<T>& set){
                 if (set.isEmpty())
                     return true;
 
@@ -769,20 +767,28 @@ namespace erdo::ui
                     sourceParent
                 );
 
-                auto value = index.data(Qt::UserRole).toString();
+                T value;
+                if constexpr (std::same_as<T, QString>)
+                    value = index.data(Qt::UserRole).toString();
+                else if constexpr (std::same_as<T, int>)
+                    value = index.data(Qt::UserRole).toInt();
+                else if constexpr (std::same_as<T, bool>)
+                    value = index.data(Qt::UserRole).toBool();
 
                 return set.contains(value);
             };
 
-            return check_filter(tuple_index_v<sections::TypeSection, Row>, this->types)
+            return check_filter(tuple_index_v<sections::BaseGameDLCSection, Row>, this->base_game_dlc)
+                && check_filter(tuple_index_v<sections::TypeSection, Row>, this->types)
                 && check_filter(tuple_index_v<sections::BaseNameSection, Row>, this->base_names)
                 && check_filter(tuple_index_v<sections::AffinitySection, Row>, this->affinities);
         }
 
     private:
-        QSet<QString> types;
+        QSet<bool> base_game_dlc; // true = dlc, false = base game
+        QSet<int> types;
         QSet<QString> base_names;
-        QSet<QString> affinities;
+        QSet<int> affinities;
     };
 
     class LinkDelegate : public QStyledItemDelegate

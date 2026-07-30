@@ -1,5 +1,6 @@
 module;
 // #include <meta>
+#include <ranges>
 export module erdo:meta;
 
 import std;
@@ -33,12 +34,21 @@ export {
 
     template <typename E>
         requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
-    consteval auto integral_enumerators_of()
+    consteval auto enumerator_integrals_of()
     {
         std::array<std::underlying_type_t<E>, enumerators_of<E>().size()> r{};
         for (auto&& [enumerator, integral] : std::views::zip(enumerators_of<E>(), r))
             integral = std::to_underlying(enumerator);
 
+        return r;
+    }
+
+    template <typename E>
+        requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
+    consteval auto enumerator_strings_of()
+    {
+        std::array<std::string_view, enumerators_of<E>().size()> r{};
+        std::ranges::copy(enum_string_mapping<E> | std::views::values, r.begin());
         return r;
     }
 
@@ -122,10 +132,6 @@ export {
         requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
     constexpr bool is_valid_enum_integral(std::underlying_type_t<E> integral)
     {
-        for (auto e : integral_enumerators_of<E>())
-            if (integral == e)
-                return true;
-
-        return false;
+        return std::ranges::contains(enumerator_integrals_of<E>(), integral);
     }
 }

@@ -262,21 +262,41 @@ namespace erdo::ui
                 auto raii = calculate_weapon_stats_counter(this);
             });
 
+            // base game / dlc
+            for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"base game", "dlc"}))
+            {
+                auto item = new QListWidgetItem(string_to_display(str), this->ui->base_game_dlc_list);
+                item->setData(Qt::UserRole, val);
+            }
+            connect(
+                this->ui->base_game_dlc_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<bool> selected;
+
+                    for (QListWidgetItem *item : this->ui->base_game_dlc_list->selectedItems())
+                        selected.insert(item->data(Qt::UserRole).toBool());
+
+                    this->weapon_table->proxy_model->set_selected_base_game_dlc(std::move(selected));
+                }
+            );
+
             // weapon type list widget
-            this->ui->weapon_type_list->addItems(enumerators_of<calculator::Weapon::Type>()
-                | std::views::transform(&enum_to_string<calculator::Weapon::Type>)
-                | std::ranges::to<std::set>()
-                | std::views::transform(static_cast<QString(*)(std::string_view)>(string_to_display))
-                | std::ranges::to<QList>());
+            for (auto&& [type, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Type>(), enumerator_strings_of<calculator::Weapon::Type>()))
+            {
+                auto item = new QListWidgetItem(string_to_display(str), this->ui->weapon_type_list);
+                item->setData(Qt::UserRole, type);
+            }
             connect(
                 this->ui->weapon_type_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
-                    QSet<QString> selected;
+                    QSet<int> selected;
 
                     for (QListWidgetItem *item : this->ui->weapon_type_list->selectedItems())
-                        selected.insert(item->text());
+                        selected.insert(item->data(Qt::UserRole).toInt());
 
                     this->weapon_table->proxy_model->set_selected_types(std::move(selected));
                 }
@@ -298,19 +318,20 @@ namespace erdo::ui
             );
 
             // weapon affinity list widget
-            this->ui->weapon_affinity_list->addItems(enumerators_of<calculator::Weapon::Affinity>()
-                | std::views::transform(&enum_to_string<calculator::Weapon::Affinity>)
-                | std::views::transform(static_cast<QString(*)(std::string_view)>(string_to_display))
-                | std::ranges::to<QList>());
+            for (auto&& [affinity, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Affinity>(), enumerator_strings_of<calculator::Weapon::Affinity>()))
+            {
+                auto item = new QListWidgetItem(string_to_display(str), this->ui->weapon_affinity_list);
+                item->setData(Qt::UserRole, affinity);
+            }
             connect(
                 this->ui->weapon_affinity_list,
                 &QListWidget::itemSelectionChanged,
                 this,
                 [this]() {
-                    QSet<QString> selected;
+                    QSet<int> selected;
 
                     for (QListWidgetItem *item : this->ui->weapon_affinity_list->selectedItems())
-                        selected.insert(item->text());
+                        selected.insert(item->data(Qt::UserRole).toInt());
 
                     this->weapon_table->proxy_model->set_selected_affinities(std::move(selected));
                 }

@@ -351,7 +351,7 @@ export namespace erdo::calculator
         {
             IneffectiveAttackPowerTypes ineffective_attack_power_types{};
 
-            for(auto attack_power_type_integral : integral_enumerators_of<AttackPowerType>())
+            for(auto attack_power_type_integral : enumerator_integrals_of<AttackPowerType>())
             {
                 auto base_attack_power = base_attack_powers[attack_power_type_integral];
 
@@ -359,7 +359,7 @@ export namespace erdo::calculator
                 {
                     auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_integral];
 
-                    for (auto attribute : integral_enumerators_of<RelevantAttribute>())
+                    for (auto attribute : enumerator_integrals_of<RelevantAttribute>())
                     {
                         if (ineffective_attributes[attribute] && scaling_attributes[attribute])
                         {
@@ -389,7 +389,7 @@ export namespace erdo::calculator
             {
                 double total_scaling = 1.;
 
-                for (auto &&attribute : integral_enumerators_of<RelevantAttribute>())
+                for (auto &&attribute : enumerator_integrals_of<RelevantAttribute>())
                 {
                     auto &&attribute_correct = scaling_attributes[attribute];
                     double scaling{};
@@ -454,7 +454,7 @@ export namespace erdo::calculator
         {
             AttackPower total_attack_power{};
             
-            for (auto damage_type : integral_enumerators_of<DamageType>())
+            for (auto damage_type : enumerator_integrals_of<DamageType>())
             {
                 auto&& attack_power = attack_powers[damage_type];
 
