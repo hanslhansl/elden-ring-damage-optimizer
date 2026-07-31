@@ -201,12 +201,12 @@ namespace erdo::ui
             // character level label
             this->character_stats_layout->addRow(
                 string_to_display("character level:"),
-                this->character_level_label = new QLabel(QString::number(this->get_character_full_stats().character_level()))
+                this->character_level_label = new QLabel(QString::number(calculator::attribute_points_to_character_level(this->get_character_full_stats().attribute_points())))
             );
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::FullStats& full_stats){
-                this->character_level_label->setText(QString::number(full_stats.character_level()));
+                this->character_level_label->setText(QString::number(calculator::attribute_points_to_character_level(full_stats.attribute_points())));
                 this->calculate_weapon_stats();
             });
 
@@ -377,32 +377,38 @@ namespace erdo::ui
     {
     public:
         QSpinBox* max_character_level_spinbox{};
-        QLabel* attribute_points_label{};
+        QLabel* free_attribute_points_label{};
         QLabel* stat_variations_label{};
 
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
+            auto character_stats_callback = [this](const calculator::FullStats& full_stats){
+                auto min_attribute_points = full_stats.attribute_points();
+                auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
+                auto free_attribute_points = max_attribute_points - min_attribute_points;
+                this->free_attribute_points_label->setText(QString::number(free_attribute_points));
+                this->stat_variations_label->setText(QString::number(calculator::get_stat_variation_count(max_attribute_points, full_stats)));
+            };
+
             // max character level label
             this->character_stats_layout->addRow(string_to_display("max character level:"), this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
             calculator::FullStats max_stats{};
             max_stats.fill(99);
-            this->max_character_level_spinbox->setMaximum(max_stats.character_level());
+            this->max_character_level_spinbox->setMaximum(calculator::attribute_points_to_character_level(max_stats.attribute_points()));
+            connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, [this, character_stats_callback]() {
+                character_stats_callback(this->get_character_full_stats());
+            });
 
             // attribute points label
-            this->character_stats_layout->addRow(string_to_display("attribute points:"), this->attribute_points_label = new QLabel());
+            this->character_stats_layout->addRow(string_to_display("free attribute points:"), this->free_attribute_points_label = new QLabel());
 
             // stat variations label
             this->character_stats_layout->addRow(string_to_display("stat variations:"), this->stat_variations_label = new QLabel());
 
             // character stats spinboxes
-            auto character_stats_spinboxes_callback = [this](const calculator::FullStats& full_stats){
-                auto attribute_points = full_stats.attribute_points();
-                this->attribute_points_label->setText(QString::number(attribute_points));
-                this->stat_variations_label->setText(QString::number(calculator::get_stat_variation_count(attribute_points, full_stats.to_stats())));
-            };
-            connect(this, &StatsTabBase::character_stats_changed, character_stats_spinboxes_callback);
-            character_stats_spinboxes_callback(this->get_character_full_stats());
+            connect(this, &StatsTabBase::character_stats_changed, character_stats_callback);
+            character_stats_callback(this->get_character_full_stats());
         }
     
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)

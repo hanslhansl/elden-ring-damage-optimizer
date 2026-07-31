@@ -126,17 +126,20 @@ export namespace erdo::calculator
 {
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
     using Stats = std::array<int, enumerators_of<RelevantAttribute>().size()>;
-    struct FullStats : std::array<int, enumerators_of<Attribute>().size()> {
-        constexpr Stats to_stats() const
+    struct FullStats : std::array<int, enumerators_of<Attribute>().size()>
+    {
+        constexpr Stats to_relevant_stats() const
         {
-            Stats result{};
-            std::ranges::copy(*this | std::views::drop(irrelevant_attribute_count), result.begin());
-            return result;
+            Stats relevant_stats{};
+            std::ranges::copy(this->begin() + irrelevant_attribute_count, this->end(), relevant_stats.begin());
+            return relevant_stats;
         }
-
-        constexpr int character_level() const
+        constexpr std::span<const int, irrelevant_attribute_count> to_irrelevant_stats() const
         {
-            return this->attribute_points() - 79;
+            return std::span<const int, irrelevant_attribute_count>{
+                this->begin(),
+                this->begin() + irrelevant_attribute_count
+            };
         }
 
         constexpr int attribute_points() const
@@ -158,6 +161,15 @@ export namespace erdo::calculator
         {"heavy knight", {14, 11, 8, 7, 17, 8, 15, 9}},
         {"idus knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     };
+
+    constexpr auto attribute_points_to_character_level(int attribute_points)
+    {
+        return attribute_points - 79;
+    }
+    constexpr auto character_level_to_attribute_points(int character_level)
+    {
+        return character_level + 79;
+    }
 
     using ScalingCurve = std::array<double, 149>;
     using AttributeScaling = std::array<double, enumerators_of<RelevantAttribute>().size()>;
@@ -471,7 +483,7 @@ export namespace erdo::calculator
 
         AttackRating calculate_attack_rating(const AttackOptions &attack_options, const FullStats &full_stats) const
         {
-            auto stats = full_stats.to_stats();
+            auto stats = full_stats.to_relevant_stats();
             auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options.two_handing, stats);
             auto upgrade_level = attack_options.upgrade_levels[upgrade_level_index];
 
@@ -520,20 +532,20 @@ export namespace erdo::calculator
         std::array<int, 3> statusSpEffectId; // statusSpEffectId1, statusSpEffectId2, statusSpEffectId3
     };
 
-    constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats)
+    constexpr std::size_t get_stat_variation_count(const int attribute_points, const FullStats &min_full_stats)
     {
         constexpr auto N = std::tuple_size_v<Stats>;
         constexpr auto UPPER = 99;
-        const auto SUM = attribute_points;
+        const auto SUM = attribute_points - std::ranges::fold_left(min_full_stats.to_irrelevant_stats(), 0, std::plus<>{});
         std::size_t count = 0;
 
-        if (attribute_points > UPPER * min_stats.size())
-            return 0;
-        // throw std::invalid_argument("attribute_points must be <= " +
-        // std::to_string(UPPER) + " * " + std::to_string(N));
+        if (attribute_points > UPPER * min_full_stats.size())
+            throw std::invalid_argument(std::format("attribute_points must be <= {}", UPPER * N));
 
-        if (std::ranges::any_of(min_stats, [](int v) { return v > UPPER; }))
-            throw std::invalid_argument("min_stats must be <= " + std::to_string(UPPER));
+        if (std::ranges::any_of(min_full_stats, [](auto v) { return v > UPPER; }))
+            throw std::invalid_argument(std::format("min_stats must be <= {}", UPPER));
+
+        auto min_stats = min_full_stats.to_relevant_stats();
 
         for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
         {
@@ -617,18 +629,19 @@ export namespace erdo::calculator
 
         return count;
     }
-    std::vector<FullStats> get_stat_variations(const int attribute_points, const Stats &min_stats)
+    std::vector<FullStats> get_stat_variations(const int attribute_points, const FullStats &min_full_stats)
     {
         constexpr auto N = std::tuple_size_v<Stats>;
         constexpr auto UPPER = 99;
-        const auto SUM = attribute_points;
+        const auto SUM = attribute_points - std::ranges::fold_left(min_full_stats.to_irrelevant_stats(), 0, std::plus<>{});
 
-        auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
+        auto possible_occurances = get_stat_variation_count(attribute_points, min_full_stats);
         if (possible_occurances == 0)
             return {};
         std::vector<FullStats> stat_variations{};
         stat_variations.reserve(possible_occurances);
 
+        auto min_stats = min_full_stats.to_relevant_stats();
         for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
         {
             auto SUM_i = SUM - i;
