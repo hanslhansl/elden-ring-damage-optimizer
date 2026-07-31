@@ -211,13 +211,27 @@ namespace erdo::ui
                 (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
             }
         };
-
-        template<std::size_t I>
-        struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
+        export struct CharacterLevelSection : UnaryTextSection
         {
             static constexpr bool draw_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
+            inline const static std::vector<QString> column_names { string_to_display("character level") };
+
+            explicit CharacterLevelSection(const calculator::AttackRating& attack_rating)
+            {
+                this->update(attack_rating);
+            }
+
+            void update(const calculator::AttackRating& attack_rating)
+            {
+                (*this)[0] = attack_rating.full_stats.character_level();
+            }
+        };
+
+        template<std::size_t I>
+        struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
+        {
             QVariant data(int column, int role) const
             {
                 if (role == Qt::DisplayRole)
@@ -238,7 +252,8 @@ namespace erdo::ui
         };
         export struct SpellScaling : DataSection<1>
         {
-            static constexpr bool draw_header_labels_rotated = false;
+            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_seperators = true;
             inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
 
             explicit SpellScaling(const calculator::AttackRating& attack_rating)
@@ -255,6 +270,8 @@ namespace erdo::ui
         };
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
         {
+            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_seperators = true;
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attack power";
             inline const static std::vector<QString> column_names = [](){
@@ -295,6 +312,9 @@ namespace erdo::ui
         {
             using enum_type = E;
 
+            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_seperators = true;
+            
             inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
                 | std::views::transform([](enum_type e){ return string_to_display(enum_to_string(e)); })
                 | std::ranges::to<std::vector>();
@@ -391,7 +411,7 @@ namespace erdo::ui
             void update(const calculator::AttackRating& attack_rating)
             {
                 for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-                    attack_rating.stats,
+                    attack_rating.full_stats.to_stats(),
                     attack_rating.ineffective_attributes,
                     *this))
                 {
@@ -467,6 +487,7 @@ namespace erdo::ui
         sections::AttributeScalings,
         sections::Requirements,
         sections::Stats,
+        sections::CharacterLevelSection,
         sections::BaseGameDLCSection,
 
         sections::BaseNameSection

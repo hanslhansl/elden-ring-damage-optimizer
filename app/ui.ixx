@@ -5,11 +5,8 @@ module;
 #include <QProgressDialog>
 #include <QFuture>
 #include <QtConcurrent>
-#include <algorithm>
-#include <ranges>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
-#include "ui_optimize_tab.h"
 #include "ui_plot_tab.h"
 export module erdo.ui;
 export import erdo.ui.weapons_table;
@@ -140,8 +137,33 @@ namespace erdo::ui
         }
     };
 
-    struct StatsTab : StatsTabBase
+    class StatsTab : public StatsTabBase
     {
+        Q_OBJECT
+
+        void emit_calculate_weapon_stats(const std::filesystem::path& new_path)
+        {
+            emit calculate_weapon_stats(new_path);
+        }
+        long long _calculate_weapon_stats_counter = 0;
+        struct calculate_weapon_stats_counter
+        {
+            StatsTab* self;
+            std::filesystem::path new_path;
+
+            explicit calculate_weapon_stats_counter(StatsTab* self, const std::filesystem::path& new_path = {}) : self{self}, new_path{new_path}
+            {
+                self->_calculate_weapon_stats_counter++;
+            }
+
+            ~calculate_weapon_stats_counter()
+            {
+                if (--self->_calculate_weapon_stats_counter == 0)
+                    self->emit_calculate_weapon_stats(new_path);
+            }
+        };
+
+    public:
         QLabel* character_level_label{};
 
         explicit StatsTab(QWidget *parent = nullptr) : StatsTabBase(parent)
@@ -151,11 +173,21 @@ namespace erdo::ui
                 string_to_display("character level:"),
                 this->character_level_label = new QLabel()
             );
+
+            // weapon table view
+            this->weapon_table->hide_section<sections::Stats>();
+            this->weapon_table->hide_section<sections::CharacterLevelSection>();
         }
+
+    signals:
+        void calculate_weapon_stats(const std::filesystem::path& new_weapon_data_directory);
     };
 
-    struct OptimizeTab : StatsTabBase
+    class OptimizeTab : public StatsTabBase
     {
+        Q_OBJECT
+
+    public:
         QSpinBox* max_character_level_spinbox{};
         QLabel* attribute_points_label{};
         QLabel* stat_variations_label{};
@@ -228,7 +260,6 @@ namespace erdo::ui
         {
             // get character stats
             auto full_stats = this->stats->get_character_full_stats();
-            auto stats = full_stats.to_stats();
 
             // get attack options
             calculator::AttackOptions attack_options{
@@ -244,7 +275,7 @@ namespace erdo::ui
 
                 std::ranges::for_each(std::views::zip(this->get_active_weapon_data(), this->stats->weapon_table->model->rows), [&](auto&& pair) {
                     auto&& [w, row] = pair;
-                    row.update(w.calculate_attack_rating(attack_options, stats));
+                    row.update(w.calculate_attack_rating(attack_options, full_stats));
                 });
                 // this->stats->weapon_table->model->rows.clear();
                 // this->stats->weapon_table->model->rows.append_range(
@@ -275,7 +306,7 @@ namespace erdo::ui
 
                         result.second.reserve(result.first.size());
                         result.second.append_range(result.first
-                            | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, stats)); })
+                            | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
                             | std::ranges::to<std::vector>()
                         );
 
@@ -475,9 +506,6 @@ namespace erdo::ui
                     this->stats->weapon_table->proxy_model->set_selected_affinities(std::move(selected));
                 }
             );
-
-            // weapon table view
-            this->stats->weapon_table->hide_section<sections::Stats>();
         }
 
         const std::vector<calculator::Weapon>& get_active_weapon_data() const
@@ -524,4 +552,4 @@ namespace erdo::ui
     }
 }
 
-// #include "ui.moc"
+#include "ui.moc"

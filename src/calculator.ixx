@@ -125,14 +125,13 @@ constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 
 export namespace erdo::calculator
 {
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
-    struct Stats : std::array<int, enumerators_of<RelevantAttribute>().size()> { };
+    using Stats = std::array<int, enumerators_of<RelevantAttribute>().size()>;
     struct FullStats : std::array<int, enumerators_of<Attribute>().size()> {
         constexpr Stats to_stats() const
         {
-            Stats stats{};
-            for (auto attribute : enumerators_of<RelevantAttribute>())
-                stats.at(std::to_underlying(attribute)) = this->at(std::to_underlying(attribute) + irrelevant_attribute_count);
-            return stats;
+            Stats result{};
+            std::ranges::copy(*this | std::views::drop(irrelevant_attribute_count), result.begin());
+            return result;
         }
 
         constexpr int character_level() const
@@ -177,7 +176,7 @@ export namespace erdo::calculator
     };
 
     struct AttackRating {
-        Stats stats;
+        FullStats full_stats;
         AttackOptions attack_options;
         std::reference_wrapper<const Weapon> weapon;
 
@@ -320,7 +319,7 @@ export namespace erdo::calculator
                 two_handing = true;
 
             if (two_handing)
-                stats.at(std::to_underlying(RelevantAttribute::STRENGTH)) *= 1.5;
+                stats[std::to_underlying(Attribute::STRENGTH)] *= 1.5;
 
             return stats;
         }
@@ -465,13 +464,14 @@ export namespace erdo::calculator
             return total_attack_power;
         }
 
-        AttackRating calculate_attack_rating(const AttackOptions &attack_options, const Stats &stats) const
+        AttackRating calculate_attack_rating(const AttackOptions &attack_options, const FullStats &full_stats) const
         {
+            auto stats = full_stats.to_stats();
             auto adjusted_stats = this->adjust_stats_for_two_handing(attack_options.two_handing, stats);
             auto upgrade_level = attack_options.upgrade_levels[upgrade_level_index];
 
             AttackRating attack_rating{
-                .stats=stats,
+                .full_stats=full_stats,
                 .attack_options=attack_options,
                 .weapon=*this,
                 .attribute_scalings = this->attribute_scalings[upgrade_level],
@@ -515,8 +515,9 @@ export namespace erdo::calculator
         std::array<int, 3> statusSpEffectId; // statusSpEffectId1, statusSpEffectId2, statusSpEffectId3
     };
 
-    constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats) {
-        constexpr auto N = Stats{}.size();
+    constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats)
+    {
+        constexpr auto N = std::tuple_size_v<Stats>;
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points;
         std::size_t count = 0;
@@ -611,15 +612,17 @@ export namespace erdo::calculator
 
         return count;
     }
-    std::vector<Stats> get_stat_variations(const int attribute_points, const Stats &min_stats) {
-        constexpr auto N = Stats{}.size();
+    std::vector<FullStats> get_stat_variations(const int attribute_points, const FullStats &full_min_stats)
+    {
+        constexpr auto N = std::tuple_size_v<Stats>;
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points;
 
+        auto min_stats = full_min_stats.to_stats();
         auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
         if (possible_occurances == 0)
             return {};
-        std::vector<Stats> stat_variations{};
+        std::vector<FullStats> stat_variations{};
         stat_variations.reserve(possible_occurances);
 
         for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
@@ -637,7 +640,7 @@ export namespace erdo::calculator
                         auto m = SUM_i_j_k_l;
                         if (min_stats[4] <= m && m <= UPPER)
                         {
-                            stat_variations.push_back({i, j, k, l, m});
+                            stat_variations.push_back({{i, j, k, l, m}});
                         }
                     }
                 }

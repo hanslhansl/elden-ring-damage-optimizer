@@ -32,10 +32,10 @@ namespace erdo::optimizer
     }
 
 
-    export AttackRating optimize_weapon(const Weapon &weapon, const std::vector<Stats>& stat_variations, const AttackOptions& attack_options) {
-        auto attack_ratings_view = stat_variations | std::views::transform([&](const Stats &stats) {
-                return weapon.calculate_attack_rating(attack_options, stats);
-            }) | std::ranges::to<std::vector>();
+    export AttackRating optimize_weapon(const Weapon &weapon, const std::vector<FullStats>& stat_variations, const AttackOptions& attack_options) {
+        auto attack_ratings_view = stat_variations
+            | std::views::transform([&](const FullStats &full_stats) { return weapon.calculate_attack_rating(attack_options, full_stats); })
+            | std::ranges::to<std::vector>();
 
         return std::ranges::max(attack_ratings_view, {}, total_attack_power_projection);
     }
@@ -43,7 +43,7 @@ namespace erdo::optimizer
     export
     template<auto optimize_weapon = optimize_weapon, auto...th_flags>
     SortedMultiFuture<AttackRating, std::ranges::greater, decltype(&total_attack_power_projection)>
-    optimize(const std::vector<Weapon> &weapons, const std::vector<Stats>& stat_variations, AttackOptions attack_options, BS::thread_pool<th_flags...>& pool) {
+    optimize(const std::vector<Weapon> &weapons, const std::vector<FullStats>& stat_variations, AttackOptions attack_options, BS::thread_pool<th_flags...>& pool) {
         if (std::ranges::empty(stat_variations))
             return {
                 {},
@@ -79,8 +79,8 @@ namespace erdo::optimizer
         auto do_weapon = [&](std::size_t i) {
             auto &&weapon = weapons.at(i);
 
-            auto attack_ratings_view = stat_variations | std::views::transform([&](const Stats &stats) {
-                return weapon.calculate_attack_rating(attack_options, stats);
+            auto attack_ratings_view = stat_variations | std::views::transform([&](const FullStats &full_stats) {
+                return weapon.calculate_attack_rating(attack_options, full_stats);
             });
 
             auto max_element = std::ranges::max_element(attack_ratings_view, {}, total_attack_power_projection);

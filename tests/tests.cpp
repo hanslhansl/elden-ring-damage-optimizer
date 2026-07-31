@@ -41,20 +41,20 @@ TEST_CASE("verify stat variations correctness") {
     
     auto stat_variations = calculator::get_stat_variations(
         1 + 60,
-        calculator::character_class_stats.at("wretch").to_stats()
+        calculator::character_class_stats.at("wretch")
     );
     CHECK(stat_variations.size() == expected_stat_variation_count);
 }
 
 TEST_CASE("verify total attack rating optimization correctness") {
-    std::vector<calculator::Stats> stat_variations{};
+    std::vector<calculator::FullStats> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("calculator::get_stat_variations")
 #endif
     {
         stat_variations = calculator::get_stat_variations(
             1 + 60,
-            calculator::character_class_stats.at("wretch").to_stats()
+            calculator::character_class_stats.at("wretch")
         );
     };
 
@@ -71,7 +71,7 @@ TEST_CASE("verify total attack rating optimization correctness") {
     auto&& attack_rating = attack_ratings.front();
 
     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
-    CHECK(attack_rating.stats == calculator::Stats{ 21, 10, 10, 10, 10 });
+    CHECK(attack_rating.full_stats == calculator::FullStats{ 10, 10, 10, 21, 10, 10, 10, 10 });
 
     auto expected = 734.8908832256299;
     CHECK_THAT(attack_rating.total_attack_power.at(1), Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
@@ -81,10 +81,10 @@ TEST_CASE("verify total attack rating calculation correctness 1") {
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::Stats stats{ 21, 10, 10, 10, 10 };
+    calculator::FullStats full_stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(1); })
+        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, full_stats).total_attack_power.at(1); })
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_1.size());
@@ -97,10 +97,10 @@ TEST_CASE("verify total attack rating calculation correctness 2") {
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::Stats stats{ 70, 70, 70, 70, 70 };
+    calculator::FullStats full_stats{ 70, 70, 70, 70, 70 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, stats).total_attack_power.at(1); })
+        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, full_stats).total_attack_power.at(1); })
         | std::ranges::to<std::vector>();
 
     // std::println("{}", total_attack_powers);
