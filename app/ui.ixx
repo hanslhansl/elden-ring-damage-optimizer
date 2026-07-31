@@ -7,6 +7,7 @@ module;
 #include <QtConcurrent>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
+#include "ui_optimize_widget.h"
 #include "ui_plot_tab.h"
 export module erdo.ui;
 export import erdo.ui.weapons_table;
@@ -201,12 +202,12 @@ namespace erdo::ui
             // character level label
             this->character_stats_layout->addRow(
                 string_to_display("character level:"),
-                this->character_level_label = new QLabel(QString::number(calculator::attribute_points_to_character_level(this->get_character_full_stats().attribute_points())))
+                this->character_level_label = new QLabel(QString::number(this->get_character_full_stats().character_level()))
             );
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::FullStats& full_stats){
-                this->character_level_label->setText(QString::number(calculator::attribute_points_to_character_level(full_stats.attribute_points())));
+                this->character_level_label->setText(QString::number(full_stats.character_level()));
                 this->calculate_weapon_stats();
             });
 
@@ -375,11 +376,12 @@ namespace erdo::ui
 
     class OptimizeTab : public StatsTabBase
     {
-    public:
         QSpinBox* max_character_level_spinbox{};
         QLabel* free_attribute_points_label{};
         QLabel* stat_variations_label{};
+        Ui::OptimizeWidget optimize;
 
+    public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
             auto character_stats_callback = [this](const calculator::FullStats& full_stats){
@@ -395,7 +397,7 @@ namespace erdo::ui
             this->max_character_level_spinbox->setMinimum(1);
             calculator::FullStats max_stats{};
             max_stats.fill(99);
-            this->max_character_level_spinbox->setMaximum(calculator::attribute_points_to_character_level(max_stats.attribute_points()));
+            this->max_character_level_spinbox->setMaximum(max_stats.character_level());
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, [this, character_stats_callback]() {
                 character_stats_callback(this->get_character_full_stats());
             });
@@ -409,6 +411,67 @@ namespace erdo::ui
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, character_stats_callback);
             character_stats_callback(this->get_character_full_stats());
+
+            /*// base game / dlc filter
+            connect(
+                this->base_game_dlc_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<bool> selected;
+
+                    for (QListWidgetItem *item : this->base_game_dlc_list->selectedItems())
+                        selected.insert(item->data(Qt::UserRole).toBool());
+                }
+            );
+
+            // weapon type filter
+            connect(
+                this->type_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<int> selected;
+
+                    for (QListWidgetItem *item : this->type_list->selectedItems())
+                        selected.insert(item->data(Qt::UserRole).toInt());
+                }
+            );
+
+            // weapon base name filter
+            connect(
+                this->base_name_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<QString> selected;
+
+                    for (QListWidgetItem *item : this->base_name_list->selectedItems())
+                        selected.insert(item->text());
+                }
+            );
+
+            // weapon affinity filter
+            connect(
+                this->affinity_list,
+                &QListWidget::itemSelectionChanged,
+                this,
+                [this]() {
+                    QSet<int> selected;
+
+                    for (QListWidgetItem *item : this->affinity_list->selectedItems())
+                        selected.insert(item->data(Qt::UserRole).toInt());
+                }
+            );*/
+
+
+            // optimize widget
+            auto temp_layout = new QVBoxLayout();
+            this->horizontal_layout->addLayout(temp_layout);
+            auto opt_group = new QGroupBox();
+            temp_layout->addWidget(opt_group);
+            temp_layout->addStretch(1);
+            this->optimize.setupUi(opt_group);
         }
     
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)

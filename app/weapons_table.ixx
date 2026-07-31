@@ -225,7 +225,7 @@ namespace erdo::ui
 
             void update(const calculator::AttackRating& attack_rating)
             {
-                (*this)[0] = calculator::attribute_points_to_character_level(attack_rating.full_stats.attribute_points());
+                (*this)[0] = attack_rating.full_stats.character_level();
             }
         };
 

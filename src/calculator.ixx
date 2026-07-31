@@ -146,6 +146,10 @@ export namespace erdo::calculator
         {
             return std::ranges::fold_left(*this, 0, std::plus<>{});
         }
+        constexpr int character_level() const
+        {
+            return attribute_points_to_character_level(this->attribute_points());
+        } 
     };
     const std::map<std::string, FullStats> character_class_stats{
         {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
