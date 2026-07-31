@@ -60,6 +60,8 @@ namespace erdo::ui
 
     class StatsTabBase : public QWidget, public Ui::StatsTab
     {
+        Q_OBJECT
+
     protected:
         std::span<calculator::Weapon> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
@@ -74,6 +76,19 @@ namespace erdo::ui
             for (const auto& [class_name, _] : calculator::character_class_stats)
                 this->starting_class_combobox->addItem(QString::fromStdString(class_name));
             this->starting_class_combobox->setCurrentIndex(-1);
+            connect(this->starting_class_combobox, &QComboBox::currentTextChanged, [this](const QString& text) {
+                if (text.isEmpty())
+                    return;
+
+                auto&& full_stats = calculator::character_class_stats.at(text.toStdString());
+                for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, full_stats))
+                {
+                    QSignalBlocker b { spinbox };
+                    spinbox->setValue(stat);
+                }
+
+                emit character_stats_changed(full_stats);
+            });
 
             // character stats spinboxes
             for (auto& attribute : enumerators_of<calculator::Attribute>())
@@ -85,6 +100,23 @@ namespace erdo::ui
                     string_to_display(enum_to_string(attribute)),
                     attribute_spinbox
                 );
+
+                connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
+                    auto&& full_stats = this->get_character_full_stats();
+
+                    QSignalBlocker b { this->starting_class_combobox };
+                    auto it = std::ranges::find(
+                        calculator::character_class_stats,
+                        full_stats,
+                        &decltype(calculator::character_class_stats)::value_type::second
+                    );
+                    if (it != calculator::character_class_stats.end()) 
+                        this->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
+                    else
+                        this->starting_class_combobox->setCurrentIndex(-1);
+
+                    emit character_stats_changed(full_stats);
+                });
             }
 
             // base game / dlc
@@ -120,6 +152,7 @@ namespace erdo::ui
                 stat = spinbox->value();
             return stats;
         }
+
         calculator::FullStats get_character_full_stats() const
         {
             calculator::FullStats full_stats{};
@@ -140,45 +173,42 @@ namespace erdo::ui
         {
             return this->two_handing_checkbox->isChecked();
         }
+    
+        void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
+        {
+            auto new_base_names = active_weapon_data
+                | std::views::transform(&calculator::Weapon::base_name)
+                | std::ranges::to<std::set>()
+                | std::views::transform(static_cast<QString(*)(const std::string&)>(string_to_display))
+                | std::ranges::to<QList>();
+            this->base_name_list->clear();
+            this->base_name_list->addItems(new_base_names);
+
+            this->active_weapon_data = active_weapon_data;
+        }
+    
+    signals:
+        void character_stats_changed(const calculator::FullStats& full_stats);
     };
 
     class StatsTab : public StatsTabBase
     {
-        Q_OBJECT
-
     public:
         QLabel* character_level_label{};
 
         explicit StatsTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
-            // starting class combobox
-            connect(this->starting_class_combobox, &QComboBox::currentTextChanged, [this](const QString& text) {
-                if (text.isEmpty())
-                    return;
-
-                this->set_character_full_stats(calculator::character_class_stats.at(text.toStdString()));
-            });
+            // character level label
+            this->character_stats_layout->addRow(
+                string_to_display("character level:"),
+                this->character_level_label = new QLabel(QString::number(this->get_character_full_stats().character_level()))
+            );
 
             // character stats spinboxes
-            for (auto attribute_spinbox : this->attribute_spinboxes)
-                connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
-                    auto it = std::ranges::find(
-                        calculator::character_class_stats,
-                        this->get_character_full_stats(),
-                        &decltype(calculator::character_class_stats)::value_type::second
-                    );
-
-                    QSignalBlocker b { this->starting_class_combobox };
-                    if (it != calculator::character_class_stats.end()) 
-                        this->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
-                    else
-                        this->starting_class_combobox->setCurrentIndex(-1);
-
-                    this->calculate_weapon_stats();
-                });
-            
-            // character level label
-            this->character_stats_layout->addRow(string_to_display("character level:"), this->character_level_label = new QLabel());
+            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::FullStats& full_stats){
+                this->character_level_label->setText(QString::number(full_stats.character_level()));
+                this->calculate_weapon_stats();
+            });
 
             // upgrade level spinboxes
             connect(this->normal_upgrade_level_spinbox, &QSpinBox::valueChanged, this, &StatsTab::calculate_weapon_stats);
@@ -252,27 +282,6 @@ namespace erdo::ui
             this->weapon_table->hide_section<sections::CharacterLevelSection>();
         }
 
-        void set_character_stats(const calculator::Stats& stats)
-        {
-            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
-            {
-                QSignalBlocker b { spinbox };
-                spinbox->setValue(stat);
-            }
-
-            this->calculate_weapon_stats();
-        }
-        void set_character_full_stats(const calculator::FullStats& full_stats)
-        {
-            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, full_stats))
-            {
-                QSignalBlocker b { spinbox };
-                spinbox->setValue(stat);
-            }
-
-            this->calculate_weapon_stats();
-        }
-
         void set_upgrade_levels(const calculator::UpgradeLevels& upgrade_levels)
         {
             QSignalBlocker b1 { this->normal_upgrade_level_spinbox };
@@ -295,6 +304,10 @@ namespace erdo::ui
 
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
         {
+            auto start = std::chrono::high_resolution_clock::now();
+
+            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
+
             // get character stats
             auto full_stats = this->get_character_full_stats();
 
@@ -304,42 +317,28 @@ namespace erdo::ui
                 this->get_two_handing()
             };
 
-            this->character_level_label->setText(QString::number(full_stats.character_level()));
+            this->weapon_table->model->set_rows(
+                blocking_progress_bar_dialog(
+                    this,
+                    "calculating weapon data",
+                    [&](){
+                        std::vector<Row> result{};
+                        
+                        result.reserve(this->active_weapon_data.size());
+                        result.append_range(this->active_weapon_data
+                            | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
+                        );
 
-            
-            auto start = std::chrono::high_resolution_clock::now();
-
-            auto&& new_rows = blocking_progress_bar_dialog(
-                this,
-                "calculating weapon data",
-                [&](){
-                    std::vector<Row> result{};
-                    
-                    result.reserve(active_weapon_data.size());
-                    result.append_range(active_weapon_data
-                        | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
-                    );
-
-                    return result;
-                }
+                        return result;
+                    }
+                )
             );
-
-            auto new_base_names = active_weapon_data
-                | std::views::transform(&calculator::Weapon::base_name)
-                | std::ranges::to<std::set>()
-                | std::views::transform(static_cast<QString(*)(const std::string&)>(string_to_display))
-                | std::ranges::to<QList>();
-            this->base_name_list->clear();
-            this->base_name_list->addItems(new_base_names);
-            
-            this->active_weapon_data = active_weapon_data;
-            this->weapon_table->model->set_rows(std::move(new_rows));
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
-            std::println("calculate weapon data: {} seconds", elapsed.count());
+            std::println("StatsTab::set_active_weapon_data: {} seconds", elapsed.count());
         
-            QTimer::singleShot(50, this->weapon_table, &WeaponTable::resize_columns_to_contents);
+            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
         
         void calculate_weapon_stats()
@@ -352,8 +351,6 @@ namespace erdo::ui
                 this->get_upgrade_levels(),
                 this->get_two_handing()
             };
-
-            this->character_level_label->setText(QString::number(full_stats.character_level()));
 
             auto start = std::chrono::high_resolution_clock::now();
 
@@ -370,16 +367,14 @@ namespace erdo::ui
             this->weapon_table->model->notifyAllChanged();
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
-            std::println("recalculate weapon data: {} seconds", elapsed.count());
-            
-            QTimer::singleShot(50, this->weapon_table, &WeaponTable::resize_columns_to_contents);
+            std::println("StatsTab::calculate_weapon_stats: {} seconds", elapsed.count());
+
+            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
     };
 
     class OptimizeTab : public StatsTabBase
     {
-        Q_OBJECT
-
     public:
         QSpinBox* max_character_level_spinbox{};
         QLabel* attribute_points_label{};
@@ -388,32 +383,39 @@ namespace erdo::ui
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
             // max character level label
-            this->character_stats_layout->addRow(
-                string_to_display("max character level:"),
-                this->max_character_level_spinbox = new QSpinBox()
-            );
+            this->character_stats_layout->addRow(string_to_display("max character level:"), this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
             calculator::FullStats max_stats{};
             max_stats.fill(99);
             this->max_character_level_spinbox->setMaximum(max_stats.character_level());
 
-            // character level label
-            this->character_stats_layout->addRow(
-                string_to_display("attribute points:"),
-                this->attribute_points_label = new QLabel()
-            );
+            // attribute points label
+            this->character_stats_layout->addRow(string_to_display("attribute points:"), this->attribute_points_label = new QLabel());
 
-            // character level label
-            this->character_stats_layout->addRow(
-                string_to_display("stat variations:"),
-                this->stat_variations_label = new QLabel()
-            );
+            // stat variations label
+            this->character_stats_layout->addRow(string_to_display("stat variations:"), this->stat_variations_label = new QLabel());
+
+            // character stats spinboxes
+            auto character_stats_spinboxes_callback = [this](const calculator::FullStats& full_stats){
+                auto attribute_points = full_stats.attribute_points();
+                this->attribute_points_label->setText(QString::number(attribute_points));
+                this->stat_variations_label->setText(QString::number(calculator::get_stat_variation_count(attribute_points, full_stats.to_stats())));
+            };
+            connect(this, &StatsTabBase::character_stats_changed, character_stats_spinboxes_callback);
+            character_stats_spinboxes_callback(this->get_character_full_stats());
         }
     
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
         {
+            auto start = std::chrono::high_resolution_clock::now();
 
-            QTimer::singleShot(50, this->weapon_table, &WeaponTable::resize_columns_to_contents);
+            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
+
+            this->weapon_table->model->set_rows({});
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            std::println("OptimizeTab::set_active_weapon_data: {} seconds", elapsed.count());
         }
     };
 
@@ -485,7 +487,7 @@ namespace erdo::ui
                 group->addAction(action);
                 connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
                 if (i == 0)
-                    QTimer::singleShot(50, action, &QAction::trigger);
+                    QTimer::singleShot(0, action, &QAction::trigger);
             }
             this->ui->menu_weapon_data->addSeparator();
             QAction* action = this->ui->menu_weapon_data->addAction("load weapon data from directory");
@@ -515,7 +517,7 @@ namespace erdo::ui
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
-            std::println("load weapon data: {} seconds", elapsed.count());
+            std::println("MainWindow::set_active_weapon_data: {} seconds", elapsed.count());
 
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);

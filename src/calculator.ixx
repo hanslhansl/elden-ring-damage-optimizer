@@ -136,7 +136,12 @@ export namespace erdo::calculator
 
         constexpr int character_level() const
         {
-            return std::ranges::fold_left(*this, 0, std::plus<>{}) - 79;
+            return this->attribute_points() - 79;
+        }
+
+        constexpr int attribute_points() const
+        {
+            return std::ranges::fold_left(*this, 0, std::plus<>{});
         }
     };
     const std::map<std::string, FullStats> character_class_stats{
@@ -612,13 +617,12 @@ export namespace erdo::calculator
 
         return count;
     }
-    std::vector<FullStats> get_stat_variations(const int attribute_points, const FullStats &full_min_stats)
+    std::vector<FullStats> get_stat_variations(const int attribute_points, const Stats &min_stats)
     {
         constexpr auto N = std::tuple_size_v<Stats>;
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points;
 
-        auto min_stats = full_min_stats.to_stats();
         auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
         if (possible_occurances == 0)
             return {};
@@ -640,7 +644,7 @@ export namespace erdo::calculator
                         auto m = SUM_i_j_k_l;
                         if (min_stats[4] <= m && m <= UPPER)
                         {
-                            stat_variations.push_back({{i, j, k, l, m}});
+                            stat_variations.push_back({i, j, k, l, m});
                         }
                     }
                 }

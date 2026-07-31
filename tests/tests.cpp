@@ -41,7 +41,7 @@ TEST_CASE("verify stat variations correctness") {
     
     auto stat_variations = calculator::get_stat_variations(
         1 + 60,
-        calculator::character_class_stats.at("wretch")
+        calculator::character_class_stats.at("wretch").to_stats()
     );
     CHECK(stat_variations.size() == expected_stat_variation_count);
 }
@@ -54,7 +54,7 @@ TEST_CASE("verify total attack rating optimization correctness") {
     {
         stat_variations = calculator::get_stat_variations(
             1 + 60,
-            calculator::character_class_stats.at("wretch")
+            calculator::character_class_stats.at("wretch").to_stats()
         );
     };
 

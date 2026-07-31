@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="main_layout">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0,1,1,1">
      <item>
       <widget class="QGroupBox" name="character_stats_box">
        <property name="locale">
