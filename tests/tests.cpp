@@ -9,7 +9,8 @@ import erdo;
 
 using namespace erdo;
 
-const auto& get_weapons() {
+const auto& get_weapons()
+{
     static std::once_flag flag;
     static std::vector<calculator::Weapon> data;
     static std::vector<std::reference_wrapper<const calculator::Weapon>> data_reference;

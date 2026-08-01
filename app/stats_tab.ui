@@ -92,7 +92,7 @@
              <locale language="English" country="AmericanSamoa"/>
             </property>
             <property name="maximum">
-             <number>9</number>
+             <number>10</number>
             </property>
            </widget>
           </item>
@@ -175,6 +175,9 @@
           </property>
           <property name="selectionMode">
            <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
+          </property>
+          <property name="sortingEnabled">
+           <bool>true</bool>
           </property>
          </widget>
         </item>

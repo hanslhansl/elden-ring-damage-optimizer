@@ -15,7 +15,7 @@ export import erdo.ui.weapons_table;
 
 import erdo;
 import std;
-
+import BS.thread_pool;
 
 namespace erdo::ui
 {
@@ -176,6 +176,14 @@ namespace erdo::ui
             return this->two_handing_checkbox->isChecked();
         }
     
+        calculator::AttackOptions get_attack_options()
+        {
+            return calculator::AttackOptions{
+                this->get_upgrade_levels(),
+                this->get_two_handing()
+            };
+        }
+
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
         {
             auto new_base_names = active_weapon_data
@@ -314,24 +322,19 @@ namespace erdo::ui
             auto full_stats = this->get_character_full_stats();
 
             // get attack options
-            calculator::AttackOptions attack_options{
-                this->get_upgrade_levels(),
-                this->get_two_handing()
-            };
+            auto attack_options = this->get_attack_options();
 
             this->weapon_table->model->set_rows(
                 blocking_progress_bar_dialog(
                     this,
                     "calculating weapon data",
                     [&](){
-                        std::vector<Row> result{};
-                        
-                        result.reserve(this->active_weapon_data.size());
-                        result.append_range(this->active_weapon_data
+                        std::vector<Row> rows{};
+                        rows.reserve(this->active_weapon_data.size());
+                        rows.append_range(this->active_weapon_data
                             | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
                         );
-
-                        return result;
+                        return rows;
                     }
                 )
             );
@@ -349,10 +352,7 @@ namespace erdo::ui
             auto full_stats = this->get_character_full_stats();
 
             // get attack options
-            calculator::AttackOptions attack_options{
-                this->get_upgrade_levels(),
-                this->get_two_handing()
-            };
+            auto attack_options = this->get_attack_options();
 
             auto start = std::chrono::high_resolution_clock::now();
 
@@ -448,6 +448,45 @@ namespace erdo::ui
 
         void optimize_brute_force()
         {
+            auto start = std::chrono::high_resolution_clock::now();
+
+            auto full_stats = this->get_character_full_stats();
+            auto attack_options = this->get_attack_options();
+            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
+            auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
+
+            auto thread_count = this->optimize.threads_spinbox->value();
+
+            this->weapon_table->model->set_rows(
+                blocking_progress_bar_dialog(
+                    this,
+                    "optimizing",
+                    [&](){
+                        BS::thread_pool<> thread_pool{ thread_count };
+
+                        auto attack_ratings = optimizer::optimize<optimizer::projections::total_attack_power>(
+                            this->filtered_active_weapon_data,
+                            stat_variations,
+                            attack_options,
+                            thread_pool
+                        ).get();
+
+                        std::vector<Row> rows{};
+                        rows.reserve(attack_ratings.size());
+                        rows.append_range(attack_ratings
+                            | std::views::transform([&](const calculator::AttackRating& attack_rating) { return Row(attack_rating); })
+                        );
+
+                        return rows;
+                    }
+                )
+            );
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            std::println("OptimizeTab::optimize_brute_force: {} seconds", elapsed.count());
+        
+            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
 
         }
         void optimize_v2()
