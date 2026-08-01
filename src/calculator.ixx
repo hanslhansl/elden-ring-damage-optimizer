@@ -124,6 +124,15 @@ constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 
 
 export namespace erdo::calculator
 {
+    constexpr auto attribute_points_to_character_level(int attribute_points)
+    {
+        return attribute_points - 79;
+    }
+    constexpr auto character_level_to_attribute_points(int character_level)
+    {
+        return character_level + 79;
+    }
+
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
     using Stats = std::array<int, enumerators_of<RelevantAttribute>().size()>;
     struct FullStats : std::array<int, enumerators_of<Attribute>().size()>
@@ -149,7 +158,12 @@ export namespace erdo::calculator
         constexpr int character_level() const
         {
             return attribute_points_to_character_level(this->attribute_points());
-        } 
+        }
+
+        constexpr std::array<int, enumerators_of<Attribute>().size()>& to_array()
+        {
+            return *this;
+        }
     };
     const std::map<std::string, FullStats> character_class_stats{
         {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
@@ -166,15 +180,7 @@ export namespace erdo::calculator
         {"idus knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     };
 
-    constexpr auto attribute_points_to_character_level(int attribute_points)
-    {
-        return attribute_points - 79;
-    }
-    constexpr auto character_level_to_attribute_points(int character_level)
-    {
-        return character_level + 79;
-    }
-
+    
     using ScalingCurve = std::array<double, 149>;
     using AttributeScaling = std::array<double, enumerators_of<RelevantAttribute>().size()>;
     using AttackElementCorrects = std::array<AttributeScaling, enumerators_of<AttackPowerType>().size()>;
@@ -645,23 +651,30 @@ export namespace erdo::calculator
         std::vector<FullStats> stat_variations{};
         stat_variations.reserve(possible_occurances);
 
+        auto result = min_full_stats;
+        auto& i = result[irrelevant_attribute_count];
+        auto& j = result[irrelevant_attribute_count + 1];
+        auto& k = result[irrelevant_attribute_count + 2];
+        auto& l = result[irrelevant_attribute_count + 3];
+        auto& m = result[irrelevant_attribute_count + 4];
+
         auto min_stats = min_full_stats.to_relevant_stats();
-        for (auto i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
+        for (i = min_stats[0]; i <= std::min(UPPER, SUM); ++i)
         {
             auto SUM_i = SUM - i;
-            for (auto j = min_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
+            for (j = min_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
             {
                 auto SUM_i_j = SUM_i - j;
-                for (auto k = min_stats[2]; k <= std::min(UPPER, SUM_i_j); ++k)
+                for (k = min_stats[2]; k <= std::min(UPPER, SUM_i_j); ++k)
                 {
                     auto SUM_i_j_k = SUM_i_j - k;
-                    for (auto l = min_stats[3]; l <= std::min(UPPER, SUM_i_j_k); ++l)
+                    for (l = min_stats[3]; l <= std::min(UPPER, SUM_i_j_k); ++l)
                     {
                         auto SUM_i_j_k_l = SUM_i_j_k - l;
-                        auto m = SUM_i_j_k_l;
+                        m = SUM_i_j_k_l;
                         if (min_stats[4] <= m && m <= UPPER)
                         {
-                            stat_variations.push_back({i, j, k, l, m});
+                            stat_variations.push_back(result);
                         }
                     }
                 }
