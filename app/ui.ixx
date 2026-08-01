@@ -455,7 +455,7 @@ namespace erdo::ui
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
 
-            auto thread_count = this->optimize.threads_spinbox->value();
+            std::size_t thread_count = this->optimize.threads_spinbox->value();
 
             this->weapon_table->model->set_rows(
                 blocking_progress_bar_dialog(

@@ -188,6 +188,7 @@ export namespace erdo::calculator
     using IneffectiveAttackPowerTypes = std::array<bool, enumerators_of<AttackPowerType>().size()>;
     using IneffectiveAttributes = std::array<bool, enumerators_of<RelevantAttribute>().size()>;
     using BaseAttackPower = std::array<double, enumerators_of<AttackPowerType>().size()>;
+    using TotalScalings = std::array<double, enumerators_of<AttackPowerType>().size()>;
     using AttackPower = std::array<double, 2>;  // base / full
     using AttackPowers = std::array<AttackPower, enumerators_of<AttackPowerType>().size()>;
     using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
@@ -210,6 +211,7 @@ export namespace erdo::calculator
         AttackPower total_attack_power;
         AttackPowers attack_powers;
         double spell_scaling;
+        TotalScalings total_scalings;
         AttributeScalings attribute_scalings;
         IneffectiveAttackPowerTypes ineffective_attack_power_types;
         IneffectiveAttributes ineffective_attributes;
@@ -373,41 +375,15 @@ export namespace erdo::calculator
             return ineffective_attributes;
         }
 
-        IneffectiveAttackPowerTypes calculate_ineffective_attack_power_types(const IneffectiveAttributes& ineffective_attributes, const BaseAttackPower& base_attack_powers) const
-        {
-            IneffectiveAttackPowerTypes ineffective_attack_power_types{};
-
-            for(auto attack_power_type_integral : enumerator_integrals_of<AttackPowerType>())
-            {
-                auto base_attack_power = base_attack_powers[attack_power_type_integral];
-
-                if (base_attack_power || this->is_sorcery_or_incantation_tool)
-                {
-                    auto &&scaling_attributes = this->attack_power_attribute_scaling[attack_power_type_integral];
-
-                    for (auto attribute : enumerator_integrals_of<RelevantAttribute>())
-                    {
-                        if (ineffective_attributes[attribute] && scaling_attributes[attribute])
-                        {
-                            ineffective_attack_power_types[attack_power_type_integral] = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            return ineffective_attack_power_types;
-        }
-
         double calculate_total_scaling(
-            bool ineffective_attack_power_type,
+            bool is_ineffective_attack_power_type,
             const Stats& effective_stats,
             const AttributeScaling& scaling_attributes,
             const AttributeScaling& attribute_scaling_at_upgrade_level,
             const ScalingCurve& scaling_curve
         ) const
         {
-            if (ineffective_attack_power_type)
+            if (is_ineffective_attack_power_type)
             {
                 return 1. - ineffective_attribute_penalty;
             }
@@ -436,42 +412,48 @@ export namespace erdo::calculator
             }
         }
 
-        auto calculate_attack_powers(
+        auto calculate_attack_power(
             const Stats& stats,
             const Stats& adjusted_stats,
             const bool disable_two_handing_attack_power_bonus,
-            const AttackPowerType &attack_power_type,
+            const bool is_damage_type,
+            const AttributeScaling& scaling_attributes,
+            const ScalingCurve& scaling_curve,
             const IneffectiveAttributes& ineffective_attributes,
-            const IneffectiveAttackPowerTypes& ineffective_attack_power_types,
-            const BaseAttackPower& base_attack_powers,
+            bool& is_ineffective_attack_power_type,
+            const double& base_attack_power,
             const AttributeScaling& attribute_scaling_at_upgrade_level,
-            AttackPowers& attack_powers,
-            double& spell_scaling
+            AttackPower& attack_power,
+            double& total_scaling
         ) const
         {
-            auto attack_power_type_integral = std::to_underlying(attack_power_type);
+            if (base_attack_power || this->is_sorcery_or_incantation_tool)
+            {
+                for (auto attribute : enumerator_integrals_of<RelevantAttribute>())
+                {
+                    if (ineffective_attributes[attribute] && scaling_attributes[attribute])
+                    {
+                        is_ineffective_attack_power_type = true;
+                        break;
+                    }
+                }
+            }
 
-            auto is_damage_type = attack_power_type_integral <= std::to_underlying(AttackPowerType::HOLY);
-            auto total_scaling = this->calculate_total_scaling(
-                ineffective_attack_power_types[attack_power_type_integral],
+            total_scaling = this->calculate_total_scaling(
+                is_ineffective_attack_power_type,
                 (!disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats,
-                this->attack_power_attribute_scaling[attack_power_type_integral],
+                scaling_attributes,
                 attribute_scaling_at_upgrade_level,
-                this->attack_power_scaling_curves[attack_power_type_integral]
+                scaling_curve
             );
 
-            auto base_attack_power = base_attack_powers[attack_power_type_integral];
             if (base_attack_power != 0)
             {
                 auto full_attack_power = base_attack_power * total_scaling;
 
-                auto &&attack_power = attack_powers[attack_power_type_integral];
                 attack_power[0] = base_attack_power;
                 attack_power[1] = full_attack_power;
             }
-
-            if (attack_power_type == AttackPowerType::PHYSICAL && this->is_sorcery_or_incantation_tool)
-                spell_scaling = total_scaling;
 
             return;
         }
@@ -505,25 +487,25 @@ export namespace erdo::calculator
                 .ineffective_attributes=this->calculate_ineffective_attributes(adjusted_stats),
             };
             auto&& base_attack_powers = this->base_attack_powers[upgrade_level];
-            attack_rating.ineffective_attack_power_types = this->calculate_ineffective_attack_power_types(
-                attack_rating.ineffective_attributes,
-                base_attack_powers
-            );
 
-
-            for (auto &&attack_power_type : enumerators_of<AttackPowerType>())
-                this->calculate_attack_powers(
+            for (auto attack_power_type_integral : enumerator_integrals_of<AttackPowerType>())
+                this->calculate_attack_power(
                     stats,
                     adjusted_stats,
                     attack_options.disable_two_handing_attack_power_bonus,
-                    attack_power_type,
+                    attack_power_type_integral <= std::to_underlying(AttackPowerType::HOLY),
+                    this->attack_power_attribute_scaling[attack_power_type_integral],
+                    this->attack_power_scaling_curves[attack_power_type_integral],
                     attack_rating.ineffective_attributes,
-                    attack_rating.ineffective_attack_power_types,
-                    base_attack_powers,
+                    attack_rating.ineffective_attack_power_types[attack_power_type_integral],
+                    base_attack_powers[attack_power_type_integral],
                     this->attribute_scalings[upgrade_level],
-                    attack_rating.attack_powers,
-                    attack_rating.spell_scaling
+                    attack_rating.attack_powers[attack_power_type_integral],
+                    attack_rating.total_scalings[attack_power_type_integral]
                 );
+
+            if (this->is_sorcery_or_incantation_tool)
+                attack_rating.spell_scaling = attack_rating.total_scalings[std::to_underlying(AttackPowerType::PHYSICAL)];
 
             attack_rating.total_attack_power = this->calculate_total_attack_power(attack_rating.attack_powers);
 
