@@ -19,6 +19,8 @@ import BS.thread_pool;
 
 namespace erdo::ui
 {
+    BS::thread_pool<> thread_pool{};
+
     template<typename F>
     auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation)
     {
@@ -188,11 +190,14 @@ namespace erdo::ui
         {
             auto new_base_names = active_weapon_data
                 | std::views::transform(&calculator::Weapon::base_name)
-                | std::ranges::to<std::set>()
-                | std::views::transform(static_cast<QString(*)(const std::string&)>(string_to_display))
-                | std::ranges::to<QList>();
+                | std::ranges::to<std::set>();
+
             this->base_name_list->clear();
-            this->base_name_list->addItems(new_base_names);
+            for (auto&& base_name : new_base_names)
+            {
+                auto item = new QListWidgetItem(string_to_display(base_name), this->base_name_list);
+                item->setData(Qt::UserRole, QString::fromStdString(base_name));
+            }
 
             this->active_weapon_data = active_weapon_data;
         }
@@ -417,7 +422,7 @@ namespace erdo::ui
             std::unordered_set<std::string> base_name_set;
             base_name_set.reserve(selected_base_names.size());
             for (QListWidgetItem *item : selected_base_names)
-                base_name_set.insert(item->text().toStdString());
+                base_name_set.insert(item->data(Qt::UserRole).toString().toStdString());
 
             // weapon affinity filter
             auto selected_affinity = this->affinity_list->selectedItems();
@@ -455,16 +460,18 @@ namespace erdo::ui
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
 
-            std::size_t thread_count = this->optimize.threads_spinbox->value();
+            static constexpr auto optimizers = [](auto){
+                static constexpr auto [...enumerators] = enumerators_of<optimizer::Target>();
+                return std::array{ optimizer::optimizers<enumerators>.operator()... };
+            }(1);
+            auto target_index = this->optimize.target_combobox->currentIndex();
 
             this->weapon_table->model->set_rows(
                 blocking_progress_bar_dialog(
                     this,
                     "optimizing",
                     [&](){
-                        BS::thread_pool<> thread_pool{ thread_count };
-
-                        auto attack_ratings = optimizer::optimize<optimizer::projections::total_attack_power>(
+                        auto attack_ratings = optimizers.at(target_index)(
                             this->filtered_active_weapon_data,
                             stat_variations,
                             attack_options,
@@ -515,6 +522,18 @@ namespace erdo::ui
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);
 
+            // base game / dlc filter
+            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+
+            // weapon type filter
+            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+
+            // weapon base name filter
+            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+
+            // weapon affinity filter
+            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+
             // optimize widget
             auto temp_layout = new QVBoxLayout();
             this->horizontal_layout->addLayout(temp_layout);
@@ -522,6 +541,14 @@ namespace erdo::ui
             temp_layout->addWidget(opt_group);
             temp_layout->addStretch(1);
             this->optimize.setupUi(opt_group);
+
+            // optimize target combobox
+            for (const auto& target : enumerator_strings_of<optimizer::Target>())
+                this->optimize.target_combobox->addItem(string_to_display(target));
+            this->optimize.target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
+            
+            // thread count spinbox
+            connect(this->optimize.threads_spinbox, &QSpinBox::valueChanged, [](std::size_t size){ thread_pool.reset(size); });
 
             // optimize buttons
             connect(this->optimize.start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize_brute_force);

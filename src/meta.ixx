@@ -1,11 +1,11 @@
 module;
 // #include <meta>
-#include <ranges>
 export module erdo:meta;
 
 import std;
 
-export {
+export namespace erdo
+{
     template <typename E>
         requires std::is_enum_v<E>
     constexpr auto enum_string_mapping = nullptr;
@@ -134,4 +134,19 @@ export {
     {
         return std::ranges::contains(enumerator_integrals_of<E>(), integral);
     }
+
+
+    template<typename T, typename Tuple, std::size_t... Is>
+    constexpr std::size_t tuple_index_impl(std::index_sequence<Is...>)
+    {
+        constexpr bool matches[] = { std::same_as<T, std::tuple_element_t<Is, Tuple>>... };
+
+        for (std::size_t i = 0; i < sizeof...(Is); ++i)
+            if (matches[i])
+                return i;
+
+        throw std::out_of_range("Type not found in tuple");
+    }
+    template<typename T, typename Tuple>
+    constexpr std::size_t tuple_index_v = tuple_index_impl<T, Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 }
