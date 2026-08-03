@@ -5,7 +5,7 @@ module;
 #include <QProgressDialog>
 #include <QFuture>
 #include <QtConcurrent>
-#include <functional>
+#include <QCloseEvent>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -15,51 +15,45 @@ export import erdo.ui.weapons_table;
 
 import erdo;
 import std;
-import BS.thread_pool;
 
 namespace erdo::ui
 {
-    BS::thread_pool<> thread_pool{};
-
-    template<typename F>
-    auto blocking_progress_bar_dialog(QWidget* parent, const QString& label_text, F&& computation)
+    template<typename T>
+    bool execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget *parent, const QString &labelText, bool cancelable)
     {
-        using R = decltype(computation());
-
-        QProgressDialog dialog(nullptr/*label_text*/, nullptr, 0, 0, parent);
-        // auto title = parent->windowTitle();
-        dialog.setWindowTitle(label_text);
-        // dialog.setMinimumWidth(QFontMetrics(dialog.font()).horizontalAdvance(title) + 150);
-        dialog.setWindowModality(Qt::ApplicationModal);
-        dialog.setMinimumDuration(0);
-        dialog.setCancelButton(nullptr);
-        dialog.show();
-
-        QFuture<R> future = QtConcurrent::run(std::forward<F>(computation));
-
-        QFutureWatcher<R> watcher;
-        QEventLoop loop;
-
-        QObject::connect(
-            &watcher,
-            &QFutureWatcher<R>::finished,
-            &loop,
-            &QEventLoop::quit
-        );
-
+        QFutureWatcher<T> watcher;
         watcher.setFuture(future);
 
-        // Blocks this function, but keeps Qt responsive
-        loop.exec();
+        auto cancel_button_string = cancelable ? QObject::tr("Cancel") : QString{};
 
-        dialog.close();
+        QProgressDialog progress(labelText, cancel_button_string, 0, 0, parent);
+        progress.setWindowModality(Qt::ApplicationModal);
+        progress.setMinimumDuration(0);
+        if (!cancelable)
+            progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
 
-        if constexpr (!std::is_void_v<R>)
-        {
-            if (!future.isValid())
-                throw std::runtime_error("future is not valid after computation");
-            return future.takeResult();
-        }
+        // Busy indicator until the future reports progress.
+        progress.setRange(0, 0);
+
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressRangeChanged, &progress, [&](int min, int max) {
+            progress.setRange(min, max);
+        });
+
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressValueChanged, &progress, &QProgressDialog::setValue);
+
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressTextChanged, &progress, &QProgressDialog::setLabelText);
+
+        QObject::connect(&watcher, &QFutureWatcher<T>::finished, &progress, &QDialog::accept);
+
+        // User pressed Cancel or closed the dialog.
+        QObject::connect(&progress, &QProgressDialog::canceled, [&]() { future.cancel(); });
+
+        progress.exec();
+
+        // Wait in case cancellation takes a moment.
+        future.waitForFinished();
+
+        return !future.isCanceled();
     }
 
     class StatsTabBase : public QWidget, public Ui::StatsTab
@@ -297,31 +291,10 @@ namespace erdo::ui
             this->weapon_table->hide_section<sections::CharacterLevelSection>();
         }
 
-        void set_upgrade_levels(const calculator::UpgradeLevels& upgrade_levels)
-        {
-            QSignalBlocker b1 { this->normal_upgrade_level_spinbox };
-            QSignalBlocker b2 { this->somber_upgrade_level_spinbox };
-
-            this->normal_upgrade_level_spinbox->setValue(upgrade_levels.at(1));
-            this->somber_upgrade_level_spinbox->setValue(upgrade_levels.at(2));
-
-            this->calculate_weapon_stats();
-        }
-        
-        void set_two_handing(bool two_handing)
-        {
-            QSignalBlocker b { this->two_handing_checkbox };
-
-            this->two_handing_checkbox->setChecked(two_handing);
-
-            this->calculate_weapon_stats();
-        }
-
         void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
         {
             auto start = std::chrono::high_resolution_clock::now();
 
-            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
 
             // get character stats
             auto full_stats = this->get_character_full_stats();
@@ -329,20 +302,18 @@ namespace erdo::ui
             // get attack options
             auto attack_options = this->get_attack_options();
 
-            this->weapon_table->model->set_rows(
-                blocking_progress_bar_dialog(
-                    this,
-                    "calculating weapon data",
-                    [&](){
-                        std::vector<Row> rows{};
-                        rows.reserve(this->active_weapon_data.size());
-                        rows.append_range(this->active_weapon_data
-                            | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
-                        );
-                        return rows;
-                    }
-                )
+            // temporary attack rating object to avoid copying the weapon data multiple times
+            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, full_stats, attack_options };
+
+            std::vector<Row> rows{};
+            rows.reserve(active_weapon_data.size());
+            rows.append_range(active_weapon_data
+                | std::views::transform([&](const calculator::Weapon& w) {
+                    attack_rating.calculate_inplace(w);
+                    return Row(attack_rating);
+                })
             );
+            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
@@ -359,17 +330,16 @@ namespace erdo::ui
             // get attack options
             auto attack_options = this->get_attack_options();
 
+            // temporary attack rating object to avoid copying the weapon data multiple times
+            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, full_stats, attack_options };
+
             auto start = std::chrono::high_resolution_clock::now();
 
             std::ranges::for_each(std::views::zip(this->active_weapon_data, this->weapon_table->model->rows), [&](auto&& pair) {
                 auto&& [w, row] = pair;
-                row.update(w.calculate_attack_rating(attack_options, full_stats));
+                attack_rating.calculate_inplace(w);
+                row.update(attack_rating);
             });
-            // this->weapon_table->model->rows.clear();
-            // this->weapon_table->model->rows.append_range(
-            //     this->active_weapon_data
-            //         | std::views::transform([&](const calculator::Weapon& w) { return Row(w.calculate_attack_rating(attack_options, full_stats)); })
-            // );
 
             this->weapon_table->model->notifyAllChanged();
             auto end = std::chrono::high_resolution_clock::now();
@@ -460,41 +430,33 @@ namespace erdo::ui
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
 
-            static constexpr auto optimizers = [](auto){
+            static constexpr auto optimizer_callbacks = [](auto){
                 static constexpr auto [...enumerators] = enumerators_of<calculator::OptimizationTarget>();
-                return std::array{ calculator::optimizers<enumerators>.operator()... };
+                return std::array{ calculator::optimizers<enumerators>.get_callback... };
             }(1);
             auto target_index = this->optimize.target_combobox->currentIndex();
+            auto&& callback = optimizer_callbacks.at(target_index)(stat_variations, attack_options);
 
-            this->weapon_table->model->set_rows(
-                blocking_progress_bar_dialog(
-                    this,
-                    "optimizing",
-                    [&](){
-                        auto attack_ratings = optimizers.at(target_index)(
-                            this->filtered_active_weapon_data,
-                            stat_variations,
-                            attack_options,
-                            thread_pool
-                        ).get();
-
-                        std::vector<Row> rows{};
-                        rows.reserve(attack_ratings.size());
-                        rows.append_range(attack_ratings
-                            | std::views::transform([&](const calculator::AttackRating& attack_rating) { return Row(attack_rating); })
-                        );
-
-                        return rows;
-                    }
-                )
+            auto future = QtConcurrent::mapped(
+                this->filtered_active_weapon_data,
+                [&](const calculator::Weapon& w){ return Row(callback(w)); }
             );
+
+            auto success = execute_future_with_blocking_progress_bar(future, this, "optimizing...", true);
+
+            std::vector<Row> rows{};
+            if (success)
+            {
+                rows.reserve(this->filtered_active_weapon_data.size());
+                rows.append_range(future);
+            }
+            this->weapon_table->model->set_rows(std::move(rows));
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             std::println("OptimizeTab::optimize_brute_force: {} seconds", elapsed.count());
         
             QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
-
         }
         void optimize_v2()
         {
@@ -547,9 +509,6 @@ namespace erdo::ui
                 this->optimize.target_combobox->addItem(string_to_display(target));
             this->optimize.target_combobox->setCurrentIndex(std::to_underlying(calculator::OptimizationTarget::TOTAL_ATTACK_POWER));
             
-            // thread count spinbox
-            connect(this->optimize.threads_spinbox, &QSpinBox::valueChanged, [](std::size_t size){ thread_pool.reset(size); });
-
             // optimize buttons
             connect(this->optimize.start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize_brute_force);
             connect(this->optimize.start_v2_button, &QPushButton::clicked, this, &OptimizeTab::optimize_v2);
@@ -660,11 +619,9 @@ namespace erdo::ui
         {
             auto start = std::chrono::high_resolution_clock::now();
 
-            this->active_weapon_data = blocking_progress_bar_dialog(
-                this,
-                "loading weapon data",
-                [&](){ return parser::load_weapons(dir); }
-            );
+            auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
+            execute_future_with_blocking_progress_bar(future, this, "loading weapon data...", false);
+            this->active_weapon_data = future.takeResult();
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;

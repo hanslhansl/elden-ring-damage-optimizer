@@ -1,16 +1,3 @@
-# add thread pool
-add_compile_definitions(BS_THREAD_POOL_IMPORT_STD)
-CPMAddPackage(
-    NAME BS_thread_pool
-    GITHUB_REPOSITORY bshoshany/thread-pool
-    VERSION 5.1.0
-    EXCLUDE_FROM_ALL
-    SYSTEM
-)
-add_library(BS_thread_pool)
-target_sources(BS_thread_pool PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${BS_thread_pool_SOURCE_DIR}/modules FILES ${BS_thread_pool_SOURCE_DIR}/modules/BS.thread_pool.cppm)
-target_include_directories(BS_thread_pool PRIVATE ${BS_thread_pool_SOURCE_DIR}/include)
-
 # add pugixml
 CPMAddPackage(
     NAME pugixml
@@ -38,7 +25,6 @@ function(configure_erdo_core_library target)
         )
 
     target_link_libraries(${target} PUBLIC
-        BS_thread_pool
         pugixml::pugixml
     )
 

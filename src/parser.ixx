@@ -25,6 +25,19 @@ auto map_get(Map &&m, Key &&key, Default &&default_) {
 namespace erdo::parser
 {
     using ParamRow = std::map<std::string, double>;
+    struct CalcCorrectGraphEntry
+    {
+        long long maxVal;
+        double maxGrowVal, adjPt;
+    };
+    using CalcCorrectGraph = std::array<CalcCorrectGraphEntry, 5>;
+    struct ReinforceTypesDict
+    {
+        calculator::AttributeScaling attack;             // index: DamageType
+        calculator::AttributeScaling attributeScaling;   // index: RelevantAttribute
+        std::array<int, 3> statusSpEffectId;            // statusSpEffectId1, statusSpEffectId2, statusSpEffectId3
+    };
+
 
     const std::map<long long, calculator::Weapon::Type> weapon_type_overrides = {{110000, calculator::Weapon::Type::FIST}};
     constexpr bool isVanilla = true;
@@ -92,14 +105,14 @@ namespace erdo::parser
 
         return {};
     }
-    calculator::CalcCorrectGraph parse_calc_correct_graph(const std::map<std::string, double> &row) {
-        calculator::CalcCorrectGraph ret{};
+    CalcCorrectGraph parse_calc_correct_graph(const std::map<std::string, double> &row) {
+        CalcCorrectGraph ret{};
         for (auto i = 0; i < 5; ++i)
         {
             auto maxVal = assert_float_is_llong(row.at(std::format("stageMaxVal{}", i)));
             auto maxGrowVal = row.at(std::format("stageMaxGrowVal{}", i)) / 100.;
             auto adjPt = row.at(std::format("adjPt_maxGrowVal{}", i));
-            ret.at(i) = calculator::CalcCorrectGraphEntry{maxVal, maxGrowVal, adjPt};
+            ret.at(i) = CalcCorrectGraphEntry{maxVal, maxGrowVal, adjPt};
         }
         return ret;
     }
@@ -131,8 +144,8 @@ namespace erdo::parser
         }
         return ret;
     }
-    calculator::ReinforceTypesDict parse_reinforce_param_weapon(const ParamRow &row) {
-        calculator::ReinforceTypesDict ret{};
+    ReinforceTypesDict parse_reinforce_param_weapon(const ParamRow &row) {
+        ReinforceTypesDict ret{};
         for (auto damage_type : enumerators_of<calculator::DamageType>())
         {
             auto apt = integral_to_enum<calculator::AttackPowerType>(std::to_underlying(damage_type));
@@ -158,7 +171,7 @@ namespace erdo::parser
         }
         return ret;
     }
-    calculator::ScalingCurve evaluate_CalcCorrectGraph(const calculator::CalcCorrectGraph &calcCorrectGraph) {
+    calculator::ScalingCurve evaluate_CalcCorrectGraph(const CalcCorrectGraph &calcCorrectGraph) {
         calculator::ScalingCurve arr{};
 
         for (auto i = 1; i < calcCorrectGraph.size(); i++)
@@ -231,7 +244,7 @@ namespace erdo::parser
         auto weaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponNameFile += ".xml");
         auto dlcWeaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponName_dlc01File += ".xml");
 
-        std::map<long long, std::vector<calculator::ReinforceTypesDict>> reinforce_types;
+        std::map<long long, std::vector<ReinforceTypesDict>> reinforce_types;
         for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)
         {
             auto reinforce_level = reinforce_param_id % 50;

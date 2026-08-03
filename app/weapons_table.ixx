@@ -102,6 +102,7 @@ namespace erdo::ui
         {
             inline const static std::vector<QString> column_names { string_to_display("name") };
 
+            using SectionBase::SectionBase;
             explicit NameSection(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -110,9 +111,8 @@ namespace erdo::ui
             void update(const calculator::AttackRating& attack_rating)
             {
                 auto&& weapon = attack_rating.weapon.get();
-                auto&& attack_options = attack_rating.attack_options;
 
-                (*this)[0][0] = string_to_display(weapon.qualified_name(attack_options.upgrade_levels.at(weapon.upgrade_level_index)));
+                (*this)[0][0] = string_to_display(weapon.qualified_name(attack_rating.upgrade_levels.at(weapon.upgrade_level_index)));
                 (*this)[0][1] = QUrl(QString::fromStdString(weapon.url));
             }
 
@@ -145,6 +145,7 @@ namespace erdo::ui
         {
             inline const static std::vector<QString> column_names { string_to_display("affinity") };
 
+            using BinaryTextSection::BinaryTextSection;
             explicit AffinitySection(const calculator::AttackRating& attack_rating)
             {
                 auto&& weapon = attack_rating.weapon.get();
@@ -157,6 +158,7 @@ namespace erdo::ui
         {
             inline const static std::vector<QString> column_names { string_to_display("type") };
 
+            using BinaryTextSection::BinaryTextSection;
             explicit TypeSection(const calculator::AttackRating& attack_rating)
             {
                 auto&& weapon = attack_rating.weapon.get();
@@ -169,6 +171,7 @@ namespace erdo::ui
         {
             inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
 
+            using BinaryTextSection::BinaryTextSection;
             explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
             {
                 auto&& weapon = attack_rating.weapon.get();
@@ -192,6 +195,7 @@ namespace erdo::ui
         {
             inline const static std::vector<QString> column_names { string_to_display("base name") };
 
+            using UnaryTextSection::UnaryTextSection;
             explicit BaseNameSection(const calculator::AttackRating& attack_rating)
             {
                 (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
@@ -205,6 +209,7 @@ namespace erdo::ui
 
             inline const static std::vector<QString> column_names { string_to_display("character level") };
 
+            using SectionBase::SectionBase;
             explicit CharacterLevelSection(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -255,6 +260,7 @@ namespace erdo::ui
             static constexpr bool draw_section_seperators = true;
             inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
 
+            using DataSection::DataSection;
             explicit SpellScaling(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -281,6 +287,7 @@ namespace erdo::ui
                 return result;
             }();
 
+            using DataSection::DataSection;
             explicit AttackPowers(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -320,11 +327,10 @@ namespace erdo::ui
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
-            using EnumDataSection::EnumDataSection;
-
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "status effects";
 
+            using EnumDataSection::EnumDataSection;
             explicit StatusEffects(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -348,6 +354,7 @@ namespace erdo::ui
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attribute scaling";
 
+            using EnumDataSection::EnumDataSection;
             explicit AttributeScalings(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -357,12 +364,12 @@ namespace erdo::ui
             {
                 auto&& weapon = attack_rating.weapon.get();
 
-                for (auto&& [attribute_scaling, is_ineffective, arr] : std::views::zip(
+                for (auto&& [attribute_scaling, scaling_tier, is_ineffective, arr] : std::views::zip(
                     attack_rating.attribute_scalings,
+                    attack_rating.calculate_scaling_tiers(),
                     attack_rating.ineffective_attributes,
                     *this))
                 {
-                    auto scaling_tier = weapon.calculate_scaling_tier(attribute_scaling);
                     if (scaling_tier.empty())
                         arr[0] = format_number(attribute_scaling * 100);
                     else
@@ -377,6 +384,7 @@ namespace erdo::ui
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attribute requirements";
 
+            using EnumDataSection::EnumDataSection;
             explicit Requirements(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -402,6 +410,7 @@ namespace erdo::ui
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "character stats";
 
+            using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::AttackRating& attack_rating)
             {
                 this->update(attack_rating);
@@ -422,7 +431,7 @@ namespace erdo::ui
         };
     }
 
-    export template<typename...Args>
+    export template<std::default_initializable...Args>
     struct BasicRow : _tuple_base<std::tuple<Args...>>
     {
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
@@ -448,7 +457,9 @@ namespace erdo::ui
             (result.append_range(Args::column_names), ...);
             return result;
         }();
-
+        
+        // BasicRow() = default;
+        BasicRow() : _tuple_base{} { };
         explicit BasicRow(const calculator::AttackRating& attack_rating) : _tuple_base(Args(attack_rating)...) { }
 
         void update(const calculator::AttackRating& attack_rating)

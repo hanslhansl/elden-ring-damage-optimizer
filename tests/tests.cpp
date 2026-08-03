@@ -4,7 +4,6 @@
 
 
 import std;
-import BS.thread_pool;
 import erdo;
 
 using namespace erdo;
@@ -64,15 +63,19 @@ TEST_CASE("verify total attack rating optimization correctness") {
 
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    BS::thread_pool<> thread_pool{ 1 };
     std::vector<calculator::AttackRating> attack_ratings{};
+    attack_ratings.reserve(weapons.size());
+    constexpr auto optimizer = calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>;
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::OptimizationContext")
 #endif
     {
-        attack_ratings = calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>(weapons, stat_variations, attack_options, thread_pool).get();
+        attack_ratings.append_range(
+            optimizer.get_tasks(weapons, stat_variations, attack_options)
+                | std::views::transform([](const auto& task) { return task(); })
+        );
     };
-    std::ranges::sort(attack_ratings, {}, calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection);
+    std::ranges::sort(attack_ratings, {}, optimizer.projection);
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
@@ -92,7 +95,8 @@ TEST_CASE("verify total attack rating calculation correctness 1")
     calculator::FullStats full_stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, full_stats).total_attack_power.at(1); })
+        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, full_stats, attack_options); })
+        | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_1.size());
@@ -110,7 +114,8 @@ TEST_CASE("verify total attack rating calculation correctness 2")
     full_stats.fill(70);
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return w.calculate_attack_rating(attack_options, full_stats).total_attack_power.at(1); })
+        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, full_stats, attack_options); })
+        | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_2.size());
