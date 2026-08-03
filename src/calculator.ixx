@@ -358,6 +358,18 @@ export namespace erdo::calculator
                     ineffective_attribute = true;
             return ineffective_attributes;
         }
+    };
+
+    struct AttackRating : FullAttackOptions
+    {
+        // results
+        AttackPower total_attack_power;
+        AttackPowers attack_powers;
+        double spell_scaling;
+        TotalScalings total_scalings;
+        AttributeScalings attribute_scalings;
+        IneffectiveAttackPowerTypes ineffective_attack_power_types;
+        IneffectiveAttributes ineffective_attributes;
 
         double calculate_total_scaling(
             const bool is_ineffective_attack_power_type,
@@ -399,42 +411,44 @@ export namespace erdo::calculator
         }
 
         auto calculate_attack_power(
+            const AttackPowerType attack_power_type,
             const Stats& stats,
             const Stats& adjusted_stats,
-            const bool is_damage_type,
-            const AttributeScaling& scaling_attributes,
-            const ScalingCurve& scaling_curve,
             const IneffectiveAttributes& ineffective_attributes,
             const double& base_attack_power,
-            const AttributeScaling& attribute_scaling_at_upgrade_level,
-            bool& is_ineffective_attack_power_type,
-            AttackPower& attack_power,
-            double& total_scaling
-        ) const
+            const AttributeScaling& attribute_scaling_at_upgrade_level
+        )
         {
-            is_ineffective_attack_power_type = false;
-            if (base_attack_power || this->weapon.get().is_sorcery_or_incantation_tool)
+            const auto attack_power_type_integral = std::to_underlying(attack_power_type);
+            const auto is_damage_type = attack_power_type <= AttackPowerType::HOLY;
+            
+            auto&& weapon = this->weapon.get();
+            auto&& scaling_attributes = weapon.attack_power_attribute_scaling[attack_power_type_integral];
+            auto&& scaling_curve = weapon.attack_power_scaling_curves[attack_power_type_integral];
+
+            this->ineffective_attack_power_types[attack_power_type_integral] = false;
+            if (base_attack_power || weapon.is_sorcery_or_incantation_tool)
             {
                 for (auto&& [ineffective_attribute, scaling_attribute] : std::views::zip(ineffective_attributes, scaling_attributes))
                 {
                     if (ineffective_attribute && scaling_attribute)
                     {
-                        is_ineffective_attack_power_type = true;
+                        this->ineffective_attack_power_types[attack_power_type_integral] = true;
                         break;
                     }
                 }
             }
 
-            total_scaling = this->calculate_total_scaling(
-                is_ineffective_attack_power_type,
+            this->total_scalings[attack_power_type_integral] = this->calculate_total_scaling(
+                this->ineffective_attack_power_types[attack_power_type_integral],
                 (!this->disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_stats : stats,
                 scaling_attributes,
                 attribute_scaling_at_upgrade_level,
                 scaling_curve
             );
 
-            attack_power[0] = base_attack_power;
-            attack_power[1] = base_attack_power * total_scaling;
+            this->attack_powers[attack_power_type_integral][0] = base_attack_power;
+            this->attack_powers[attack_power_type_integral][1] = base_attack_power * this->total_scalings[attack_power_type_integral];
 
             return;
         }
@@ -453,45 +467,60 @@ export namespace erdo::calculator
 
             return total_attack_power;
         }
-    };
+    
+        void calculate_attack_power_inplace(AttackPowerType attack_power_type)
+        {
+            auto&& weapon = this->weapon.get();
 
-    struct AttackRating : FullAttackOptions
-    {
-        // results
-        AttackPower total_attack_power;
-        AttackPowers attack_powers;
-        double spell_scaling;
-        TotalScalings total_scalings;
-        AttributeScalings attribute_scalings;
-        IneffectiveAttackPowerTypes ineffective_attack_power_types;
-        IneffectiveAttributes ineffective_attributes;
+            auto upgrade_level = this->upgrade_levels.at(weapon.upgrade_level_index);
+            auto stats = this->full_stats.to_relevant_stats();
+            auto adjusted_stats = this->adjust_stats_for_two_handing(this->two_handing, stats);
+            this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_stats);
+            this->attribute_scalings = weapon.attribute_scalings[upgrade_level];
 
+            auto&& base_attack_powers = weapon.base_attack_powers[upgrade_level];
+
+            this->calculate_attack_power(
+                attack_power_type,
+                stats,
+                adjusted_stats,
+                this->ineffective_attributes,
+                base_attack_powers[std::to_underlying(attack_power_type)],
+                weapon.attribute_scalings[upgrade_level]
+            );
+        }
+        void calculate_spell_scaling_inplace()
+        {
+            auto&& weapon = this->weapon.get();
+
+            if (weapon.is_sorcery_or_incantation_tool)
+            {
+                this->calculate_attack_power_inplace(AttackPowerType::PHYSICAL);
+                this->spell_scaling = this->total_scalings[std::to_underlying(AttackPowerType::PHYSICAL)];
+            }
+            else
+                this->spell_scaling = 0.;
+        }
         void calculate_inplace()
         {
             auto&& weapon = this->weapon.get();
 
+            auto upgrade_level = this->upgrade_levels.at(weapon.upgrade_level_index);
             auto stats = this->full_stats.to_relevant_stats();
             auto adjusted_stats = this->adjust_stats_for_two_handing(this->two_handing, stats);
-            auto upgrade_level = this->upgrade_levels.at(weapon.upgrade_level_index);
-
-            this->attribute_scalings = weapon.attribute_scalings[upgrade_level];
             this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_stats);
+            this->attribute_scalings = weapon.attribute_scalings[upgrade_level];
 
             auto&& base_attack_powers = weapon.base_attack_powers[upgrade_level];
 
-            for (auto attack_power_type_integral : enumerator_integrals_of<AttackPowerType>())
+            for (auto attack_power_type : enumerators_of<AttackPowerType>())
                 this->calculate_attack_power(
+                    attack_power_type,
                     stats,
                     adjusted_stats,
-                    attack_power_type_integral <= std::to_underlying(AttackPowerType::HOLY),
-                    weapon.attack_power_attribute_scaling[attack_power_type_integral],
-                    weapon.attack_power_scaling_curves[attack_power_type_integral],
                     this->ineffective_attributes,
-                    base_attack_powers[attack_power_type_integral],
-                    weapon.attribute_scalings[upgrade_level],
-                    this->ineffective_attack_power_types[attack_power_type_integral],
-                    this->attack_powers[attack_power_type_integral],
-                    this->total_scalings[attack_power_type_integral]
+                    base_attack_powers[std::to_underlying(attack_power_type)],
+                    weapon.attribute_scalings[upgrade_level]
                 );
 
             if (weapon.is_sorcery_or_incantation_tool)
@@ -500,16 +529,6 @@ export namespace erdo::calculator
                 this->spell_scaling = 0.;
 
             this->total_attack_power = this->calculate_total_attack_power(this->attack_powers);
-        }
-        void calculate_inplace(const Weapon& weapon)
-        {
-            this->weapon = weapon;
-            this->calculate_inplace();
-        }
-        void calculate_inplace(const FullStats& full_stats)
-        {
-            this->full_stats = full_stats;
-            this->calculate_inplace();
         }
 
         std::vector<std::string> calculate_scaling_tiers() const

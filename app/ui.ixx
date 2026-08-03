@@ -309,7 +309,8 @@ namespace erdo::ui
             rows.reserve(active_weapon_data.size());
             rows.append_range(active_weapon_data
                 | std::views::transform([&](const calculator::Weapon& w) {
-                    attack_rating.calculate_inplace(w);
+                    attack_rating.weapon = w;
+                    attack_rating.calculate_inplace();
                     return Row(attack_rating);
                 })
             );
@@ -337,7 +338,8 @@ namespace erdo::ui
 
             std::ranges::for_each(std::views::zip(this->active_weapon_data, this->weapon_table->model->rows), [&](auto&& pair) {
                 auto&& [w, row] = pair;
-                attack_rating.calculate_inplace(w);
+                attack_rating.weapon = w;
+                attack_rating.calculate_inplace();
                 row.update(attack_rating);
             });
 
@@ -434,21 +436,25 @@ namespace erdo::ui
                 static constexpr auto [...enumerators] = enumerators_of<calculator::OptimizationTarget>();
                 return std::array{ calculator::optimizers<enumerators>.get_callback... };
             }(1);
-            auto target_index = this->optimize.target_combobox->currentIndex();
-            auto&& callback = optimizer_callbacks.at(target_index)(stat_variations, attack_options);
-
-            auto future = QtConcurrent::mapped(
-                this->filtered_active_weapon_data,
-                [&](const calculator::Weapon& w){ return Row(callback(w)); }
-            );
-
-            auto success = execute_future_with_blocking_progress_bar(future, this, "optimizing...", true);
 
             std::vector<Row> rows{};
-            if (success)
+            if (stat_variations.size() > 0)
             {
-                rows.reserve(this->filtered_active_weapon_data.size());
-                rows.append_range(future);
+                auto target_index = this->optimize.target_combobox->currentIndex();
+                auto&& callback = optimizer_callbacks.at(target_index)(stat_variations, attack_options);
+
+                auto future = QtConcurrent::mapped(
+                    this->filtered_active_weapon_data,
+                    [&](const calculator::Weapon& w){ return Row(callback(w)); }
+                );
+
+                auto success = execute_future_with_blocking_progress_bar(future, this, "optimizing...", true);
+
+                if (success)
+                {
+                    rows.reserve(this->filtered_active_weapon_data.size());
+                    rows.append_range(future | std::views::as_rvalue);
+                }
             }
             this->weapon_table->model->set_rows(std::move(rows));
 
