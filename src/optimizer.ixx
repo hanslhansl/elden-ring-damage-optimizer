@@ -8,11 +8,9 @@ import BS.thread_pool;
 
 
 
-namespace erdo::optimizer
+namespace erdo::calculator
 {
-    using namespace calculator;
-
-    export enum class Target
+    export enum class OptimizationTarget
     {
         PHYSICAL_ATTACK_POWER = std::to_underlying(AttackPowerType::PHYSICAL),
         MAGIC_ATTACK_POWER = std::to_underlying(AttackPowerType::MAGIC),
@@ -32,7 +30,7 @@ namespace erdo::optimizer
         SPELL_SCALING,
     };
 
-    template<Target target_>
+    template<OptimizationTarget target_>
     struct Optimizer
     {
         static constexpr auto target = target_;
@@ -72,40 +70,37 @@ namespace erdo::optimizer
     };
 
     template<>
-    double Optimizer<Target::TOTAL_ATTACK_POWER>::projection(const AttackRating& attack_rating)
+    double Optimizer<OptimizationTarget::TOTAL_ATTACK_POWER>::projection(const AttackRating& attack_rating)
     {
         return attack_rating.total_attack_power[1];
     }
 
     template<>
-    double Optimizer<Target::SPELL_SCALING>::projection(const AttackRating& attack_rating)
+    double Optimizer<OptimizationTarget::SPELL_SCALING>::projection(const AttackRating& attack_rating)
     {
         return attack_rating.spell_scaling;
     }
+
+    export template<OptimizationTarget target>
+    constexpr Optimizer<target> optimizers{};
 }
 
 using namespace erdo;
 template<>
-constexpr std::array<std::pair<optimizer::Target, std::string_view>, 14> enum_string_mapping<optimizer::Target> = {
-    std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
-    std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
-    std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
-    std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
-    std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
-    std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
-    std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
-    std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
+constexpr std::array<std::pair<calculator::OptimizationTarget, std::string_view>, 14> enum_string_mapping<calculator::OptimizationTarget> = {
+    std::pair{calculator::OptimizationTarget::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
+    std::pair{calculator::OptimizationTarget::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
+    std::pair{calculator::OptimizationTarget::SPELL_SCALING, "SPELL_SCALING"},
 };
-
-namespace erdo::optimizer
-{
-    export template<Target target>
-    constexpr Optimizer<target> optimizers{};
-}
 

@@ -461,8 +461,8 @@ namespace erdo::ui
             auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
 
             static constexpr auto optimizers = [](auto){
-                static constexpr auto [...enumerators] = enumerators_of<optimizer::Target>();
-                return std::array{ optimizer::optimizers<enumerators>.operator()... };
+                static constexpr auto [...enumerators] = enumerators_of<calculator::OptimizationTarget>();
+                return std::array{ calculator::optimizers<enumerators>.operator()... };
             }(1);
             auto target_index = this->optimize.target_combobox->currentIndex();
 
@@ -543,9 +543,9 @@ namespace erdo::ui
             this->optimize.setupUi(opt_group);
 
             // optimize target combobox
-            for (const auto& target : enumerator_strings_of<optimizer::Target>())
+            for (const auto& target : enumerator_strings_of<calculator::OptimizationTarget>())
                 this->optimize.target_combobox->addItem(string_to_display(target));
-            this->optimize.target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
+            this->optimize.target_combobox->setCurrentIndex(std::to_underlying(calculator::OptimizationTarget::TOTAL_ATTACK_POWER));
             
             // thread count spinbox
             connect(this->optimize.threads_spinbox, &QSpinBox::valueChanged, [](std::size_t size){ thread_pool.reset(size); });

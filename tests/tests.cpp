@@ -70,9 +70,9 @@ TEST_CASE("verify total attack rating optimization correctness") {
     BENCHMARK("optimizer::OptimizationContext")
 #endif
     {
-        attack_ratings = optimizer::optimizers<optimizer::Target::TOTAL_ATTACK_POWER>(weapons, stat_variations, attack_options, thread_pool).get();
+        attack_ratings = calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>(weapons, stat_variations, attack_options, thread_pool).get();
     };
-    std::ranges::sort(attack_ratings, {}, optimizer::optimizers<optimizer::Target::TOTAL_ATTACK_POWER>.projection);
+    std::ranges::sort(attack_ratings, {}, calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection);
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");

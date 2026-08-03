@@ -197,7 +197,8 @@ namespace erdo::ui
                 (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
             }
         };
-        export struct CharacterLevelSection : UnaryTextSection
+        
+        export struct CharacterLevelSection : SectionBase<std::array<QVariant, 1>>
         {
             static constexpr bool draw_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
@@ -212,6 +213,18 @@ namespace erdo::ui
             void update(const calculator::AttackRating& attack_rating)
             {
                 (*this)[0] = attack_rating.full_stats.character_level();
+            }
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole || role == Qt::UserRole)
+                    return (*this)[column];
+                
+                static const auto alignment = QVariant::fromValue(Qt::AlignCenter);
+                if (role == Qt::TextAlignmentRole)
+                    return alignment;
+
+                return {};
             }
         };
 
