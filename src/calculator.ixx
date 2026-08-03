@@ -159,11 +159,6 @@ export namespace erdo::calculator
         {
             return attribute_points_to_character_level(this->attribute_points());
         }
-
-        constexpr std::array<int, enumerators_of<Attribute>().size()>& to_array()
-        {
-            return *this;
-        }
     };
     const std::map<std::string, FullStats> character_class_stats{
         {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
@@ -429,9 +424,9 @@ export namespace erdo::calculator
         {
             if (base_attack_power || this->is_sorcery_or_incantation_tool)
             {
-                for (auto attribute : enumerator_integrals_of<RelevantAttribute>())
+                for (auto&& [ineffective_attribute, scaling_attribute] : std::views::zip(ineffective_attributes, scaling_attributes))
                 {
-                    if (ineffective_attributes[attribute] && scaling_attributes[attribute])
+                    if (ineffective_attribute && scaling_attribute)
                     {
                         is_ineffective_attack_power_type = true;
                         break;
@@ -449,10 +444,8 @@ export namespace erdo::calculator
 
             if (base_attack_power != 0)
             {
-                auto full_attack_power = base_attack_power * total_scaling;
-
                 attack_power[0] = base_attack_power;
-                attack_power[1] = full_attack_power;
+                attack_power[1] = base_attack_power * total_scaling;
             }
 
             return;
@@ -630,8 +623,9 @@ export namespace erdo::calculator
         auto possible_occurances = get_stat_variation_count(attribute_points, min_full_stats);
         if (possible_occurances == 0)
             return {};
-        std::vector<FullStats> stat_variations{};
-        stat_variations.reserve(possible_occurances);
+
+        std::vector<FullStats> stat_variations{ possible_occurances };
+        auto current_it = stat_variations.begin(); 
 
         auto result = min_full_stats;
         auto& i = result[irrelevant_attribute_count];
@@ -656,7 +650,7 @@ export namespace erdo::calculator
                         m = SUM_i_j_k_l;
                         if (min_stats[4] <= m && m <= UPPER)
                         {
-                            stat_variations.push_back(result);
+                            *current_it++ = result;
                         }
                     }
                 }
