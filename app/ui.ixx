@@ -6,6 +6,9 @@ module;
 #include <QFuture>
 #include <QtConcurrent>
 #include <QCloseEvent>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <exception>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -546,11 +549,144 @@ namespace erdo::ui
     class MainWindow : public QMainWindow
     {
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
+        QActionGroup* menu_weapon_data_group = new QActionGroup(this);
+        QAction* menu_weapon_data_seperator;
         StatsTab* stats = new StatsTab();
         OptimizeTab* optimize = new OptimizeTab();
         PlotTab* plot = new PlotTab();
 
         std::vector<calculator::Weapon> active_weapon_data{};
+
+        std::span<const calculator::Weapon> get_active_weapon_data() const
+        {
+            return std::span<const calculator::Weapon>(this->active_weapon_data);
+        }
+        void set_active_weapon_data(const std::filesystem::path& dir)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+
+            auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
+            execute_future_with_blocking_progress_bar(future, this, "loading weapon data...", false);
+            this->active_weapon_data = future.takeResult();
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            std::println("MainWindow::set_active_weapon_data: {} seconds", elapsed.count());
+
+            this->stats->set_active_weapon_data(this->active_weapon_data);
+            this->optimize->set_active_weapon_data(this->active_weapon_data);
+        }
+
+        QAction* add_weapon_data(std::filesystem::path dir)
+        {
+            dir = std::filesystem::canonical(dir).make_preferred();
+            if (!std::filesystem::is_directory(dir))
+            {
+                QMessageBox::critical(this, "invalid directory", std::format("not a directory: {}", dir).c_str());
+                return nullptr;
+            }
+
+            auto action_text = dir.string();
+            auto version_string = dir.filename().string();
+
+            if (version_string.size() == 8)
+            {
+                std::size_t version_number;
+                auto result = std::from_chars(version_string.data(), version_string.data() + version_string.size(), version_number);
+                if (result)
+                {
+                    auto major = version_string.subview(0, 1);
+                    auto minor = version_string.subview(1, 2);
+                    auto patch = version_string.subview(3, std::string::npos);
+                    while (patch.ends_with('0'))
+                        patch.remove_suffix(1);
+                    version_string = std::format("{}.{}.{}", major, minor, patch);
+                    while(version_string.ends_with('.'))
+                        version_string.pop_back();
+                    action_text = std::format("{} ({})", action_text, version_string);
+                }
+            }
+
+            QAction *action = new QAction(QString::fromStdString(action_text), this->ui->menu_weapon_data);
+            this->ui->menu_weapon_data->insertAction(this->menu_weapon_data_seperator, action);
+            action->setCheckable(true);
+
+            this->menu_weapon_data_group->addAction(action);
+            connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
+            return action;
+        }
+
+        void load_weapon_data_from_directory()
+        {
+            QString directory = QFileDialog::getExistingDirectory(
+                this,
+                "select weapon data directory",
+                QDir::homePath(),
+                QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+            );
+
+            if (directory.isEmpty())
+                return;
+            
+            this->add_weapon_data(std::filesystem::path(directory.toStdString()));
+        }
+
+        void generate_weapon_data_from_game_data()
+        {
+            QString file_name = QFileDialog::getOpenFileName(
+                this,
+                "select eldenring.exe",
+                QDir::homePath(),
+                "elden ring executable (eldenring.exe)"
+            );
+            if (file_name.isEmpty())
+                return;
+            auto elden_ring_executable = std::filesystem::path(file_name.toStdString());
+            if (elden_ring_executable.filename() != "eldenring.exe")
+            {
+                QMessageBox::critical(this, "invalid file", "please select eldenring.exe");
+                return;
+            }
+
+            file_name = QFileDialog::getOpenFileName(
+                this,
+                "select WitchyBND.exe",
+                QDir::homePath(),
+                "WitchyBND executable (WitchyBND.exe)"
+            );
+            if (file_name.isEmpty())
+                return;
+            auto witchybdn_executable = std::filesystem::path(file_name.toStdString());
+            if (witchybdn_executable.filename() != "WitchyBND.exe")
+            {
+                QMessageBox::critical(this, "invalid file", "please select WitchyBND.exe");
+                return;
+            }
+
+            QString directory = QFileDialog::getExistingDirectory(
+                this,
+                "select a save directory",
+                QDir::homePath(),
+                QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+            );
+            if (directory.isEmpty())
+                return;
+            auto save_directory = std::filesystem::path(directory.toStdString());
+            if (!std::filesystem::is_directory(save_directory))
+            {
+                QMessageBox::critical(this, "invalid directory", std::format("not a directory: {}", save_directory).c_str());
+                return;
+            }
+
+            auto future = QtConcurrent::run([&](){
+                witchy::run_witchy(
+                    elden_ring_executable.parent_path(),
+                    witchybdn_executable,
+                    save_directory
+                );
+            });
+            execute_future_with_blocking_progress_bar(future, this, "generating weapon data...", false);
+        }
 
     public:
         explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
@@ -594,47 +730,25 @@ namespace erdo::ui
                 throw std::runtime_error("no weapon data directories found in xml_data directory");
 
             // weapon data menu
-            QActionGroup *group = new QActionGroup(this);
-            group->setExclusive(true);
+            this->menu_weapon_data_seperator = this->ui->menu_weapon_data->addSeparator();
+            this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
-                QAction *action = this->ui->menu_weapon_data->addAction(QString::fromStdString(dir.string()));
-                action->setCheckable(true);
-                group->addAction(action);
-                connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
+                auto action = this->add_weapon_data(dir);
+                if (action == nullptr)
+                    std::terminate();
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            this->ui->menu_weapon_data->addSeparator();
             QAction* action = this->ui->menu_weapon_data->addAction("load weapon data from directory");
-            connect(action, &QAction::triggered, this, [this]() { std::println("not implemented"); });
+            connect(action, &QAction::triggered, this, &MainWindow::load_weapon_data_from_directory);
             action = this->ui->menu_weapon_data->addAction("generate weapon data from game data");
-            connect(action, &QAction::triggered, this, [this]() { std::println("not implemented"); });
+            connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));
             this->ui->tab_widget->addTab(optimize, string_to_display("optimize"));
             this->ui->tab_widget->addTab(plot, string_to_display("plot"));
-        }
-
-        std::span<const calculator::Weapon> get_active_weapon_data() const
-        {
-            return std::span<const calculator::Weapon>(this->active_weapon_data);
-        }
-        void set_active_weapon_data(const std::filesystem::path& dir)
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-
-            auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
-            execute_future_with_blocking_progress_bar(future, this, "loading weapon data...", false);
-            this->active_weapon_data = future.takeResult();
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("MainWindow::set_active_weapon_data: {} seconds", elapsed.count());
-
-            this->stats->set_active_weapon_data(this->active_weapon_data);
-            this->optimize->set_active_weapon_data(this->active_weapon_data);
         }
     };
 

@@ -24,8 +24,9 @@ struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_
     }
 };
 
-std::string quote_path(const std::filesystem::path& p) {
-    return std::format("\"{}\"", p);
+std::string quote_path(const std::filesystem::path& p)
+{
+    return std::format("\"{}\"", std::filesystem::canonical(p).make_preferred());
 }
 
 namespace erdo::witchy
@@ -151,5 +152,7 @@ namespace erdo::witchy
         // remove temporary directory
         std::filesystem::remove_all(temp_dir);
         std::println("removed temporary directory {}", quote_path(temp_dir));
+
+        std::println("\nsuccessfully unpacked and converted uxm files to xml in {}", quote_path(full_save_to_directory));
     }
 }
