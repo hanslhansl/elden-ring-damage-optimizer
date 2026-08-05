@@ -63,7 +63,7 @@ namespace erdo::ui
         Q_OBJECT
 
     protected:
-        std::span<calculator::Weapon> active_weapon_data{};
+        std::span<const calculator::Weapon> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
         WeaponTable* weapon_table{};
 
@@ -182,7 +182,7 @@ namespace erdo::ui
             };
         }
 
-        void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
             auto new_base_names = active_weapon_data
                 | std::views::transform(&calculator::Weapon::base_name)
@@ -293,7 +293,7 @@ namespace erdo::ui
             this->weapon_table->hide_section<sections::CharacterLevelSection>();
         }
 
-        void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
             auto start = std::chrono::high_resolution_clock::now();
 
@@ -317,6 +317,7 @@ namespace erdo::ui
                 })
             );
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
+            this->weapon_table->model->set_rows(std::move(rows));
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
@@ -522,7 +523,7 @@ namespace erdo::ui
             connect(this->optimize.start_v2_button, &QPushButton::clicked, this, &OptimizeTab::optimize_v2);
         }
     
-        void set_active_weapon_data(std::span<calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
             auto start = std::chrono::high_resolution_clock::now();
 
