@@ -280,8 +280,8 @@ namespace erdo::ui
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attack power";
             inline const static std::vector<QString> column_names = [](){
-                auto result = enumerators_of<calculator::DamageType>()
-                    | std::views::transform([](calculator::DamageType e){ return string_to_display(enum_to_string(e)); })
+                auto result = enumerator_strings_of<calculator::DamageType>()
+                    | std::views::transform([](std::string_view e){ return string_to_display(e); })
                     | std::ranges::to<std::vector>();
                 result.emplace_back("total");
                 return result;
@@ -321,8 +321,8 @@ namespace erdo::ui
             static constexpr bool draw_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
             
-            inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
-                | std::views::transform([](enum_type e){ return string_to_display(enum_to_string(e)); })
+            inline const static std::vector<QString> column_names = enumerator_strings_of<enum_type>()
+                | std::views::transform([](std::string_view e){ return string_to_display(e); })
                 | std::ranges::to<std::vector>();
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
@@ -451,15 +451,19 @@ namespace erdo::ui
         static constexpr std::size_t total_size = std::accumulate(section_sizes.begin(), section_sizes.end(), 0);
         static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
         static constexpr std::array draw_header_labels_rotated = { Args::draw_header_labels_rotated... };
-        inline const static std::vector<QString> column_names = [](){
-            std::vector<QString> result{};
-            result.reserve(total_size);
-            (result.append_range(Args::column_names), ...);
-            return result;
-        }();
         
-        // BasicRow() = default;
-        BasicRow() : _tuple_base{} { };
+        static const QString& column_name(int column)
+        {
+            const static std::vector<QString> column_names = [](){
+                std::vector<QString> result{};
+                result.reserve(total_size);
+                (result.append_range(Args::column_names), ...);
+                return result;
+            }();
+            return column_names.at(column);
+        }
+
+        BasicRow() = default;
         explicit BasicRow(const calculator::AttackRating& attack_rating) : _tuple_base(Args(attack_rating)...) { }
 
         void update(const calculator::AttackRating& attack_rating)
@@ -532,7 +536,7 @@ namespace erdo::ui
                 return {};
 
             if (orientation == Qt::Horizontal)
-                return Row::column_names.at(section);
+                return Row::column_name(section);
 
             return {};
         }
