@@ -26,6 +26,7 @@ NINJA_BIN = None    # None: get from PATH
 # Qt configure options
 QT_SUBMODULES = "qtbase,qtsvg,qttools"
 BUILD_STATIC = True
+QT_USE_ORIGINAL_COMPILER = True # if true, the generated qt.toolchain.cmake file will set the C/CXX to the compiler used to build Qt itself
 
 SYSTEM_PATHS = [
     os.path.join(os.environ["SystemRoot"], "System32"),
@@ -126,6 +127,7 @@ def main():
 
             f"-DCMAKE_C_COMPILER={C_COMPILER}",
             f"-DCMAKE_CXX_COMPILER={CXX_COMPILER}",
+            "-DQT_USE_ORIGINAL_COMPILER=ON" if QT_USE_ORIGINAL_COMPILER else "",
             "-DQT_INSTALL_CONFIG_INFO_FILES=ON",
 
             # "-DCMAKE_C_COMPILER_TARGET=x86_64-w64-windows-gnu",
