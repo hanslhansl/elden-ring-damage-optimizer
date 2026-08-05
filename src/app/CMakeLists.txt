@@ -31,3 +31,13 @@ target_link_libraries(erdo PRIVATE
     erdo_ui
 )
 copy_xml_data(erdo)
+
+install(TARGETS erdo)
+
+if(NOT QT_FEATURE_static)
+    qt_generate_deploy_app_script(
+        TARGET erdo
+        OUTPUT_SCRIPT deploy_script
+    )
+    install(SCRIPT ${deploy_script})
+endif()

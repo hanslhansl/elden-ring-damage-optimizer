@@ -1,4 +1,4 @@
-﻿import std;
+﻿
 
 import erdo.ui;
 int main(int argc, char *argv[])

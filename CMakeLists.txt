@@ -36,10 +36,10 @@ include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 
 # add core library
-add_subdirectory(src)
+add_subdirectory(src/core)
 
 # add ui
-add_subdirectory(app)
+add_subdirectory(src/app)
 
 # add testing
 include(CTest)
