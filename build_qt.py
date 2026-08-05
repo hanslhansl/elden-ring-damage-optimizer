@@ -12,9 +12,10 @@ from pathlib import Path
 
 COMPILER_BIN = r".../bin"
 QT_SOURCE = r".../Qt/6.11.1/Src"
-BUILD_DIR = r"..."
 INSTALL_PREFIX = r"..."
 
+
+BUILD_DIR = f"{INSTALL_PREFIX}-build"
 
 C_COMPILER = COMPILER_BIN + r"/clang.exe"
 CXX_COMPILER = COMPILER_BIN + r"/clang++.exe"
@@ -111,9 +112,7 @@ def main():
             INSTALL_PREFIX,
 
             "-release",
-            "-force-debug-info",
-            "-separate-debug-info",
-            "-static" if BUILD_STATIC else "-shared",
+            "-static" if BUILD_STATIC else "-shared -force-debug-info -separate-debug-info",
             "-opensource",
             "-confirm-license",
 
