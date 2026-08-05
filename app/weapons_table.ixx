@@ -1,4 +1,4 @@
-module;
+﻿module;
 #include <QSortFilterProxyModel>
 #include <QHeaderView>
 #include <QPainter>

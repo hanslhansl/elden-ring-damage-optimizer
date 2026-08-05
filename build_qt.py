@@ -10,14 +10,14 @@ from pathlib import Path
 # Global configuration
 # ============================================================
 
-COMPILER_BIN = r"...\bin"
-QT_SOURCE = r"...\Qt\6.11.1\Src"
+COMPILER_BIN = r".../bin"
+QT_SOURCE = r".../Qt/6.11.1/Src"
 BUILD_DIR = r"..."
 INSTALL_PREFIX = r"..."
 
 
-C_COMPILER = COMPILER_BIN + r"\clang.exe"
-CXX_COMPILER = COMPILER_BIN + r"\clang++.exe"
+C_COMPILER = COMPILER_BIN + r"/clang.exe"
+CXX_COMPILER = COMPILER_BIN + r"/clang++.exe"
 
 CMAKE_BIN = None    # None: get from PATH
 NINJA_BIN = None    # None: get from PATH
@@ -112,14 +112,10 @@ def main():
             INSTALL_PREFIX,
 
             "-release",
+            "-force-debug-info",
+            "-static",
             "-opensource",
             "-confirm-license",
-
-            "-nomake",
-            "examples",
-
-            "-nomake",
-            "tests",
 
             "-cmake-generator",
             "Ninja",
@@ -131,6 +127,7 @@ def main():
 
             f"-DCMAKE_C_COMPILER={C_COMPILER}",
             f"-DCMAKE_CXX_COMPILER={CXX_COMPILER}",
+            "-DQT_INSTALL_CONFIG_INFO_FILES=ON",
 
             # "-DCMAKE_C_COMPILER_TARGET=x86_64-w64-windows-gnu",
             # "-DCMAKE_CXX_COMPILER_TARGET=x86_64-w64-windows-gnu",

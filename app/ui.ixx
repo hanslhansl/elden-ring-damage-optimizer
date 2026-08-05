@@ -1,4 +1,4 @@
-module;
+﻿module;
 #include <QMainWindow>
 #include <QPainter>
 #include <QActionGroup>
@@ -8,7 +8,6 @@ module;
 #include <QCloseEvent>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <exception>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"

@@ -1,4 +1,4 @@
-module;
+﻿module;
 #include <pugixml.hpp>
 export module erdo:xml;
 
@@ -9,7 +9,7 @@ namespace erdo::xml
 {
     pugi::xml_document load_file(const std::filesystem::path &file_path) {
         pugi::xml_document data;
-        auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::encoding_utf8);
+        auto result = data.load_file(file_path.c_str(), pugi::parse_default, pugi::xml_encoding::encoding_utf8);
         if (!result)
             throw std::runtime_error(std::format("could not load xml file: {}", result.description()));
         return data;

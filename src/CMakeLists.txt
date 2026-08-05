@@ -1,4 +1,4 @@
-# add pugixml
+﻿# add pugixml
 CPMAddPackage(
     NAME pugixml
     GITHUB_REPOSITORY zeux/pugixml
@@ -8,8 +8,6 @@ CPMAddPackage(
 # set up core libraries
 function(configure_erdo_core_library target)
     add_library(${target} STATIC)
-
-    target_compile_definitions(${target} PRIVATE PUGIXML_HEADER_ONLY)
 
     target_sources(${target}
         PUBLIC FILE_SET CXX_MODULES
