@@ -24,8 +24,7 @@ NINJA_BIN = None    # None: get from PATH
 
 # Qt configure options
 QT_SUBMODULES = "qtbase,qtsvg,qttools"
-BUILD_TYPE = "release"
-
+BUILD_STATIC = True
 
 SYSTEM_PATHS = [
     os.path.join(os.environ["SystemRoot"], "System32"),
@@ -35,7 +34,7 @@ SYSTEM_PATHS = [
 # Helper functions
 # ============================================================
 
-def run_command(command, cwd=None, env=None):
+def run_command(command : list[str], cwd=None, env=None):
     """Run a command and stop on failure."""
     print("\nRunning:")
     print(" ".join(command))
@@ -113,7 +112,8 @@ def main():
 
             "-release",
             "-force-debug-info",
-            "-static",
+            "-separate-debug-info",
+            "-static" if BUILD_STATIC else "-shared",
             "-opensource",
             "-confirm-license",
 
