@@ -23,12 +23,27 @@ target_link_libraries(erdo_ui PRIVATE
     Qt6::Concurrent
 )
 
+
+add_library(profiling INTERFACE)
+CPMAddPackage(
+    NAME tracy
+    GITHUB_REPOSITORY wolfpld/tracy
+    GIT_TAG v0.13.1
+)
+set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+set(TRACY_ON_DEMAND OFF CACHE BOOL "" FORCE)
+target_compile_definitions(profiling INTERFACE TRACY_ENABLE)
+target_link_libraries(profiling INTERFACE TracyClient)
+
+
+
 # set up main executable
 add_executable(erdo
     main.cpp
 )
 target_link_libraries(erdo PRIVATE
     erdo_ui
+    profiling
 )
 copy_xml_data(erdo)
 
