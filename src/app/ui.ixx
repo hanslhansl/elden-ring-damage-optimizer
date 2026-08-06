@@ -8,6 +8,7 @@
 #include <QCloseEvent>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QProgressBar>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -21,7 +22,7 @@ import std;
 namespace erdo::ui
 {
     template<typename T>
-    bool execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget *parent, const QString &labelText, bool cancelable)
+    bool execute_future_with_blocking_progress_bar_old(QFuture<T>& future, QWidget *parent, const QString &labelText, bool cancelable)
     {
         QFutureWatcher<T> watcher;
         watcher.setFuture(future);
@@ -57,6 +58,179 @@ namespace erdo::ui
 
         return !future.isCanceled();
     }
+
+    template<typename T>
+    bool execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget* parent, const QString& labelText, bool cancelable)
+    {
+        QFutureWatcher<T> watcher;
+        watcher.setFuture(future);
+
+        const QString cancelButtonText =
+            cancelable ? QObject::tr("Cancel") : QString{};
+
+        QProgressDialog progress(
+            labelText,
+            cancelButtonText,
+            0,
+            0,
+            parent);
+
+        progress.setWindowModality(Qt::ApplicationModal);
+        progress.setMinimumDuration(0);
+
+        if (!cancelable)
+            progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+
+        // We provide our own progress text, so hide QProgressBar's "xx%" overlay.
+        if (auto* bar = progress.findChild<QProgressBar*>())
+            bar->setTextVisible(false);
+
+        // Busy indicator until the future reports its range.
+        progress.setRange(0, 0);
+
+        // ---------------------------------------------------------------------
+        // ETA state
+        // ---------------------------------------------------------------------
+
+        QElapsedTimer timer;
+        timer.start();
+
+        QString progressText;
+
+        QString cachedEta;
+        qint64 lastEtaUpdate = -1000;
+
+        auto formatDuration = [](qint64 seconds)
+        {
+            if (seconds < 60)
+                return QObject::tr("%1 s").arg(seconds);
+
+            if (seconds < 3600)
+                return QTime(0, 0).addSecs(int(seconds)).toString("mm:ss");
+
+            const int hours = int(seconds / 3600);
+            const int minutes = int((seconds % 3600) / 60);
+
+            return QObject::tr("%1h %2m")
+                .arg(hours)
+                .arg(minutes, 2, 10, QLatin1Char('0'));
+        };
+
+        auto updateLabel = [&]()
+        {
+            QString text = labelText;
+
+            if (!progressText.isEmpty())
+                text += '\n' + progressText;
+
+            const int min = progress.minimum();
+            const int max = progress.maximum();
+            const int value = progress.value();
+
+            if (max > min)
+            {
+                const int completed = value - min;
+                const int total = max - min;
+
+                const double fraction =
+                    double(completed) / double(total);
+
+                QString status =
+                    QString("%1/%2 (%3%)")
+                        .arg(completed)
+                        .arg(total)
+                        .arg(qRound(fraction * 100.0));
+
+                // Don't show ETA before we have enough information.
+                // 5% is a reasonable start for hundreds of tasks.
+                if (completed > 0 && fraction >= 0.05)
+                {
+                    const qint64 now = timer.elapsed();
+
+                    if (now - lastEtaUpdate >= 1000)
+                    {
+                        const double averageMsPerTask =
+                            double(now) / double(completed);
+
+                        const qint64 remainingMs =
+                            qRound64(
+                                averageMsPerTask *
+                                double(total - completed));
+
+                        cachedEta =
+                            formatDuration(remainingMs / 1000);
+
+                        lastEtaUpdate = now;
+                    }
+
+                    if (!cachedEta.isEmpty())
+                        status += QObject::tr(" • ETA %1")
+                                    .arg(cachedEta);
+                }
+
+                text += '\n' + status;
+            }
+
+            progress.setLabelText(text);
+        };
+
+        // ---------------------------------------------------------------------
+        // Connections
+        // ---------------------------------------------------------------------
+
+        QObject::connect(
+            &watcher,
+            &QFutureWatcher<T>::progressRangeChanged,
+            &progress,
+            [&](int min, int max)
+            {
+                progress.setRange(min, max);
+
+                cachedEta.clear();
+                lastEtaUpdate = -1000;
+
+                updateLabel();
+            });
+
+        QObject::connect(
+            &watcher,
+            &QFutureWatcher<T>::progressTextChanged,
+            [&](const QString& text)
+            {
+                progressText = text;
+                updateLabel();
+            });
+
+        QObject::connect(
+            &watcher,
+            &QFutureWatcher<T>::progressValueChanged,
+            [&](int value)
+            {
+                progress.setValue(value);
+                updateLabel();
+            });
+
+        QObject::connect(
+            &watcher,
+            &QFutureWatcher<T>::finished,
+            &progress,
+            &QDialog::accept);
+
+        QObject::connect(
+            &progress,
+            &QProgressDialog::canceled,
+            [&]()
+            {
+                future.cancel();
+            });
+
+        progress.exec();
+
+        future.waitForFinished();
+
+        return !future.isCanceled();
+    }
+
 
     class StatsTabBase : public QWidget, public Ui::StatsTab
     {
