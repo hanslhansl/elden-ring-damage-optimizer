@@ -22,44 +22,6 @@ import std;
 namespace erdo::ui
 {
     template<typename T>
-    bool execute_future_with_blocking_progress_bar_old(QFuture<T>& future, QWidget *parent, const QString &labelText, bool cancelable)
-    {
-        QFutureWatcher<T> watcher;
-        watcher.setFuture(future);
-
-        auto cancel_button_string = cancelable ? QObject::tr("Cancel") : QString{};
-
-        QProgressDialog progress(labelText, cancel_button_string, 0, 0, parent);
-        progress.setWindowModality(Qt::ApplicationModal);
-        progress.setMinimumDuration(0);
-        if (!cancelable)
-            progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
-
-        // Busy indicator until the future reports progress.
-        progress.setRange(0, 0);
-
-        QObject::connect(&watcher, &QFutureWatcher<T>::progressRangeChanged, &progress, [&](int min, int max) {
-            progress.setRange(min, max);
-        });
-
-        QObject::connect(&watcher, &QFutureWatcher<T>::progressValueChanged, &progress, &QProgressDialog::setValue);
-
-        QObject::connect(&watcher, &QFutureWatcher<T>::progressTextChanged, &progress, &QProgressDialog::setLabelText);
-
-        QObject::connect(&watcher, &QFutureWatcher<T>::finished, &progress, &QDialog::accept);
-
-        // User pressed Cancel or closed the dialog.
-        QObject::connect(&progress, &QProgressDialog::canceled, [&]() { future.cancel(); });
-
-        progress.exec();
-
-        // Wait in case cancellation takes a moment.
-        future.waitForFinished();
-
-        return !future.isCanceled();
-    }
-
-    template<typename T>
     bool execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget* parent, const QString& labelText, bool cancelable)
     {
         QFutureWatcher<T> watcher;
@@ -231,7 +193,6 @@ namespace erdo::ui
         return !future.isCanceled();
     }
 
-
     class StatsTabBase : public QWidget, public Ui::StatsTab
     {
         Q_OBJECT
@@ -318,14 +279,6 @@ namespace erdo::ui
             this->weapon_table = new WeaponTable(this);
             this->main_layout->addWidget(this->weapon_table, 1);
         };
-
-        calculator::RelevantStats get_character_relevant_stats() const
-        {
-            calculator::RelevantStats relevant_stats{};
-            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), relevant_stats))
-                stat = spinbox->value();
-            return relevant_stats;
-        }
 
         calculator::Stats get_character_stats() const
         {

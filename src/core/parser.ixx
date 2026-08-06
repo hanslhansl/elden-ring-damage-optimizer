@@ -460,7 +460,7 @@ namespace erdo::parser
             auto url_part = weaponName;
             std::ranges::replace(url_part, ' ', '_');
 
-            calculator::RelevantStats required_relevant_stats{};
+            calculator::RelevantStatsArray required_relevant_stats{};
             for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
                 required_relevant_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
 

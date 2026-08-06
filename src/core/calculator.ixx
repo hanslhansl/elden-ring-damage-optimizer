@@ -134,14 +134,13 @@ export namespace erdo::calculator
     }
 
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
-    using RelevantStats = std::array<int, enumerators_of<RelevantAttribute>().size()>;
+    using RelevantStatsArray = std::array<int, enumerators_of<RelevantAttribute>().size()>;
+    using RelevantStats = std::span<const int, enumerators_of<RelevantAttribute>().size()>;
     struct Stats : std::array<int, enumerators_of<Attribute>().size()>
     {
         constexpr RelevantStats relevant_stats() const
         {
-            RelevantStats relevant_stats{};
-            std::ranges::copy(this->begin() + irrelevant_attribute_count, this->end(), relevant_stats.begin());
-            return relevant_stats;
+            return RelevantStats{ this->begin() + irrelevant_attribute_count, this->end() };
         }
         constexpr std::span<const int, irrelevant_attribute_count> irrelevant_stats() const
         {
@@ -286,7 +285,7 @@ export namespace erdo::calculator
         // the affinity of the weapon, e.g. Affinity.HEAVY
         Affinity affinity;
         // stat requirements necessary to use the weapon effectively (without an attack rating penalty)
-        RelevantStats requirements;
+        RelevantStatsArray requirements;
         // scaling amount at each upgrade level (0-10 or 0-25) for each player attribute (e.g. Attribute.STRENGTH)
         std::vector<AttributeScaling> attribute_scalings;
         // base attack power at each upgrade level for each attack power type
@@ -330,8 +329,11 @@ export namespace erdo::calculator
         Stats stats;
 
     public:
-        RelevantStats adjust_stats_for_two_handing(RelevantStats relevant_stats) const
+        RelevantStatsArray adjust_stats_for_two_handing(const RelevantStats& relevant_stats) const
         {
+            RelevantStatsArray adjusted_relevant_stats{};
+            std::ranges::copy(relevant_stats, adjusted_relevant_stats.begin());
+
             auto effective_two_handing = this->two_handing;
 
             // Paired weapons do not get the two handing bonus
@@ -343,10 +345,10 @@ export namespace erdo::calculator
             if (std::ranges::contains(bow_types, this->weapon.get().type))
                 effective_two_handing = true;
 
-            if (effective_two_handing)
-                relevant_stats[std::to_underlying(Attribute::STRENGTH)] *= 1.5;
+            if (effective_two_handing && !this->disable_two_handing_attack_power_bonus)
+                adjusted_relevant_stats[std::to_underlying(Attribute::STRENGTH)] *= 1.5;
 
-            return relevant_stats;
+            return adjusted_relevant_stats;
         }
 
         IneffectiveAttributes calculate_ineffective_attributes(const RelevantStats& adjusted_relevant_stats) const
@@ -444,7 +446,7 @@ export namespace erdo::calculator
 
             this->total_scalings[attack_power_type_integral] = this->calculate_total_scaling(
                 this->ineffective_attack_power_types[attack_power_type_integral],
-                (!this->disable_two_handing_attack_power_bonus && is_damage_type) ? adjusted_relevant_stats : relevant_stats,
+                is_damage_type ? adjusted_relevant_stats : relevant_stats,
                 scaling_attributes,
                 attribute_scaling_at_upgrade_level,
                 scaling_curve
@@ -560,13 +562,12 @@ export namespace erdo::calculator
 
     constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats)
     {
-        constexpr auto N = std::tuple_size_v<RelevantStats>;
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
         std::size_t count = 0;
 
         if (attribute_points > UPPER * min_stats.size())
-            throw std::invalid_argument(std::format("attribute_points must be <= {}", UPPER * N));
+            throw std::invalid_argument(std::format("attribute_points must be <= {}", UPPER * min_stats.size()));
 
         if (std::ranges::any_of(min_stats, [](auto v) { return v > UPPER; }))
             throw std::invalid_argument(std::format("min_stats must be <= {}", UPPER));
@@ -657,7 +658,6 @@ export namespace erdo::calculator
     }
     std::vector<Stats> get_stat_variations(const int attribute_points, const Stats &min_stats)
     {
-        constexpr auto N = std::tuple_size_v<RelevantStats>;
         constexpr auto UPPER = 99;
         const auto SUM = attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
 
