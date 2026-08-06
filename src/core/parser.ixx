@@ -1,6 +1,5 @@
 export module erdo:parser;
 import :xml;
-import :witchy;
 import :calculator;
 
 import std;
@@ -24,6 +23,18 @@ auto map_get(Map &&m, Key &&key, Default &&default_) {
 
 namespace erdo::parser
 {
+    export {
+        const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param";
+        const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param";
+        const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param";
+        const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param";
+        const std::filesystem::path SpEffectParamFile = "SpEffectParam.param";
+        const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param";
+        const std::filesystem::path WeaponNameFile = "WeaponName.fmg";
+        const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg";
+        const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg";
+    }
+
     using ParamRow = std::map<std::string, double>;
     struct CalcCorrectGraphEntry
     {
@@ -232,17 +243,17 @@ namespace erdo::parser
 
     export auto load_weapons(const std::filesystem::path &xml_data_directory) {
         auto scalingTiers = get_scaling_tiers(
-            xml_data_directory / witchy::GR_MenuTextFile += ".xml",
-            xml_data_directory / witchy::MenuValueTableParamFile += ".xml"
+            xml_data_directory / GR_MenuTextFile += ".xml",
+            xml_data_directory / MenuValueTableParamFile += ".xml"
         );
-        auto attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / witchy::AttackElementCorrectParamFile += ".xml");
+        auto attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / AttackElementCorrectParamFile += ".xml");
 
-        auto spEffectParams = xml::read_param_file<long long>(xml_data_directory / witchy::SpEffectParamFile += ".xml");
-        auto calcCorrectGraphs = xml::read_param_file<double>(xml_data_directory / witchy::CalcCorrectGraphFile += ".xml");
-        auto equipParamWeapons = xml::read_param_file<double>(xml_data_directory / witchy::EquipParamWeaponFile += ".xml");
-        auto reinforceParamWeapons = xml::read_param_file<double>(xml_data_directory / witchy::ReinforceParamWeaponFile += ".xml");
-        auto weaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponNameFile += ".xml");
-        auto dlcWeaponNames = xml::read_fmg_file(xml_data_directory / witchy::WeaponName_dlc01File += ".xml");
+        auto spEffectParams = xml::read_param_file<long long>(xml_data_directory / SpEffectParamFile += ".xml");
+        auto calcCorrectGraphs = xml::read_param_file<double>(xml_data_directory / CalcCorrectGraphFile += ".xml");
+        auto equipParamWeapons = xml::read_param_file<double>(xml_data_directory / EquipParamWeaponFile += ".xml");
+        auto reinforceParamWeapons = xml::read_param_file<double>(xml_data_directory / ReinforceParamWeaponFile += ".xml");
+        auto weaponNames = xml::read_fmg_file(xml_data_directory / WeaponNameFile += ".xml");
+        auto dlcWeaponNames = xml::read_fmg_file(xml_data_directory / WeaponName_dlc01File += ".xml");
 
         std::map<long long, std::vector<ReinforceTypesDict>> reinforce_types;
         for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)

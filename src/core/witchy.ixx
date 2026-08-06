@@ -1,5 +1,6 @@
 export module erdo:witchy;
 import :xml;
+import :parser;
 
 import std;
 
@@ -41,28 +42,16 @@ namespace erdo::witchy
         "msg/engus/item_dlc02.msgbnd.dcx"
     };
 
-    export {
-        const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param";
-        const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param";
-        const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param";
-        const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param";
-        const std::filesystem::path SpEffectParamFile = "SpEffectParam.param";
-        const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param";
-        const std::filesystem::path WeaponNameFile = "WeaponName.fmg";
-        const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg";
-        const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg";
-    }
-
     const std::set<std::filesystem::path> needed_unpacked_files = {
-        AttackElementCorrectParamFile,
-        CalcCorrectGraphFile,
-        EquipParamWeaponFile,
-        ReinforceParamWeaponFile,
-        SpEffectParamFile,
-        MenuValueTableParamFile,
-        WeaponNameFile,
-        WeaponName_dlc01File,
-        GR_MenuTextFile
+        parser::AttackElementCorrectParamFile,
+        parser::CalcCorrectGraphFile,
+        parser::EquipParamWeaponFile,
+        parser::ReinforceParamWeaponFile,
+        parser::SpEffectParamFile,
+        parser::MenuValueTableParamFile,
+        parser::WeaponNameFile,
+        parser::WeaponName_dlc01File,
+        parser::GR_MenuTextFile
     };
 
     std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {}) {
