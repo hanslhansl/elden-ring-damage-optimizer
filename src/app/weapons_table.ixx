@@ -11,6 +11,7 @@ export module erdo.ui.weapons_table;
 
 import std;
 import erdo;
+import erdo.ui.settings;
 
 
 namespace erdo::ui
@@ -31,52 +32,6 @@ struct std::tuple_element<I, T> : std::tuple_element<I, typename T::tuple_base> 
 
 namespace erdo::ui
 {
-    export QString format_float(double x)
-    {
-        auto s = QString::number(x, 'f', 3);
-
-        // Remove trailing zeros
-        while (s.endsWith('0'))
-            s.chop(1);
-
-        // Remove trailing decimal point
-        if (s.endsWith('.'))
-            s.chop(1);
-
-        return s;
-    }
-
-    export QString string_to_display(const QString& str)
-    {
-        QStringList words = str.split(QRegularExpression("[_ ]+"), Qt::SkipEmptyParts);
-
-        for (QString &word : words)
-            word = word.toLower();
-
-        return words.join(' ');
-    }
-    export QString string_to_display(const char* str)
-    {
-        return string_to_display(QString(str));
-    }
-    export QString string_to_display(const std::string& str)
-    {
-        return string_to_display(QString::fromStdString(str));
-    }
-    export QString string_to_display(std::string_view str)
-    {
-        return string_to_display(std::string(str));
-    }
-
-    template<typename T>
-    auto format_number(T x)
-    {
-        if (x == 0)
-            return QString("\u2012");
-        if constexpr (std::integral<T>)
-            return QString::number(x);
-        return format_float(x);
-    };
     auto foreground_color(bool is_ineffective)
     {
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
@@ -98,7 +53,7 @@ namespace erdo::ui
             void update(const calculator::AttackRating& attack_rating) { }
         };
 
-        export struct NameSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
+        export struct NameSection : SectionBase<std::array<std::array<QVariant, 3>, 1>>
         {
             inline const static std::vector<QString> column_names { string_to_display("name") };
 
@@ -112,17 +67,30 @@ namespace erdo::ui
             {
                 auto&& weapon = attack_rating.weapon.get();
 
-                (*this)[0][0] = string_to_display(weapon.qualified_name(attack_rating.upgrade_levels.at(weapon.upgrade_level_index)));
-                (*this)[0][1] = QUrl(QString::fromStdString(weapon.url));
+                if (settings().display_base_names_instead_of_full_names)
+                    (*this)[0][0] = string_to_display(weapon.qualified_base_name(attack_rating.upgrade_level()));
+                else
+                    (*this)[0][0] = string_to_display(weapon.qualified_name(attack_rating.upgrade_level()));
+
+                if (settings().sort_by_base_names_instead_of_full_names)
+                    (*this)[0][1] = string_to_display(weapon.base_name);
+                else
+                    (*this)[0][1] = string_to_display(weapon.full_name);
+
+
+                (*this)[0][2] = QUrl(QString::fromStdString(weapon.url));
             }
 
             QVariant data(int column, int role) const
             {
-                if (role == Qt::DisplayRole || role == Qt::UserRole)
+                if (role == Qt::DisplayRole)
                     return (*this)[column][0];
+
+                if (role == Qt::UserRole)
+                    return (*this)[column][1];
                 
                 if (role == Qt::UserRole + 1)
-                    return (*this)[column][1];
+                    return (*this)[column][2];
                 
                 return {};
             }
@@ -365,7 +333,7 @@ namespace erdo::ui
                 auto&& weapon = attack_rating.weapon.get();
 
                 for (auto&& [attribute_scaling, scaling_tier, is_ineffective, arr] : std::views::zip(
-                    attack_rating.attribute_scalings,
+                    attack_rating.attribute_scalings(),
                     attack_rating.calculate_scaling_tiers(),
                     attack_rating.ineffective_attributes,
                     *this))
@@ -437,6 +405,8 @@ namespace erdo::ui
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
         using _tuple_base::_tuple_base;
 
+        calculator::AttackRating attack_rating { calculator::Weapon::dummy, {}, {} };
+
         static constexpr std::array section_sizes = { std::tuple_size_v<Args>... };
         static constexpr std::array cumulative_section_sizes = []() {
             std::array<std::size_t, sizeof...(Args)> result{};
@@ -464,13 +434,18 @@ namespace erdo::ui
         }
 
         BasicRow() = default;
-        explicit BasicRow(const calculator::AttackRating& attack_rating) : _tuple_base(Args(attack_rating)...) { }
+        explicit BasicRow(calculator::AttackRating&& attack_rating) : _tuple_base(Args(attack_rating)...), attack_rating{ std::move(attack_rating) } { }
 
-        void update(const calculator::AttackRating& attack_rating)
+        void update(calculator::AttackRating&& attack_rating)
+        {
+            this->attack_rating = std::move(attack_rating);
+            this->update();
+        }
+        void update()
         {
             std::apply(
                 [&](auto&&...args) {
-                    (std::forward<decltype(args)>(args).update(attack_rating),...);
+                    (std::forward<decltype(args)>(args).update(this->attack_rating),...);
                 },
                 *this
             );
@@ -511,7 +486,34 @@ namespace erdo::ui
     {
         std::vector<Row> rows;
 
-        explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent) { }
+        explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent)
+        {
+            connect(&settings(), &Settings::decimal_places_changed, [this](){
+                for (auto&& row : this->rows)
+                    row.update();
+                this->notify_all_changed();
+            });
+
+            static constexpr auto I = tuple_index_v<sections::NameSection, Row>;
+            connect(&settings(), &Settings::display_base_names_instead_of_full_names_changed, [this](){
+                for (auto&& row : this->rows)
+                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                emit dataChanged(
+                    index(0, Row::section_index_offsets[I]),
+                    index(rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    { Qt::DisplayRole }
+                );
+            });
+            connect(&settings(), &Settings::sort_by_base_names_instead_of_full_names_changed, [this](){
+                for (auto&& row : this->rows)
+                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                emit dataChanged(
+                    index(0, Row::section_index_offsets[I]),
+                    index(rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    {  Qt::UserRole }
+                );
+            });
+        }
 
         int rowCount(const QModelIndex& parent = {}) const override
         {
@@ -548,7 +550,7 @@ namespace erdo::ui
             this->endResetModel();
         }
 
-        void notifyAllChanged()
+        void notify_all_changed()
         {
             if (rows.empty())
                 return;

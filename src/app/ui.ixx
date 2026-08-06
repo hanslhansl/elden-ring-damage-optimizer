@@ -14,10 +14,14 @@
 #include "ui_optimize_widget.h"
 #include "ui_plot_tab.h"
 export module erdo.ui;
-export import erdo.ui.weapons_table;
+
+import std;
 
 import erdo;
-import std;
+
+import erdo.ui.settings;
+import erdo.ui.weapons_table;
+
 
 namespace erdo::ui
 {
@@ -440,7 +444,7 @@ namespace erdo::ui
                 | std::views::transform([&](const calculator::Weapon& w) {
                     attack_rating.weapon = w;
                     attack_rating.calculate_inplace();
-                    return Row(attack_rating);
+                    return Row(std::move(attack_rating));
                 })
             );
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
@@ -470,10 +474,10 @@ namespace erdo::ui
                 auto&& [w, row] = pair;
                 attack_rating.weapon = w;
                 attack_rating.calculate_inplace();
-                row.update(attack_rating);
+                row.update(std::move(attack_rating));
             });
 
-            this->weapon_table->model->notifyAllChanged();
+            this->weapon_table->model->notify_all_changed();
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             std::println("StatsTab::calculate_weapon_stats: {} seconds", elapsed.count());
@@ -734,8 +738,8 @@ namespace erdo::ui
                 }
             }
 
-            QAction *action = new QAction(QString::fromStdString(action_text), this->ui->menu_weapon_data);
-            this->ui->menu_weapon_data->insertAction(this->menu_weapon_data_seperator, action);
+            QAction *action = new QAction(QString::fromStdString(action_text), this->ui->menu_file);
+            this->ui->menu_file->insertAction(this->menu_weapon_data_seperator, action);
             action->setCheckable(true);
 
             this->menu_weapon_data_group->addAction(action);
@@ -857,7 +861,7 @@ namespace erdo::ui
                 throw std::runtime_error("no weapon data directories found in xml_data directory");
 
             // weapon data menu
-            this->menu_weapon_data_seperator = this->ui->menu_weapon_data->addSeparator();
+            this->menu_weapon_data_seperator = this->ui->menu_file->addSeparator();
             this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
@@ -867,10 +871,12 @@ namespace erdo::ui
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            QAction* action = this->ui->menu_weapon_data->addAction("load weapon data from directory");
+            QAction* action = this->ui->menu_file->addAction("load weapon data from directory");
             connect(action, &QAction::triggered, this, &MainWindow::load_weapon_data_from_directory);
-            action = this->ui->menu_weapon_data->addAction("generate weapon data from game data");
+            action = this->ui->menu_file->addAction("generate weapon data from game data");
             connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
+            action = this->ui->menu_file->addAction("settings");
+            connect(action, &QAction::triggered, [](){ settings().dialog->exec(); });
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));
@@ -881,6 +887,8 @@ namespace erdo::ui
 
     export int run_ui(int argc, char *argv[]) {
         QApplication app(argc, argv);
+        app.setOrganizationName("hanslhansl");
+        app.setApplicationName("elden-ring-damage-optimizer");
 
         MainWindow window{};
         window.showMaximized();

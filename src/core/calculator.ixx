@@ -309,6 +309,12 @@ export namespace erdo::calculator
                 return this->full_name;
             return std::format("{} +{}", this->full_name, upgrade_level);
         }
+        std::string qualified_base_name(int upgrade_level) const
+        {
+            if (upgrade_level == 0)
+                return this->base_name;
+            return std::format("{} +{}", this->base_name, upgrade_level);
+        }
 
         static const Weapon dummy;
     };
@@ -329,10 +335,10 @@ export namespace erdo::calculator
         Stats stats;
 
     public:
-        RelevantStatsArray adjust_stats_for_two_handing(const RelevantStats& relevant_stats) const
+        RelevantStatsArray adjust_stats_for_two_handing() const
         {
             RelevantStatsArray adjusted_relevant_stats{};
-            std::ranges::copy(relevant_stats, adjusted_relevant_stats.begin());
+            std::ranges::copy(this->stats.relevant_stats(), adjusted_relevant_stats.begin());
 
             auto effective_two_handing = this->two_handing;
 
@@ -363,6 +369,21 @@ export namespace erdo::calculator
                     ineffective_attribute = true;
             return ineffective_attributes;
         }
+    
+        int upgrade_level() const
+        {
+            return this->upgrade_levels.at(this->weapon.get().upgrade_level_index);
+        }
+
+        const AttributeScalings& attribute_scalings() const
+        {
+            return this->weapon.get().attribute_scalings[this->upgrade_level()];
+        }
+
+        const BaseAttackPower& base_attack_powers() const
+        {
+            return this->weapon.get().base_attack_powers[this->upgrade_level()];
+        }
     };
 
     struct AttackRating : FullAttackOptions
@@ -372,7 +393,6 @@ export namespace erdo::calculator
         AttackPowers attack_powers;
         double spell_scaling;
         TotalScalings total_scalings;
-        AttributeScalings attribute_scalings;
         IneffectiveAttackPowerTypes ineffective_attack_power_types;
         IneffectiveAttributes ineffective_attributes;
 
@@ -477,21 +497,18 @@ export namespace erdo::calculator
         {
             auto&& weapon = this->weapon.get();
 
-            auto upgrade_level = this->upgrade_levels.at(weapon.upgrade_level_index);
+            auto upgrade_level = this->upgrade_level();
             auto relevant_stats = this->stats.relevant_stats();
-            auto adjusted_relevant_stats = this->adjust_stats_for_two_handing(relevant_stats);
+            auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_relevant_stats);
-            this->attribute_scalings = weapon.attribute_scalings[upgrade_level];
-
-            auto&& base_attack_powers = weapon.base_attack_powers[upgrade_level];
 
             this->calculate_attack_power(
                 attack_power_type,
                 relevant_stats,
                 adjusted_relevant_stats,
                 this->ineffective_attributes,
-                base_attack_powers[std::to_underlying(attack_power_type)],
-                weapon.attribute_scalings[upgrade_level]
+                this->base_attack_powers()[std::to_underlying(attack_power_type)],
+                this->attribute_scalings()
             );
         }
         void calculate_spell_scaling_inplace()
@@ -510,13 +527,12 @@ export namespace erdo::calculator
         {
             auto&& weapon = this->weapon.get();
 
-            auto upgrade_level = this->upgrade_levels.at(weapon.upgrade_level_index);
+            auto upgrade_level = this->upgrade_level();
             auto relevant_stats = this->stats.relevant_stats();
-            auto adjusted_relevant_stats = this->adjust_stats_for_two_handing(relevant_stats);
+            auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_relevant_stats);
-            this->attribute_scalings = weapon.attribute_scalings[upgrade_level];
-
-            auto&& base_attack_powers = weapon.base_attack_powers[upgrade_level];
+            auto&& attribute_scalings = this->attribute_scalings();
+            auto&& base_attack_powers = this->base_attack_powers();
 
             for (auto attack_power_type : enumerators_of<AttackPowerType>())
                 this->calculate_attack_power(
@@ -525,7 +541,7 @@ export namespace erdo::calculator
                     adjusted_relevant_stats,
                     this->ineffective_attributes,
                     base_attack_powers[std::to_underlying(attack_power_type)],
-                    weapon.attribute_scalings[upgrade_level]
+                    attribute_scalings
                 );
 
             if (weapon.is_sorcery_or_incantation_tool)
@@ -538,8 +554,9 @@ export namespace erdo::calculator
 
         std::vector<std::string> calculate_scaling_tiers() const
         {
-            std::vector<std::string> scaling_tiers{ this->attribute_scalings.size() };
-            for (auto&& [scaling, scaling_tier] : std::views::zip(this->attribute_scalings, scaling_tiers))
+            auto&& attribute_scalings = this->attribute_scalings();
+            std::vector<std::string> scaling_tiers{ attribute_scalings.size() };
+            for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings, scaling_tiers))
             {
                 for (auto&& [threshold, tier] : this->weapon.get().scaling_tiers)
                     if (scaling >= threshold)
@@ -550,6 +567,7 @@ export namespace erdo::calculator
 
         AttackRating(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
             : FullAttackOptions{ attack_options, weapon, stats } { }
+        // using FullAttackOptions::FullAttackOptions;
 
         static AttackRating calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
         {

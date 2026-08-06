@@ -6,8 +6,9 @@ set(CMAKE_AUTORCC ON)
 
 add_library(erdo_ui STATIC)
 target_sources(erdo_ui PUBLIC FILE_SET CXX_MODULES FILES
-    ui.ixx
+    settings.ixx
     weapons_table.ixx
+    ui.ixx
 )
 qt_add_ui(erdo_ui SOURCES
     main_window.ui
