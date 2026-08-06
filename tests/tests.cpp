@@ -38,10 +38,10 @@ TEST_CASE("calculation - total attack power 1")
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::FullStats full_stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
+    calculator::Stats stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, full_stats, attack_options); })
+        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, stats, attack_options); })
         | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
         | std::ranges::to<std::vector>();
 
@@ -56,11 +56,11 @@ TEST_CASE("calculation - total attack power 2")
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::FullStats full_stats{};
-    full_stats.fill(70);
+    calculator::Stats stats{};
+    stats.fill(70);
 
     auto total_attack_powers = weapons
-        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, full_stats, attack_options); })
+        | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, stats, attack_options); })
         | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
         | std::ranges::to<std::vector>();
 
@@ -80,7 +80,7 @@ TEST_CASE("stat variations")
     );
     CHECK(stat_variation_count == expected_stat_variation_count);
     
-    std::vector<calculator::FullStats> stat_variations{};
+    std::vector<calculator::Stats> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("calculator::get_stat_variations")
 #endif
@@ -116,7 +116,7 @@ TEST_CASE("optimization - total attack power")
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
-    CHECK(attack_rating.full_stats == calculator::FullStats{ 10, 10, 10, 21, 10, 10, 10, 10 });
+    CHECK(attack_rating.stats == calculator::Stats{ 10, 10, 10, 21, 10, 10, 10, 10 });
 
     auto expected = 734.8908832256299;
     CHECK_THAT(attack_rating.total_attack_power.at(1),
@@ -146,7 +146,7 @@ TEST_CASE("optimization - spell scaling")
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Demi-Human Queen's Staff");
-    CHECK(attack_rating.full_stats == calculator::FullStats{ 10, 10, 10, 10, 10, 21, 10, 10 });
+    CHECK(attack_rating.stats == calculator::Stats{ 10, 10, 10, 10, 10, 21, 10, 10 });
 
     auto expected = 1.9225000000000001;
     CHECK_THAT(attack_rating.spell_scaling,

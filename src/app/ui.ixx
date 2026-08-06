@@ -254,14 +254,14 @@ namespace erdo::ui
                 if (text.isEmpty())
                     return;
 
-                auto&& full_stats = calculator::character_class_stats.at(text.toStdString());
-                for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, full_stats))
+                auto&& stats = calculator::character_class_stats.at(text.toStdString());
+                for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, stats))
                 {
                     QSignalBlocker b { spinbox };
                     spinbox->setValue(stat);
                 }
 
-                emit character_stats_changed(full_stats);
+                emit character_stats_changed(stats);
             });
 
             // character stats spinboxes
@@ -276,12 +276,12 @@ namespace erdo::ui
                 );
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
-                    auto&& full_stats = this->get_character_full_stats();
+                    auto&& stats = this->get_character_stats();
 
                     QSignalBlocker b { this->starting_class_combobox };
                     auto it = std::ranges::find(
                         calculator::character_class_stats,
-                        full_stats,
+                        stats,
                         &decltype(calculator::character_class_stats)::value_type::second
                     );
                     if (it != calculator::character_class_stats.end()) 
@@ -289,7 +289,7 @@ namespace erdo::ui
                     else
                         this->starting_class_combobox->setCurrentIndex(-1);
 
-                    emit character_stats_changed(full_stats);
+                    emit character_stats_changed(stats);
                 });
             }
 
@@ -319,20 +319,20 @@ namespace erdo::ui
             this->main_layout->addWidget(this->weapon_table, 1);
         };
 
+        calculator::RelevantStats get_character_relevant_stats() const
+        {
+            calculator::RelevantStats relevant_stats{};
+            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), relevant_stats))
+                stat = spinbox->value();
+            return relevant_stats;
+        }
+
         calculator::Stats get_character_stats() const
         {
             calculator::Stats stats{};
-            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes | std::views::drop(calculator::irrelevant_attribute_count), stats))
+            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, stats))
                 stat = spinbox->value();
             return stats;
-        }
-
-        calculator::FullStats get_character_full_stats() const
-        {
-            calculator::FullStats full_stats{};
-            for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, full_stats))
-                stat = spinbox->value();
-            return full_stats;
         }
         
         calculator::UpgradeLevels get_upgrade_levels()
@@ -373,7 +373,7 @@ namespace erdo::ui
         }
     
     signals:
-        void character_stats_changed(const calculator::FullStats& full_stats);
+        void character_stats_changed(const calculator::Stats& stats);
     };
 
     class StatsTab : public StatsTabBase
@@ -386,12 +386,12 @@ namespace erdo::ui
             // character level label
             this->character_stats_layout->addRow(
                 string_to_display("character level:"),
-                this->character_level_label = new QLabel(QString::number(this->get_character_full_stats().character_level()))
+                this->character_level_label = new QLabel(QString::number(this->get_character_stats().character_level()))
             );
 
             // character stats spinboxes
-            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::FullStats& full_stats){
-                this->character_level_label->setText(QString::number(full_stats.character_level()));
+            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::Stats& stats){
+                this->character_level_label->setText(QString::number(stats.character_level()));
                 this->calculate_weapon_stats();
             });
 
@@ -473,13 +473,13 @@ namespace erdo::ui
 
 
             // get character stats
-            auto full_stats = this->get_character_full_stats();
+            auto stats = this->get_character_stats();
 
             // get attack options
             auto attack_options = this->get_attack_options();
 
             // temporary attack rating object to avoid copying the weapon data multiple times
-            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, full_stats, attack_options };
+            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, stats, attack_options };
 
             std::vector<Row> rows{};
             rows.reserve(active_weapon_data.size());
@@ -503,13 +503,13 @@ namespace erdo::ui
         void calculate_weapon_stats()
         {
             // get character stats
-            auto full_stats = this->get_character_full_stats();
+            auto stats = this->get_character_stats();
 
             // get attack options
             auto attack_options = this->get_attack_options();
 
             // temporary attack rating object to avoid copying the weapon data multiple times
-            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, full_stats, attack_options };
+            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, stats, attack_options };
 
             auto start = std::chrono::high_resolution_clock::now();
 
@@ -541,12 +541,12 @@ namespace erdo::ui
 
         void prepare_optimization()
         {
-            auto full_stats = this->get_character_full_stats();
+            auto stats = this->get_character_stats();
 
-            auto min_attribute_points = full_stats.attribute_points();
+            auto min_attribute_points = stats.attribute_points();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto max_free_attribute_points = max_attribute_points - min_attribute_points;
-            auto stat_variations = calculator::get_stat_variation_count(max_attribute_points, full_stats);
+            auto stat_variations = calculator::get_stat_variation_count(max_attribute_points, stats);
             
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
             this->max_free_attribute_points_label->setText(QString::number(max_free_attribute_points));
@@ -604,10 +604,10 @@ namespace erdo::ui
         {
             auto start = std::chrono::high_resolution_clock::now();
 
-            auto full_stats = this->get_character_full_stats();
+            auto stats = this->get_character_stats();
             auto attack_options = this->get_attack_options();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-            auto stat_variations = calculator::get_stat_variations(max_attribute_points, full_stats);
+            auto stat_variations = calculator::get_stat_variations(max_attribute_points, stats);
 
             static constexpr auto optimizer_callbacks = [](auto){
                 static constexpr auto [...enumerators] = enumerators_of<calculator::OptimizationTarget>();
@@ -652,7 +652,7 @@ namespace erdo::ui
             // max character level label
             this->character_stats_layout->addRow(string_to_display("max character level:"), this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
-            calculator::FullStats max_stats{};
+            calculator::Stats max_stats{};
             max_stats.fill(99);
             this->max_character_level_spinbox->setMaximum(max_stats.character_level());
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, this, &OptimizeTab::prepare_optimization);

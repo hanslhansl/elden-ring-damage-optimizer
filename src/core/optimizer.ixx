@@ -91,35 +91,41 @@ namespace erdo::calculator
         static constexpr auto target = target_;
         using OptimizerImpl = OptimizerImpl<target_>;
 
-        static AttackRating optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<FullStats>& stat_variations)
+        static AttackRating optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
         {
+            if (stat_variations.empty())
+                throw std::invalid_argument("stat_variations must not be empty");
+
             AttackRating attack_rating{ weapon, {}, attack_options };
-            FullStats const* best_stats = nullptr;
+            Stats const* best_stats = nullptr;
             auto best_value = std::numeric_limits<typename Projection::value_type>::lowest();
 
-            for (const auto& full_stats : stat_variations)
+            for (const auto& stats : stat_variations)
             {
-                attack_rating.full_stats = full_stats;
+                attack_rating.stats = stats;
                 OptimizerImpl::efficient_calculate_inplace(attack_rating);
 
                 if (best_value < OptimizerImpl::projection(attack_rating))
                 {
-                    best_stats = &full_stats;
+                    best_stats = &stats;
                     best_value = OptimizerImpl::projection(attack_rating);
                 }
             }
 
-            attack_rating.full_stats = *best_stats;
+            attack_rating.stats = *best_stats;
             attack_rating.calculate_inplace();
             return attack_rating;
         }
 
         static std::vector<std::function<AttackRating()>> get_tasks(
             const std::vector<std::reference_wrapper<const calculator::Weapon>>& weapons,
-            const std::vector<FullStats>& stat_variations,
+            const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
         )
         {
+            if (stat_variations.empty())
+                throw std::invalid_argument("stat_variations must not be empty");
+
             std::vector<std::function<AttackRating()>> tasks;
             tasks.reserve(weapons.size());
 
@@ -138,10 +144,13 @@ namespace erdo::calculator
         }
 
         static std::function<AttackRating(const Weapon&)> get_callback(
-            const std::vector<FullStats>& stat_variations,
+            const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
         )
         {
+            if (stat_variations.empty())
+                throw std::invalid_argument("stat_variations must not be empty");
+
             return [&](const Weapon& weapon) {
                 return Optimizer::optimize_weapon(
                     weapon,
@@ -153,10 +162,13 @@ namespace erdo::calculator
 
         static std::vector<AttackRating> run_synchronously(
             const std::vector<std::reference_wrapper<const Weapon>>& weapons,
-            const std::vector<FullStats>& stat_variations,
+            const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
         )
         {
+            if (stat_variations.empty())
+                throw std::invalid_argument("stat_variations must not be empty");
+            
             std::vector<AttackRating> attack_ratings;
             attack_ratings.reserve(weapons.size());
             attack_ratings.append_range(

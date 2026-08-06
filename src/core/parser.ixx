@@ -460,9 +460,9 @@ namespace erdo::parser
             auto url_part = weaponName;
             std::ranges::replace(url_part, ' ', '_');
 
-            calculator::Stats required_stats{};
+            calculator::RelevantStats required_relevant_stats{};
             for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
-                required_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
+                required_relevant_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
 
             calculator::Weapon w{
                 name,
@@ -474,7 +474,7 @@ namespace erdo::parser
                 row.at("enableMiracle") == 1,
                 integral_to_enum<calculator::Weapon::Type>(weaponType),
                 integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
-                required_stats,
+                required_relevant_stats,
                 attributeScaling,
                 attack,
                 attackElementCorrectsById.at(assert_float_is_llong(row.at("attackElementCorrectId"))),
