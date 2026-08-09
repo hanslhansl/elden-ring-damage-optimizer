@@ -71,12 +71,12 @@ namespace erdo::ui
             {
                 auto&& weapon = attack_rating.weapon.get();
 
-                if (settings().display_base_names_instead_of_full_names)
+                if (settings.display_base_names_instead_of_full_names)
                     (*this)[0][0] = string_to_display(weapon.qualified_base_name(attack_rating.upgrade_level()));
                 else
                     (*this)[0][0] = string_to_display(weapon.qualified_name(attack_rating.upgrade_level()));
 
-                if (settings().sort_by_base_names_instead_of_full_names)
+                if (settings.sort_by_base_names_instead_of_full_names)
                     (*this)[0][1] = string_to_display(weapon.base_name);
                 else
                     (*this)[0][1] = string_to_display(weapon.full_name);
@@ -525,14 +525,14 @@ namespace erdo::ui
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent)
         {
-            connect(&settings(), &Settings::decimal_places_changed, [this](){
+            connect(&settings.decimal_places, settings.decimal_places.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
                     row.update();
                 emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
             });
 
             static constexpr auto I = tuple_index_v<sections::NameSection, Row>;
-            connect(&settings(), &Settings::display_base_names_instead_of_full_names_changed, [this](){
+            connect(&settings.display_base_names_instead_of_full_names, settings.display_base_names_instead_of_full_names.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
@@ -541,7 +541,7 @@ namespace erdo::ui
                     { Qt::DisplayRole }
                 );
             });
-            connect(&settings(), &Settings::sort_by_base_names_instead_of_full_names_changed, [this](){
+            connect(&settings.sort_by_base_names_instead_of_full_names, settings.sort_by_base_names_instead_of_full_names.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
@@ -1028,6 +1028,16 @@ namespace erdo::ui
 
             connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
             connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
+
+            if (settings.hide_base_game_dlc_column)
+                this->hide_section<sections::BaseGameDLCSection>();
+            connect(&settings.hide_base_game_dlc_column, settings.hide_base_game_dlc_column.changed_member_pointer, [this](){
+                if (settings.hide_base_game_dlc_column)
+                    this->hide_section<sections::BaseGameDLCSection>();
+                else
+                    this->show_section<sections::BaseGameDLCSection>();
+                this->resize_columns_to_contents();
+            });
         }
 
         void resize_columns_to_contents()
@@ -1058,6 +1068,16 @@ namespace erdo::ui
                 Row::cumulative_section_sizes[I]
             ))
                 this->header->hideSection(static_cast<int>(index));
+        }
+        template<typename ColumnType>
+        void show_section()
+        {
+            static constexpr auto I = tuple_index_v<ColumnType, Row>;
+            for (auto && index : std::views::iota(
+                Row::section_index_offsets[I],
+                Row::cumulative_section_sizes[I]
+            ))
+                this->header->showSection(static_cast<int>(index));
         }
 
     protected:

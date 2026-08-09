@@ -11,77 +11,123 @@ export module erdo.ui.settings;
 import std;
 
 
-#define DEFINE_SPINBOX_SETTING(NAME, DEFAULT_VALUE, MINIMUM_VALUE, MAXIMUM_VALUE) \
-    public: \
-        int NAME = settings.value(#NAME, DEFAULT_VALUE).toInt();   \
-        Q_SIGNAL void NAME##_changed(int new_value);  \
-    private: \
-        QSpinBox* NAME##_widget = [this](){ \
-            auto spinbox = new QSpinBox{};  \
-            spinbox->setMinimum(MINIMUM_VALUE); \
-            spinbox->setMaximum(MAXIMUM_VALUE); \
-            spinbox->setValue(this->NAME);   \
-            connect(spinbox, &QSpinBox::valueChanged, [this](int new_value){ this->NAME = new_value; });   \
-            connect(spinbox, &QSpinBox::valueChanged, [this](int new_value){ this->set_value(#NAME, new_value); });   \
-            connect(spinbox, &QSpinBox::valueChanged, this, &Settings::NAME##_changed);   \
-            this->widgets.push_back(spinbox); \
-            this->names.push_back(#NAME); \
-            return spinbox; \
-        }()
-
-#define DEFINE_CHECKBOX_SETTING(NAME, DEFAULT_VALUE) \
-    public: \
-        bool NAME = settings.value(#NAME, DEFAULT_VALUE).toBool();   \
-        Q_SIGNAL void NAME##_changed(bool new_value);  \
-    private: \
-        QCheckBox* NAME##_widget = [this](){ \
-            auto checkbox = new QCheckBox{};  \
-            checkbox->setChecked(this->NAME);   \
-            connect(checkbox, &QCheckBox::toggled, [this](bool new_value){ this->NAME = new_value; });   \
-            connect(checkbox, &QCheckBox::toggled, [this](bool new_value){ this->set_value(#NAME, new_value); });   \
-            connect(checkbox, &QCheckBox::toggled, this, &Settings::NAME##_changed);   \
-            this->widgets.push_back(checkbox); \
-            this->names.push_back(#NAME); \
-            return checkbox; \
-        }()
-
-
 namespace erdo::ui
 {
-    export class Settings : public QObject
+    class SettingBuilderBase : public QObject
     {
         Q_OBJECT
 
-
-        std::vector<QString> names{};
-        std::vector<QWidget*> widgets{};
-
-        void set_value(const QString& name, const QVariant& value)
-        {
-            this->settings.setValue(name, value);
-            this->settings.sync();
-        }
-
     public:
-        QSettings settings{ "hanslhansl", "elden-ring-damage-optimizer" };
-        QDialog* dialog = new QDialog{};
+        Q_SIGNAL void changed();
 
-        Settings();
-
-        DEFINE_SPINBOX_SETTING(decimal_places, 3, 0, 10);
-        DEFINE_CHECKBOX_SETTING(display_base_names_instead_of_full_names, false);
-        DEFINE_CHECKBOX_SETTING(sort_by_base_names_instead_of_full_names, false);
+        static constexpr auto changed_member_pointer = &SettingBuilderBase::changed;
     };
 
-    export Settings& settings()
+    template<typename T>
+    struct SettingBuilder : SettingBuilderBase
     {
-        static Settings instance{};
-        return instance;
-    } 
+        T::value_type value;
+
+        SettingBuilder(QSettings* settings, QFormLayout* layout);
+
+        operator const typename T::value_type&() const
+        {
+            return this->value;
+        }
+    };
+
+    template<typename T>
+    struct SpinBoxSetting
+    {
+        using value_type = int;
+        using widget_type = QSpinBox;
+        static constexpr auto signal = &QSpinBox::valueChanged;
+
+        static void initialize(widget_type* spinbox, value_type value)
+        {
+            spinbox->setMinimum(T::minimum_value);
+            spinbox->setMaximum(T::maximum_value);
+            spinbox->setValue(value);
+        }
+    };
+    struct DecimalPlaces : SpinBoxSetting<DecimalPlaces>
+    {
+        using typename SpinBoxSetting<DecimalPlaces>::value_type;
+
+        constexpr static std::string_view name = "decimal_places";
+        constexpr static std::string_view display_name = "decimal places";
+
+        constexpr static value_type default_value = 3;
+        constexpr static value_type minimum_value = 0;
+        constexpr static value_type maximum_value = 10;
+    };
+
+    struct CheckBoxSetting
+    {
+        using value_type = bool;
+        using widget_type = QCheckBox;
+        static constexpr auto signal = &QCheckBox::toggled;
+
+        static void initialize(widget_type* checkbox, value_type value)
+        {
+            checkbox->setChecked(value);
+        }
+    };
+    struct DisplayBaseNamesInsteadOfFullNames : CheckBoxSetting
+    {
+        using typename CheckBoxSetting::value_type;
+
+        constexpr static std::string_view name = "display_base_names_instead_of_full_names";
+        constexpr static std::string_view display_name = "display base names instead of full names";
+
+        constexpr static value_type default_value = false;
+    };
+    struct SortByBaseNamesInsteadOfFullNames : CheckBoxSetting
+    {
+        using typename CheckBoxSetting::value_type;
+
+        constexpr static std::string_view name = "sort_by_base_names_instead_of_full_names";
+        constexpr static std::string_view display_name = "sort by base names instead of full names";
+
+        constexpr static value_type default_value = false;
+    };
+    struct HideBaseGameDLCColumn : CheckBoxSetting
+    {
+        using typename CheckBoxSetting::value_type;
+
+        constexpr static std::string_view name = "hide_base_game_dlc_column";
+        constexpr static std::string_view display_name = "hide base game/dlc column";
+
+        constexpr static value_type default_value = false;
+    };
+
+    class Settings
+    {
+        QFormLayout* layout{};
+        std::unique_ptr<QSettings> settings{};
+
+    public:
+        QDialog* dialog{};
+
+        SettingBuilder<DecimalPlaces> decimal_places{ settings.get(), layout };
+        SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ settings.get(), layout };
+        SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ settings.get(), layout };
+        SettingBuilder<HideBaseGameDLCColumn> hide_base_game_dlc_column{ settings.get(), layout };
+
+        Settings(int) {};
+        Settings() : layout{ new QFormLayout{} }, dialog{ new QDialog{} }, settings{ std::make_unique<QSettings>() }
+        {
+            this->dialog->setLayout(layout);
+            this->dialog->setWindowTitle("settings");
+        }
+
+        static void initialize();
+    };
+    export Settings settings { 1 };
 
     export QString format_float(double x)
     {
-        auto s = QString::number(x, 'f', settings().decimal_places);
+        auto s = QString::number(x, 'f', settings.decimal_places.value);
 
         // Remove trailing zeros
         while (s.endsWith('0'))
@@ -129,16 +175,29 @@ namespace erdo::ui
     };
 }
 
-erdo::ui::Settings::Settings()
+template<typename T>
+erdo::ui::SettingBuilder<T>::SettingBuilder(QSettings* settings, QFormLayout* layout)
 {
-    auto layout = new QFormLayout{};
+    if (settings == nullptr || layout == nullptr)
+        return;
+    
+    auto widget = new T::widget_type{};
+    this->value = settings->value(T::name, T::default_value).template value<typename T::value_type>();
+    T::initialize(widget, this->value);
+    layout->addRow(string_to_display(T::display_name), widget);
 
-    for (auto&& [name, widget] : std::views::zip(this->names, this->widgets))
-        layout->addRow(string_to_display(name), widget);
-
-    this->dialog->setLayout(layout);
-    this->dialog->setWindowTitle("settings");
+    connect(widget, T::signal, [settings, this](T::value_type new_value){
+        this->value = new_value;
+        settings->setValue(T::name, new_value);
+        settings->sync();
+        emit this->changed();
+    });
 }
 
+void erdo::ui::Settings::initialize()
+{
+    std::destroy_at(&erdo::ui::settings);
+    std::construct_at(&erdo::ui::settings);
+}
 
 #include "settings.moc"

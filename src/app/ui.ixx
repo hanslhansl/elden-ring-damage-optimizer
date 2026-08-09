@@ -813,11 +813,11 @@ namespace erdo::ui
         void closeEvent(QCloseEvent *event) override
         {
             // save geometry and state
-            auto&& s = settings().settings;
-            s.beginGroup("MainWindow");
-            s.setValue("geometry", this->saveGeometry());
-            s.setValue("state", this->saveState());
-            s.endGroup();
+            QSettings settings{};
+            settings.beginGroup("MainWindow");
+            settings.setValue("geometry", this->saveGeometry());
+            settings.setValue("state", this->saveState());
+            settings.endGroup();
 
             QMainWindow::closeEvent(event);
         }
@@ -880,7 +880,7 @@ namespace erdo::ui
             connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
             this->ui->menu_file->addSeparator();
             action = this->ui->menu_file->addAction("settings");
-            connect(action, &QAction::triggered, [](){ settings().dialog->exec(); });
+            connect(action, &QAction::triggered, [](){ settings.dialog->exec(); });
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));
@@ -888,17 +888,17 @@ namespace erdo::ui
             this->ui->tab_widget->addTab(plot, string_to_display("plot"));
 
             // restore geometry and state
-            auto&& s = settings().settings;
-            s.beginGroup("MainWindow");
-            const auto geometry = s.value("geometry", QByteArray()).toByteArray();
+            QSettings settings{};
+            settings.beginGroup("MainWindow");
+            const auto geometry = settings.value("geometry", QByteArray()).toByteArray();
             if (!geometry.isEmpty())
                 this->restoreGeometry(geometry);
-            const auto state = s.value("state", QByteArray()).toByteArray();
+            const auto state = settings.value("state", QByteArray()).toByteArray();
             if (state.isEmpty())
                 this->setWindowState(Qt::WindowMaximized);
             else
                 this->restoreState(state);
-            s.endGroup();
+            settings.endGroup();
         }
     };
 
@@ -906,6 +906,7 @@ namespace erdo::ui
         QApplication app(argc, argv);
         app.setOrganizationName("hanslhansl");
         app.setApplicationName("elden-ring-damage-optimizer");
+        settings.initialize();
 
         MainWindow window{};
         window.show();
