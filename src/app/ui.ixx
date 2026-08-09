@@ -237,7 +237,7 @@ namespace erdo::ui
                 attribute_spinbox->setMinimum(1);
                 attribute_spinbox->setMaximum(99);
                 this->character_stats_layout->insertRow(
-                    this->character_stats_layout->rowCount(),
+                    this->character_stats_layout->rowCount() - 1,
                     string_to_display(enum_to_string(attribute)),
                     attribute_spinbox
                 );
@@ -595,8 +595,10 @@ namespace erdo::ui
     public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
+            this->character_stats_box->setTitle(string_to_display("min character stats"));
+
             auto max_character_stats_box = new QGroupBox(string_to_display("max character stats"));
-            this->second_vertical_layout->insertWidget(2, max_character_stats_box);
+            this->second_vertical_layout->insertWidget(1, max_character_stats_box);
 
             auto max_character_stats_layout = new QFormLayout();
             max_character_stats_box->setLayout(max_character_stats_layout);

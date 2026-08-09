@@ -62,29 +62,20 @@
      <item>
       <layout class="QVBoxLayout" name="second_vertical_layout" stretch="0,0,0">
        <item>
-        <widget class="QGroupBox" name="groupBox_3">
+        <spacer name="verticalSpacer">
          <property name="locale">
           <locale language="English" country="AmericanSamoa"/>
          </property>
-         <property name="title">
-          <string>base game / dlc filter</string>
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_7">
-          <item>
-           <widget class="QListWidget" name="base_game_dlc_list">
-            <property name="locale">
-             <locale language="English" country="AmericanSamoa"/>
-            </property>
-            <property name="sizeAdjustPolicy">
-             <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
-            </property>
-            <property name="selectionMode">
-             <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
        </item>
        <item>
         <widget class="QGroupBox" name="groupBox">
@@ -159,20 +150,29 @@
         </widget>
        </item>
        <item>
-        <spacer name="verticalSpacer">
+        <widget class="QGroupBox" name="groupBox_3">
          <property name="locale">
           <locale language="English" country="AmericanSamoa"/>
          </property>
-         <property name="orientation">
-          <enum>Qt::Orientation::Vertical</enum>
+         <property name="title">
+          <string>base game / dlc filter</string>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>0</width>
-           <height>0</height>
-          </size>
-         </property>
-        </spacer>
+         <layout class="QVBoxLayout" name="verticalLayout_7">
+          <item>
+           <widget class="QListWidget" name="base_game_dlc_list">
+            <property name="locale">
+             <locale language="English" country="AmericanSamoa"/>
+            </property>
+            <property name="sizeAdjustPolicy">
+             <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::SelectionMode::MultiSelection</enum>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
        </item>
       </layout>
      </item>
