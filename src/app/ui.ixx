@@ -878,7 +878,7 @@ namespace erdo::ui
             connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
             this->ui->menu_file->addSeparator();
             action = this->ui->menu_file->addAction("settings");
-            connect(action, &QAction::triggered, [](){ settings.dialog->exec(); });
+            connect(action, &QAction::triggered, [](){ settings.show(); });
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));

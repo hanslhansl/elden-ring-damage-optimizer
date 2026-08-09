@@ -7,7 +7,7 @@
 #include <QEvent>
 #include <QDesktopServices>
 #include <QUrl>
-#include <qtimer.h>
+#include <QTimer.h>
 export module erdo.ui.weapons_table;
 
 import std;

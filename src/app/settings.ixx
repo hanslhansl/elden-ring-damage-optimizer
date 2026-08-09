@@ -105,10 +105,9 @@ namespace erdo::ui
     {
         QFormLayout* layout{};
         std::unique_ptr<QSettings> settings{};
-
-    public:
         QDialog* dialog{};
 
+    public:
         SettingBuilder<DecimalPlaces> decimal_places{ settings.get(), layout };
         SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ settings.get(), layout };
         SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ settings.get(), layout };
@@ -119,6 +118,11 @@ namespace erdo::ui
         {
             this->dialog->setLayout(layout);
             this->dialog->setWindowTitle("settings");
+        }
+
+        void show()
+        {
+            this->dialog->exec();
         }
 
         static void initialize();
