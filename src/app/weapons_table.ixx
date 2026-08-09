@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <QDesktopServices>
 #include <QUrl>
+#include <qtimer.h>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -39,14 +40,17 @@ namespace erdo::ui
  
     namespace sections
     {
+        static const auto alignment_center = QVariant::fromValue(Qt::AlignCenter);
+
         template<typename T>
         struct SectionBase : _tuple_base<T>
         {
             using _tuple_base<T>::_tuple_base;
 
-            static constexpr bool draw_header_labels_rotated = false;
+            static constexpr bool draw_section_header_labels_rotated = false;
             static constexpr bool has_header_section_title = false;
             static constexpr bool draw_section_seperators = false;
+            static constexpr bool expand_section = false;
 
             explicit SectionBase(const calculator::AttackRating& attack_rating) { }
 
@@ -135,11 +139,12 @@ namespace erdo::ui
                 (*this)[0][1] = std::to_underlying(weapon.type);
             }
         };
-        export struct BaseGameDLCSection : BinaryTextSection
+        
+        export struct BaseGameDLCSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
             inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
 
-            using BinaryTextSection::BinaryTextSection;
+            using SectionBase::SectionBase;
             explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
             {
                 auto&& weapon = attack_rating.weapon.get();
@@ -147,10 +152,32 @@ namespace erdo::ui
                 (*this)[0][0] = string_to_display(weapon.dlc ? "dlc" : "base game");
                 (*this)[0][1] = weapon.dlc;
             }
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole)
+                    return (*this)[column][0];
+
+                if (role == Qt::UserRole)
+                    return (*this)[column][1];
+
+                if (role == Qt::TextAlignmentRole)
+                    return alignment_center;
+                
+                return {};
+            }
         };
 
-        struct UnaryTextSection : SectionBase<std::array<QVariant, 1>>
+        export struct BaseNameSection : SectionBase<std::array<QVariant, 1>>
         {
+            inline const static std::vector<QString> column_names { string_to_display("base name") };
+
+            using SectionBase::SectionBase;
+            explicit BaseNameSection(const calculator::AttackRating& attack_rating)
+            {
+                (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
+            }
+
             QVariant data(int column, int role) const
             {
                 if (role == Qt::DisplayRole || role == Qt::UserRole)
@@ -159,20 +186,10 @@ namespace erdo::ui
                 return {};
             }
         };
-        export struct BaseNameSection : UnaryTextSection
-        {
-            inline const static std::vector<QString> column_names { string_to_display("base name") };
-
-            using UnaryTextSection::UnaryTextSection;
-            explicit BaseNameSection(const calculator::AttackRating& attack_rating)
-            {
-                (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
-            }
-        };
         
         export struct CharacterLevelSection : SectionBase<std::array<QVariant, 1>>
         {
-            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
             inline const static std::vector<QString> column_names { string_to_display("character level") };
@@ -193,9 +210,8 @@ namespace erdo::ui
                 if (role == Qt::DisplayRole || role == Qt::UserRole)
                     return (*this)[column];
                 
-                static const auto alignment = QVariant::fromValue(Qt::AlignCenter);
                 if (role == Qt::TextAlignmentRole)
-                    return alignment;
+                    return alignment_center;
 
                 return {};
             }
@@ -204,6 +220,8 @@ namespace erdo::ui
         template<std::size_t I>
         struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
         {
+            static constexpr bool expand_section = true;
+
             QVariant data(int column, int role) const
             {
                 if (role == Qt::DisplayRole)
@@ -215,16 +233,15 @@ namespace erdo::ui
                 if (role == Qt::ForegroundRole)
                     return this->at(column)[2];
                 
-                static const auto alignment = QVariant::fromValue(Qt::AlignCenter);
                 if (role == Qt::TextAlignmentRole)
-                    return alignment;
+                    return alignment_center;
                 
                 return {};
             }
         };
         export struct SpellScaling : DataSection<1>
         {
-            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
             inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
 
@@ -243,7 +260,7 @@ namespace erdo::ui
         };
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
         {
-            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
             static constexpr bool has_header_section_title = true;
             inline static const QString header_section_title = "attack power";
@@ -286,7 +303,7 @@ namespace erdo::ui
         {
             using enum_type = E;
 
-            static constexpr bool draw_header_labels_rotated = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
             
             inline const static std::vector<QString> column_names = enumerator_strings_of<enum_type>()
@@ -419,9 +436,27 @@ namespace erdo::ui
             return result;
         }();
         static constexpr std::size_t total_size = std::accumulate(section_sizes.begin(), section_sizes.end(), 0);
-        static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
-        static constexpr std::array draw_header_labels_rotated = { Args::draw_header_labels_rotated... };
         
+        static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
+        static constexpr std::array draw_column_header_label_rotated = [](){
+            std::array draw_section_header_labels_rotated = { Args::draw_section_header_labels_rotated... };
+            std::array<bool, total_size> result{};
+            for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(draw_section_header_labels_rotated, section_index_offsets, section_sizes))
+                if (draw_rotated)
+                    std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
+            
+            return result;
+        }();
+        static constexpr std::array expand_column = [](){
+            std::array expand_section = { Args::expand_section... };
+            std::array<bool, total_size> result{};
+            for (auto [expand, section_index_offset, section_size] : std::views::zip(expand_section, section_index_offsets, section_sizes))
+                if (expand)
+                    std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
+            
+            return result;
+        }();
+
         static const QString& column_name(int column)
         {
             const static std::vector<QString> column_names = [](){
@@ -484,6 +519,8 @@ namespace erdo::ui
 
     export struct RowModel : QAbstractTableModel
     {
+        friend class WeaponsTable;
+
         std::vector<Row> rows;
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent)
@@ -491,7 +528,7 @@ namespace erdo::ui
             connect(&settings(), &Settings::decimal_places_changed, [this](){
                 for (auto&& row : this->rows)
                     row.update();
-                this->notify_all_changed();
+                emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
             });
 
             static constexpr auto I = tuple_index_v<sections::NameSection, Row>;
@@ -499,8 +536,8 @@ namespace erdo::ui
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
-                    index(0, Row::section_index_offsets[I]),
-                    index(rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    this->index(0, Row::section_index_offsets[I]),
+                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[I]-1),
                     { Qt::DisplayRole }
                 );
             });
@@ -508,8 +545,8 @@ namespace erdo::ui
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
-                    index(0, Row::section_index_offsets[I]),
-                    index(rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    this->index(0, Row::section_index_offsets[I]),
+                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[I]-1),
                     {  Qt::UserRole }
                 );
             });
@@ -550,12 +587,11 @@ namespace erdo::ui
             this->endResetModel();
         }
 
-        void notify_all_changed()
+        void update_rows(std::ranges::range auto&& attack_ratings)
         {
-            if (rows.empty())
-                return;
-
-            emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+            for (auto&& [attack_rating, row] : std::views::zip(attack_ratings, this->rows))
+                row.update(std::move(attack_rating));
+            emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
         }
     };
 
@@ -597,7 +633,7 @@ namespace erdo::ui
         painter.restore();
     }
 
-    export class RotatedHeaderView : public QHeaderView
+    class RotatedHeaderView : public QHeaderView
     {
     public:
         enum class Rotation
@@ -623,7 +659,7 @@ namespace erdo::ui
 
             painter->save();
 
-            bool rotate = std::ranges::contains(rotated_columns, logicalIndex);
+            bool rotate = Row::draw_column_header_label_rotated[logicalIndex];
 
             if (!rotate)
             {
@@ -677,7 +713,7 @@ namespace erdo::ui
             QSize size = QHeaderView::sectionSizeFromContents(logicalIndex);
 
             // Width becomes height after rotation
-            if (std::ranges::contains(rotated_columns, logicalIndex))
+            if (Row::draw_column_header_label_rotated[logicalIndex])
                 return QSize(
                     size.height(),
                     size.width()
@@ -752,14 +788,9 @@ namespace erdo::ui
         }
 
         Rotation rotation;
-        static const inline auto rotated_columns = std::views::iota(std::size_t{}, std::tuple_size_v<Row>)
-            | std::views::filter([](std::size_t i) { return Row::draw_header_labels_rotated[i]; })
-            | std::views::transform([](std::size_t i) { return std::views::iota(Row::section_index_offsets[i], Row::cumulative_section_sizes[i]); })
-            | std::views::join
-            | std::ranges::to<std::vector>();
     };
 
-    export class RowSortFilterModel : public QSortFilterProxyModel
+    class RowSortFilterModel : public QSortFilterProxyModel
     {
     public:
         explicit RowSortFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
@@ -864,8 +895,119 @@ namespace erdo::ui
 
     export class WeaponTable : public QTableView
     {
-    public:
+        void resize_columns_to_contents_impl()
+        {
+            const int columns = this->model->columnCount();
 
+            this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
+            this->resizeColumnsToContents();
+
+            QVector<int> widths(columns);
+            QVector<int> visibleColumns;
+            QVector<int> expandableColumns;
+
+            int total = 0;
+
+            for (int c = 0; c < columns; ++c)
+            {
+                if (this->header->isSectionHidden(c))
+                    continue;
+
+                widths[c] = std::max({
+                    this->header->sectionSize(c),
+                    this->header->sectionSizeHint(c),
+                    this->header->minimumSectionSize()
+                });
+                total += widths[c];
+                visibleColumns.append(c);
+
+                if (Row::expand_column[c])
+                    expandableColumns.append(c);
+            }
+
+            this->header->setSectionResizeMode(QHeaderView::Interactive);
+
+            if (total <= 0 || visibleColumns.isEmpty())
+                return;
+
+            const int available = this->viewport()->width();
+
+            // First restore the content-based widths.
+            for (int c : visibleColumns)
+                this->header->resizeSection(c, widths[c]);
+
+            if (total >= available || expandableColumns.isEmpty())
+                return;
+
+            int extra = available - total;
+
+            // Sort expandable columns from narrowest to widest.
+            std::sort(
+                expandableColumns.begin(),
+                expandableColumns.end(),
+                [&](int a, int b)
+                {
+                    return widths[a] < widths[b];
+                });
+
+            // Raise the narrowest columns until they reach the next width level.
+            int level = widths[expandableColumns[0]];
+
+            for (int i = 1; i < expandableColumns.size() && extra > 0; ++i)
+            {
+                const int nextLevel = widths[expandableColumns[i]];
+                const int count = i;
+
+                const int required = (nextLevel - level) * count;
+
+                if (required > extra)
+                {
+                    // Can't reach the next level.
+                    const int increase = extra / count;
+                    const int remainder = extra % count;
+
+                    for (int j = 0; j < count; ++j)
+                    {
+                        const int c = expandableColumns[j];
+                        const int delta = increase + (j < remainder ? 1 : 0);
+
+                        this->header->resizeSection(c, widths[c] + delta);
+                    }
+
+                    return;
+                }
+
+                // Raise the first `count` columns to the next level.
+                for (int j = 0; j < count; ++j)
+                {
+                    const int c = expandableColumns[j];
+                    widths[c] = nextLevel;
+                    this->header->resizeSection(c, widths[c]);
+                }
+
+                extra -= required;
+                level = nextLevel;
+            }
+
+            // All expandable columns have reached the same width.
+            // Distribute any remaining space evenly.
+            if (extra > 0)
+            {
+                const int count = expandableColumns.size();
+                const int increase = extra / count;
+                const int remainder = extra % count;
+
+                for (int i = 0; i < count; ++i)
+                {
+                    const int c = expandableColumns[i];
+                    const int delta = increase + (i < remainder ? 1 : 0);
+
+                    this->header->resizeSection(c, widths[c] + delta);
+                }
+            }
+        }
+
+    public:
         RowModel* model = new RowModel(this);
         RowSortFilterModel* proxy_model = new RowSortFilterModel(this);
         RotatedHeaderView* header = new RotatedHeaderView(Qt::Horizontal, RotatedHeaderView::Rotation::Clockwise, this);
@@ -883,60 +1025,28 @@ namespace erdo::ui
             this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
 
             this->hide_section<sections::BaseNameSection>();
+
+            connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
+            connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
         }
 
         void resize_columns_to_contents()
         {
-            const int columns = this->model->columnCount();
-
-            this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
-            this->resizeColumnsToContents();
-
-            QVector<int> widths(columns);
-            int total = 0;
-            QVector<int> visibleColumns;
-
-            for (int c = 0; c < columns; ++c)
-            {
-                if (this->header->isSectionHidden(c))
-                    continue;
-
-                widths[c] = this->header->sectionSize(c);
-                total += widths[c];
-                visibleColumns.append(c);
-            }
-
-            this->header->setSectionResizeMode(QHeaderView::Interactive);
-
-            if (total <= 0 || visibleColumns.isEmpty())
+            if (!this->isVisible())
                 return;
 
-            const int available = this->viewport()->width();
-
-            if (total < available)
+            QTimer::singleShot(0, this, [this]()
             {
-                const double factor = double(available) / total;
+                this->doItemsLayout();
 
-                int used = 0;
-
-                for (int i = 0; i < visibleColumns.size() - 1; ++i)
+                QTimer::singleShot(0, this, [this]()
                 {
-                    int c = visibleColumns[i];
-                    int w = qRound(widths[c] * factor);
+                    if (!this->isVisible())
+                        return;
 
-                    this->header->resizeSection(c, w);
-                    used += w;
-                }
-
-                // Last visible column gets the remainder
-                int last = visibleColumns.back();
-                this->header->resizeSection(last, available - used);
-            }
-            else
-            {
-                for (int c : visibleColumns)
-                    this->header->resizeSection(c, widths[c]);
-            }
+                    this->resize_columns_to_contents_impl();
+                });
+            });
         }
 
         template<typename ColumnType>
@@ -956,6 +1066,13 @@ namespace erdo::ui
             QTableView::paintEvent(event);
 
             draw_column_group_separators(this->viewport(), this->horizontalHeader());
+        }
+    
+        void showEvent(QShowEvent *event) override
+        {
+            QTableView::showEvent(event);
+
+            this->resize_columns_to_contents();
         }
     };
 }

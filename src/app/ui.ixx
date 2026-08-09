@@ -202,6 +202,7 @@ namespace erdo::ui
         Q_OBJECT
 
     protected:
+    public:
         std::span<const calculator::Weapon> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
         WeaponTable* weapon_table{};
@@ -428,7 +429,6 @@ namespace erdo::ui
         {
             auto start = std::chrono::high_resolution_clock::now();
 
-
             // get character stats
             auto stats = this->get_character_stats();
 
@@ -453,8 +453,6 @@ namespace erdo::ui
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             std::println("StatsTab::set_active_weapon_data: {} seconds", elapsed.count());
-        
-            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
         
         void calculate_weapon_stats()
@@ -470,19 +468,17 @@ namespace erdo::ui
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            std::ranges::for_each(std::views::zip(this->active_weapon_data, this->weapon_table->model->rows), [&](auto&& pair) {
-                auto&& [w, row] = pair;
-                attack_rating.weapon = w;
-                attack_rating.calculate_inplace();
-                row.update(std::move(attack_rating));
-            });
+            this->weapon_table->model->update_rows(
+                this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::AttackRating&& {
+                    attack_rating.weapon = w;
+                    attack_rating.calculate_inplace();
+                    return std::move(attack_rating);
+                })
+            );
 
-            this->weapon_table->model->notify_all_changed();
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             std::println("StatsTab::calculate_weapon_stats: {} seconds", elapsed.count());
-
-            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
     };
 
@@ -591,12 +587,11 @@ namespace erdo::ui
                 }
             }
             this->weapon_table->model->set_rows(std::move(rows));
+            // this->weapon_table->resize_columns_to_contents();
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             std::println("OptimizeTab::optimize_brute_force: {} seconds", elapsed.count());
-        
-            QTimer::singleShot(0, this->weapon_table, &WeaponTable::resize_columns_to_contents);
         }
         void optimize_v2()
         {
@@ -660,8 +655,8 @@ namespace erdo::ui
 
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
             this->prepare_optimization();
-
             this->weapon_table->model->set_rows({});
+            // this->weapon_table->resize_columns_to_contents();
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
