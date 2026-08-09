@@ -231,16 +231,12 @@ namespace erdo::ui
             });
 
             // character stats spinboxes
-            for (auto& attribute : enumerators_of<calculator::Attribute>())
+            for (auto& attribute : enumerator_strings_of<calculator::Attribute>())
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(1);
                 attribute_spinbox->setMaximum(99);
-                this->character_stats_layout->insertRow(
-                    this->character_stats_layout->rowCount() - 1,
-                    string_to_display(enum_to_string(attribute)),
-                    attribute_spinbox
-                );
+                this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute), attribute_spinbox);
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
                     auto&& stats = this->get_character_stats();
