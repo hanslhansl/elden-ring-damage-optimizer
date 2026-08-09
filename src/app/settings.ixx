@@ -52,7 +52,6 @@ namespace erdo::ui
     {
         Q_OBJECT
 
-        QSettings settings{ "hanslhansl", "elden-ring-damage-optimizer" };
 
         std::vector<QString> names{};
         std::vector<QWidget*> widgets{};
@@ -64,6 +63,7 @@ namespace erdo::ui
         }
 
     public:
+        QSettings settings{ "hanslhansl", "elden-ring-damage-optimizer" };
         QDialog* dialog = new QDialog{};
 
         Settings();

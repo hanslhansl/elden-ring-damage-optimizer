@@ -656,7 +656,6 @@ namespace erdo::ui
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
             this->prepare_optimization();
             this->weapon_table->model->set_rows({});
-            // this->weapon_table->resize_columns_to_contents();
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
@@ -814,6 +813,18 @@ namespace erdo::ui
             execute_future_with_blocking_progress_bar(future, this, "generating weapon data...", false);
         }
 
+        void closeEvent(QCloseEvent *event) override
+        {
+            // save geometry and state
+            auto&& s = settings().settings;
+            s.beginGroup("MainWindow");
+            s.setValue("geometry", this->saveGeometry());
+            s.setValue("state", this->saveState());
+            s.endGroup();
+            
+            QMainWindow::closeEvent(event);
+        }
+
     public:
         explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
         {
@@ -877,6 +888,19 @@ namespace erdo::ui
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));
             this->ui->tab_widget->addTab(optimize, string_to_display("optimize"));
             this->ui->tab_widget->addTab(plot, string_to_display("plot"));
+
+            // restore geometry and state
+            auto&& s = settings().settings;
+            s.beginGroup("MainWindow");
+            const auto geometry = s.value("geometry", QByteArray()).toByteArray();
+            if (!geometry.isEmpty())
+                this->restoreGeometry(geometry);
+            const auto state = s.value("state", QByteArray()).toByteArray();
+            if (state.isEmpty())
+                this->setWindowState(Qt::WindowMaximized);
+            else
+                this->restoreState(state);
+            s.endGroup();
         }
     };
 
@@ -886,7 +910,7 @@ namespace erdo::ui
         app.setApplicationName("elden-ring-damage-optimizer");
 
         MainWindow window{};
-        window.showMaximized();
+        window.show();
 
         return app.exec();
     }
