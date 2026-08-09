@@ -672,7 +672,7 @@ namespace erdo::ui
     {
         std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
         QActionGroup* menu_weapon_data_group = new QActionGroup(this);
-        QAction* menu_weapon_data_seperator;
+        QMenu *menu_choose_weapon_data;
         StatsTab* stats = new StatsTab();
         OptimizeTab* optimize = new OptimizeTab();
         PlotTab* plot = new PlotTab();
@@ -729,8 +729,8 @@ namespace erdo::ui
                 }
             }
 
-            QAction *action = new QAction(QString::fromStdString(action_text), this->ui->menu_file);
-            this->ui->menu_file->insertAction(this->menu_weapon_data_seperator, action);
+            QAction *action = new QAction(QString::fromStdString(action_text), this->menu_choose_weapon_data);
+            this->menu_choose_weapon_data->addAction(action);
             action->setCheckable(true);
 
             this->menu_weapon_data_group->addAction(action);
@@ -864,7 +864,7 @@ namespace erdo::ui
                 throw std::runtime_error("no weapon data directories found in xml_data directory");
 
             // weapon data menu
-            this->menu_weapon_data_seperator = this->ui->menu_file->addSeparator();
+            this->menu_choose_weapon_data = this->ui->menu_file->addMenu("choose weapon data");
             this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
@@ -878,6 +878,7 @@ namespace erdo::ui
             connect(action, &QAction::triggered, this, &MainWindow::load_weapon_data_from_directory);
             action = this->ui->menu_file->addAction("generate weapon data from game data");
             connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
+            this->ui->menu_file->addSeparator();
             action = this->ui->menu_file->addAction("settings");
             connect(action, &QAction::triggered, [](){ settings().dialog->exec(); });
 
