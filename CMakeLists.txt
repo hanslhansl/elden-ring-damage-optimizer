@@ -17,6 +17,8 @@ project(erdo LANGUAGES CXX)
 add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-pthread>")
 # enable clang/libc++ experimental support
 add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>")
+# enable clang static linking
+add_link_options("$<$<CXX_COMPILER_ID:Clang>:-static>")
 
 # enable g++ module support
 add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
