@@ -468,9 +468,6 @@ namespace erdo::parser
                 ? weaponNames.at(uninfusedWeapon.at("id"))
                 : dlcWeaponNames.at(uninfusedWeapon.at("id"));
             
-            auto url_part = weaponName;
-            std::ranges::replace(url_part, ' ', '_');
-
             calculator::RelevantStatsArray required_relevant_stats{};
             for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
                 required_relevant_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
@@ -478,7 +475,6 @@ namespace erdo::parser
             calculator::Weapon w{
                 name,
                 weaponName,
-                "https://eldenring.fandom.com/wiki/" + url_part,
                 dlc,
                 row.at("isDualBlade") == 1,
                 row.at("enableMagic") == 1,

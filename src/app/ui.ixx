@@ -9,6 +9,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QProgressBar>
+#include <QDesktopServices>
+#include <QUrl>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -236,7 +238,7 @@ namespace erdo::ui
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(1);
                 attribute_spinbox->setMaximum(99);
-                this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute), attribute_spinbox);
+                this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute) + ":", attribute_spinbox);
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
                     auto&& stats = this->get_character_stats();
@@ -677,10 +679,6 @@ namespace erdo::ui
 
         std::vector<calculator::Weapon> active_weapon_data{};
 
-        std::span<const calculator::Weapon> get_active_weapon_data() const
-        {
-            return std::span<const calculator::Weapon>(this->active_weapon_data);
-        }
         void set_active_weapon_data(const std::filesystem::path& dir)
         {
             auto start = std::chrono::high_resolution_clock::now();
@@ -879,6 +877,11 @@ namespace erdo::ui
             this->ui->menu_file->addSeparator();
             action = this->ui->menu_file->addAction("settings");
             connect(action, &QAction::triggered, [](){ settings.show(); });
+
+            action = this->ui->menu_help->addAction("about");
+            connect(action, &QAction::triggered, [](){
+                QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer"));
+            });
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));

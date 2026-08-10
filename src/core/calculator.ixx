@@ -270,8 +270,6 @@ export namespace erdo::calculator
         std::string full_name;
         // the base weapon name without an affinity specified, e.g. "Nightrider Glaive"
         std::string base_name;
-        // a wiki link for the weapon
-        std::string url;
         // true if the weapon was introduced with SOTE
         bool dlc;
         // true if the weapon doesn't get a strength bonus when two-handing
@@ -302,6 +300,18 @@ export namespace erdo::calculator
         // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
 
+        std::string fandom_link() const
+        {
+            auto url_part = this->base_name;
+            std::ranges::replace(url_part, ' ', '_');
+            return "https://eldenring.fandom.com/wiki/" + url_part;
+        }
+        std::string fextralife_link() const
+        {
+            auto url_part = this->base_name;
+            std::ranges::replace(url_part, ' ', '+');
+            return "https://eldenring.wiki.fextralife.com/" + url_part;
+        }
 
         std::string qualified_name(int upgrade_level) const
         {
@@ -357,19 +367,6 @@ export namespace erdo::calculator
             return adjusted_relevant_stats;
         }
 
-        IneffectiveAttributes calculate_ineffective_attributes(const RelevantStats& adjusted_relevant_stats) const
-        {
-            IneffectiveAttributes ineffective_attributes{};
-            for (auto&& [ineffective_attribute, adjusted_stat, requirement] : std::views::zip(
-                ineffective_attributes,
-                adjusted_relevant_stats,
-                this->weapon.get().requirements
-            ))
-                if (adjusted_stat < requirement)
-                    ineffective_attribute = true;
-            return ineffective_attributes;
-        }
-    
         int upgrade_level() const
         {
             return this->upgrade_levels.at(this->weapon.get().upgrade_level_index);
@@ -386,15 +383,17 @@ export namespace erdo::calculator
         }
     };
 
-    struct AttackRating : FullAttackOptions
+    class AttackRating : public FullAttackOptions
     {
-        // results
-        AttackPower total_attack_power;
-        AttackPowers attack_powers;
-        double spell_scaling;
-        TotalScalings total_scalings;
-        IneffectiveAttackPowerTypes ineffective_attack_power_types;
-        IneffectiveAttributes ineffective_attributes;
+        void calculate_ineffective_attributes_inplace(const RelevantStats& adjusted_relevant_stats)
+        {
+            for (auto&& [ineffective_attribute, adjusted_stat, requirement] : std::views::zip(
+                this->ineffective_attributes,
+                adjusted_relevant_stats,
+                this->weapon.get().requirements
+            ))
+                ineffective_attribute = adjusted_stat < requirement;
+        }
 
         double calculate_total_scaling(
             const bool is_ineffective_attack_power_type,
@@ -435,7 +434,7 @@ export namespace erdo::calculator
             }
         }
 
-        auto calculate_attack_power(
+        void calculate_attack_power(
             const AttackPowerType attack_power_type,
             const RelevantStats& relevant_stats,
             const RelevantStats& adjusted_relevant_stats,
@@ -474,25 +473,16 @@ export namespace erdo::calculator
 
             this->attack_powers[attack_power_type_integral][0] = base_attack_power;
             this->attack_powers[attack_power_type_integral][1] = base_attack_power * this->total_scalings[attack_power_type_integral];
-
-            return;
-        }
-
-        static AttackPower calculate_total_attack_power(const AttackPowers& attack_powers)
-        {
-            AttackPower total_attack_power{};
-            
-            for (auto damage_type : enumerator_integrals_of<DamageType>())
-            {
-                auto&& attack_power = attack_powers[damage_type];
-
-                total_attack_power[0] += attack_power[0];
-                total_attack_power[1] += attack_power[1];
-            }
-
-            return total_attack_power;
         }
     
+    public:
+        AttackPower total_attack_power;
+        AttackPowers attack_powers;
+        double spell_scaling;
+        TotalScalings total_scalings;
+        IneffectiveAttackPowerTypes ineffective_attack_power_types;
+        IneffectiveAttributes ineffective_attributes;
+
         void calculate_attack_power_inplace(AttackPowerType attack_power_type)
         {
             auto&& weapon = this->weapon.get();
@@ -500,7 +490,7 @@ export namespace erdo::calculator
             auto upgrade_level = this->upgrade_level();
             auto relevant_stats = this->stats.relevant_stats();
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
-            this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_relevant_stats);
+            this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
 
             this->calculate_attack_power(
                 attack_power_type,
@@ -530,7 +520,7 @@ export namespace erdo::calculator
             auto upgrade_level = this->upgrade_level();
             auto relevant_stats = this->stats.relevant_stats();
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
-            this->ineffective_attributes = this->calculate_ineffective_attributes(adjusted_relevant_stats);
+            this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
             auto&& attribute_scalings = this->attribute_scalings();
             auto&& base_attack_powers = this->base_attack_powers();
 
@@ -549,7 +539,12 @@ export namespace erdo::calculator
             else
                 this->spell_scaling = 0.;
 
-            this->total_attack_power = this->calculate_total_attack_power(this->attack_powers);
+            this->total_attack_power.fill(0.);
+            for (auto&& attack_power : this->attack_powers | std::views::take(enumerators_of<DamageType>().size()))
+            {
+                this->total_attack_power[0] += attack_power[0];
+                this->total_attack_power[1] += attack_power[1];
+            }
         }
 
         std::vector<std::string> calculate_scaling_tiers() const
@@ -565,9 +560,26 @@ export namespace erdo::calculator
             return scaling_tiers;
         }
 
+        bool is_total_attack_power_ineffective() const
+        {
+            for (auto&& ineffective_attack_power_type : this->ineffective_attack_power_types | std::views::take(enumerators_of<DamageType>().size()))
+                if (ineffective_attack_power_type)
+                    return true;
+            return false;
+        }
+        bool is_spell_scaling_ineffective() const
+        {
+            AttackPowerType attack_power_type = AttackPowerType::PHYSICAL;
+            if (weapon.get().sorcery_tool) 
+                attack_power_type = AttackPowerType::MAGIC;
+            else if (weapon.get().incantation_tool)
+                attack_power_type = AttackPowerType::HOLY;
+            
+            return attack_power_type != AttackPowerType::PHYSICAL && this->ineffective_attack_power_types[std::to_underlying(attack_power_type)];
+        }
+
         AttackRating(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
             : FullAttackOptions{ attack_options, weapon, stats } { }
-        // using FullAttackOptions::FullAttackOptions;
 
         static AttackRating calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
         {

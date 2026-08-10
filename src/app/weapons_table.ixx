@@ -7,7 +7,8 @@
 #include <QEvent>
 #include <QDesktopServices>
 #include <QUrl>
-#include <QTimer.h>
+#include <QTimer>
+#include <qabstractitemmodel.h>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -38,6 +39,11 @@ namespace erdo::ui
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
  
+    enum QtDataRole
+    {
+        LinkRole = Qt::UserRole + 1
+    };
+
     namespace sections
     {
         static const auto alignment_center = QVariant::fromValue(Qt::AlignCenter);
@@ -81,8 +87,10 @@ namespace erdo::ui
                 else
                     (*this)[0][1] = string_to_display(weapon.full_name);
 
-
-                (*this)[0][2] = QUrl(QString::fromStdString(weapon.url));
+                if (settings.link_to_fextralife_instead_of_fandom)
+                    (*this)[0][2] = QUrl(QString::fromStdString(weapon.fextralife_link()));
+                else
+                    (*this)[0][2] = QUrl(QString::fromStdString(weapon.fandom_link()));
             }
 
             QVariant data(int column, int role) const
@@ -93,7 +101,7 @@ namespace erdo::ui
                 if (role == Qt::UserRole)
                     return (*this)[column][1];
                 
-                if (role == Qt::UserRole + 1)
+                if (role == QtDataRole::LinkRole)
                     return (*this)[column][2];
                 
                 return {};
@@ -255,7 +263,7 @@ namespace erdo::ui
             {
                 (*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
                 (*this)[0][1] = attack_rating.spell_scaling * 100;
-                (*this)[0][2] = foreground_color(true);
+                (*this)[0][2] = foreground_color(attack_rating.is_spell_scaling_ineffective());
             }
         };
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
@@ -280,7 +288,6 @@ namespace erdo::ui
 
             void update(const calculator::AttackRating& attack_rating)
             {
-                bool any_ineffective = false;
                 for (auto&& [ap, is_ineffective, arr] : std::views::zip(
                     attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
@@ -289,12 +296,11 @@ namespace erdo::ui
                     arr[0] = /*format_number(ap[0]) + "/" +*/ format_number(ap[1]);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
-                    any_ineffective |= is_ineffective;
                 }
 
                 this->back()[0] = format_number(attack_rating.total_attack_power[1]);
                 this->back()[1] = attack_rating.total_attack_power[1];
-                this->back()[2] = foreground_color(any_ineffective);
+                this->back()[2] = foreground_color(attack_rating.is_total_attack_power_ineffective());
             }
         };
 
@@ -531,13 +537,14 @@ namespace erdo::ui
                 emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
             });
 
-            static constexpr auto I = tuple_index_v<sections::NameSection, Row>;
+            static constexpr auto name_section_index = tuple_index_v<sections::NameSection, Row>;
+
             connect(&settings.display_base_names_instead_of_full_names, settings.display_base_names_instead_of_full_names.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
-                    this->index(0, Row::section_index_offsets[I]),
-                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    this->index(0, Row::section_index_offsets[name_section_index]),
+                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
                     { Qt::DisplayRole }
                 );
             });
@@ -545,9 +552,19 @@ namespace erdo::ui
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack_rating);
                 emit dataChanged(
-                    this->index(0, Row::section_index_offsets[I]),
-                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[I]-1),
+                    this->index(0, Row::section_index_offsets[name_section_index]),
+                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
                     {  Qt::UserRole }
+                );
+            });
+            
+            connect(&settings.link_to_fextralife_instead_of_fandom, settings.link_to_fextralife_instead_of_fandom.changed_member_pointer, [this](){
+                for (auto&& row : this->rows)
+                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                emit dataChanged(
+                    this->index(0, Row::section_index_offsets[name_section_index]),
+                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
+                    {  QtDataRole::LinkRole }
                 );
             });
         }
@@ -882,7 +899,7 @@ namespace erdo::ui
         {
             if (event->type() == QEvent::MouseButtonRelease)
             {
-                const QString url = index.data(Qt::UserRole + 1).toString();
+                const QString url = index.data(QtDataRole::LinkRole).toString();
                 if (!url.isEmpty())
                 {
                     QDesktopServices::openUrl(QUrl(url));

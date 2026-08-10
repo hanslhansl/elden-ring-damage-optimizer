@@ -13,6 +13,8 @@ import std;
 
 namespace erdo::ui
 {
+    class Settings;
+
     class SettingBuilderBase : public QObject
     {
         Q_OBJECT
@@ -28,7 +30,7 @@ namespace erdo::ui
     {
         T::value_type value;
 
-        SettingBuilder(QSettings* settings, QFormLayout* layout);
+        SettingBuilder(Settings& settings);
 
         operator const typename T::value_type&() const
         {
@@ -100,21 +102,36 @@ namespace erdo::ui
 
         constexpr static value_type default_value = false;
     };
+    struct LinkToFextralifeInsteadOfFandom : CheckBoxSetting
+    {
+        using typename CheckBoxSetting::value_type;
+
+        constexpr static std::string_view name = "link_to_fextralife_instead_of_fandom";
+        constexpr static std::string_view display_name = "link to Fextralife instead of Fandom";
+
+        constexpr static value_type default_value = false;
+    };
 
     class Settings
     {
+        bool is_initialized = false;
+
         QFormLayout* layout{};
-        std::unique_ptr<QSettings> settings{};
+        std::unique_ptr<QSettings> qsettings{};
         QDialog* dialog{};
 
+        template<typename T>
+        friend class SettingBuilder;
+
     public:
-        SettingBuilder<DecimalPlaces> decimal_places{ settings.get(), layout };
-        SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ settings.get(), layout };
-        SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ settings.get(), layout };
-        SettingBuilder<HideBaseGameDLCColumn> hide_base_game_dlc_column{ settings.get(), layout };
+        SettingBuilder<DecimalPlaces> decimal_places{ *this };
+        SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ *this };
+        SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ *this };
+        SettingBuilder<HideBaseGameDLCColumn> hide_base_game_dlc_column{ *this };
+        SettingBuilder<LinkToFextralifeInsteadOfFandom> link_to_fextralife_instead_of_fandom{ *this };
 
         Settings(int) {};
-        Settings() : layout{ new QFormLayout{} }, dialog{ new QDialog{} }, settings{ std::make_unique<QSettings>() }
+        Settings() : is_initialized{ true }, layout{ new QFormLayout{} }, dialog{ new QDialog{} }, qsettings{ std::make_unique<QSettings>() }
         {
             this->dialog->setLayout(layout);
             this->dialog->setWindowTitle("settings");
@@ -180,20 +197,20 @@ namespace erdo::ui
 }
 
 template<typename T>
-erdo::ui::SettingBuilder<T>::SettingBuilder(QSettings* settings, QFormLayout* layout)
+erdo::ui::SettingBuilder<T>::SettingBuilder(Settings& settings)
 {
-    if (settings == nullptr || layout == nullptr)
+    if (!settings.is_initialized)
         return;
     
     auto widget = new T::widget_type{};
-    this->value = settings->value(T::name, T::default_value).template value<typename T::value_type>();
+    this->value = settings.qsettings->value(T::name, T::default_value).template value<typename T::value_type>();
     T::initialize(widget, this->value);
-    layout->addRow(string_to_display(T::display_name), widget);
+    settings.layout->addRow(string_to_display(T::display_name), widget);
 
-    connect(widget, T::signal, [settings, this](T::value_type new_value){
+    connect(widget, T::signal, [&](T::value_type new_value){
         this->value = new_value;
-        settings->setValue(T::name, new_value);
-        settings->sync();
+        settings.qsettings->setValue(T::name, new_value);
+        settings.qsettings->sync();
         emit this->changed();
     });
 }
