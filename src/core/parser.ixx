@@ -1,4 +1,5 @@
 export module erdo:parser;
+import :meta;
 import :xml;
 import :calculator;
 
@@ -9,16 +10,6 @@ long long assert_float_is_llong(double f) {
     if (f != (long long)f)
         throw std::runtime_error("float is not long long");
     return f;
-}
-
-template <typename Map, typename Key, typename Default>
-auto map_get(Map &&m, Key &&key, Default &&default_) {
-    using result_type = std::common_reference_t<typename std::remove_cvref_t<Map>::mapped_type, Default &&>;
-
-    auto it = m.find(std::forward<Key>(key));
-    if (it == m.end())
-        return result_type(std::forward<Default>(default_));
-    return result_type(it->second);
 }
 
 namespace erdo::parser
@@ -44,8 +35,8 @@ namespace erdo::parser
     using CalcCorrectGraph = std::array<CalcCorrectGraphEntry, 5>;
     struct ReinforceTypesDict
     {
-        calculator::AttributeScaling attack;             // index: DamageType
-        calculator::AttributeScaling attributeScaling;   // index: RelevantAttribute
+        calculator::AttributeScalings attack;             // index: DamageType
+        calculator::AttributeScalings attributeScaling;   // index: RelevantAttribute
         std::array<int, 3> statusSpEffectId;            // statusSpEffectId1, statusSpEffectId2, statusSpEffectId3
     };
 
@@ -227,7 +218,7 @@ namespace erdo::parser
     }
 
     calculator::AttackElementCorrectsById get_attack_element_corrects_by_id(const std::filesystem::path& attack_element_correct_param_file) {
-        constexpr calculator::AttributeScaling default_{false, false, false, false, true}; // default value
+        constexpr calculator::AttributeScalings default_{false, false, false, false, true}; // default value
         
         calculator::AttackElementCorrectsById attack_element_corrects_by_id{};
         for (auto &&[id, row] : xml::read_param_file<double>(attack_element_correct_param_file))
@@ -456,12 +447,12 @@ namespace erdo::parser
                 }
             }
 
-            std::vector<calculator::AttributeScaling> attributeScaling{};
+            std::vector<calculator::AttributeScalings> attributeScalings{};
             for (const auto &reinforceParam : reinforceParams)
             {
-                auto &foo = attributeScaling.emplace_back();
+                auto &attributeScaling = attributeScalings.emplace_back();
                 for (const auto &[attribute, unupgradedScaling] : unupgradedAttributeScaling)
-                    foo.at(std::to_underlying(attribute)) = unupgradedScaling * reinforceParam.attributeScaling.at(std::to_underlying(attribute));
+                    attributeScaling.at(std::to_underlying(attribute)) = unupgradedScaling * reinforceParam.attributeScaling.at(std::to_underlying(attribute));
             }
 
             auto weaponName = weaponNames.contains(uninfusedWeapon.at("id"))
@@ -482,7 +473,7 @@ namespace erdo::parser
                 integral_to_enum<calculator::Weapon::Type>(weaponType),
                 integral_to_enum<calculator::Weapon::Affinity>(is_unique_weapon ? -1 : affinityId),
                 required_relevant_stats,
-                attributeScaling,
+                attributeScalings,
                 attack,
                 attackElementCorrectsById.at(assert_float_is_llong(row.at("attackElementCorrectId"))),
                 weaponCalcCorrectGraphs,
@@ -491,6 +482,11 @@ namespace erdo::parser
 
             weapons.emplace_back(std::move(w));
         }
+
+        auto nonscaling_attributes = weapons
+            | std::views::transform(&calculator::Weapon::nonscaling_attributes)
+            | std::ranges::to<std::set>();
+        std::println("nonscaling attributes: {}", nonscaling_attributes.size());
 
         std::ranges::sort(weapons, {}, &calculator::Weapon::full_name);
         std::println("found {} weapons", weapons.size());

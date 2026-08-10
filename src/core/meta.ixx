@@ -149,4 +149,15 @@ export namespace erdo
     }
     template<typename T, typename Tuple>
     constexpr std::size_t tuple_index_v = tuple_index_impl<T, Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+
+    template <typename Map, typename Key, typename Default>
+    auto map_get(Map &&m, Key &&key, Default &&default_) {
+        using result_type = std::common_reference_t<typename std::remove_cvref_t<Map>::mapped_type, Default &&>;
+
+        auto it = m.find(std::forward<Key>(key));
+        if (it == m.end())
+            return result_type(std::forward<Default>(default_));
+        return result_type(it->second);
+    }
 }

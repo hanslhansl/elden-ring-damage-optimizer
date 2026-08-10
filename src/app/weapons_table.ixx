@@ -357,7 +357,7 @@ namespace erdo::ui
                 auto&& weapon = attack.weapon.get();
 
                 for (auto&& [attribute_scaling, scaling_tier, is_ineffective, arr] : std::views::zip(
-                    attack.attribute_scalings(),
+                    attack.attribute_scalings_at_upgrade_level(),
                     attack.calculate_scaling_tiers(),
                     attack.ineffective_attributes,
                     *this))

@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 #include <string>
 export module erdo:calculator;
 import :meta;
@@ -175,16 +176,22 @@ export namespace erdo::calculator
     };
 
     using ScalingCurve = std::array<double, 149>;
-    using AttributeScaling = std::array<double, enumerators_of<RelevantAttribute>().size()>;
-    using AttackElementCorrects = std::array<AttributeScaling, enumerators_of<AttackPowerType>().size()>;
+    using ScalingCurves = std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()>;
+    using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
+    using AttackElementCorrects = std::array<AttributeScalings, enumerators_of<AttackPowerType>().size()>;
     using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
     using IneffectiveAttackPowerTypes = std::array<bool, enumerators_of<AttackPowerType>().size()>;
     using IneffectiveAttributes = std::array<bool, enumerators_of<RelevantAttribute>().size()>;
     using BaseAttackPower = std::array<double, enumerators_of<AttackPowerType>().size()>;
+    using BaseAttackPowersAtUpgradeLevels = std::vector<BaseAttackPower>;
+    using ScalingTiers = std::array<std::pair<double, std::string>, 6>;
+    using AttributeScalingsAtUpgradeLevels = std::vector<AttributeScalings>;
+    using NonscalingAttributes = IneffectiveAttributes;
+
     using TotalScalings = std::array<double, enumerators_of<AttackPowerType>().size()>;
     using AttackPower = std::array<double, 2>;  // base / full
     using AttackPowers = std::array<AttackPower, enumerators_of<AttackPowerType>().size()>;
-    using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
+
 
     constexpr auto ineffective_attribute_penalty = 0.4;
     constexpr auto defaultDamageCalcCorrectGraphId = 0;
@@ -285,20 +292,32 @@ export namespace erdo::calculator
         // stat requirements necessary to use the weapon effectively (without an attack rating penalty)
         RelevantStatsArray requirements;
         // scaling amount at each upgrade level (0-10 or 0-25) for each player attribute (e.g. Attribute.STRENGTH)
-        std::vector<AttributeScaling> attribute_scalings;
+        AttributeScalingsAtUpgradeLevels attribute_scalings_at_upgrade_levels;
         // base attack power at each upgrade level for each attack power type
-        std::vector<BaseAttackPower> base_attack_powers;
-        // map indicating which attack power types scale with which player attributes
+        BaseAttackPowersAtUpgradeLevels base_attack_powers_at_upgrade_levels;
+        // each attack power type's scaling with each character attribute
         AttackElementCorrects attack_power_attribute_scaling;
-        // map indicating which scaling curve is used for each attack power type
-        std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()> attack_power_scaling_curves;
+        // each attack power type's scaling curve
+        ScalingCurves attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
-        std::array<std::pair<double, std::string>, 6> scaling_tiers;
+        ScalingTiers scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        long long upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers);
+        long long upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers_at_upgrade_levels);
         // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
+        // attributes which this weapon does not scale with, i.e. which don't affect its attack rating in any way
+        NonscalingAttributes nonscaling_attributes = [&](){
+            NonscalingAttributes result;
+            for (auto attribute : enumerator_integrals_of<calculator::RelevantAttribute>())
+                result[attribute] = std::ranges::all_of(this->attack_power_attribute_scaling, [&](auto &&scaling) {
+                    return scaling[attribute] == 0;
+                }) || std::ranges::all_of(this->attribute_scalings_at_upgrade_levels, [&](auto &&scaling) {
+                    return scaling[attribute] == 0;
+                });
+            return result;
+        }();
+
 
         std::string fandom_link() const
         {
@@ -344,7 +363,6 @@ export namespace erdo::calculator
         std::reference_wrapper<const Weapon> weapon;
         Stats stats;
 
-    public:
         RelevantStatsArray adjust_stats_for_two_handing() const
         {
             RelevantStatsArray adjusted_relevant_stats{};
@@ -372,14 +390,14 @@ export namespace erdo::calculator
             return this->upgrade_levels.at(this->weapon.get().upgrade_level_index);
         }
 
-        const AttributeScalings& attribute_scalings() const
+        const AttributeScalings& attribute_scalings_at_upgrade_level() const
         {
-            return this->weapon.get().attribute_scalings[this->upgrade_level()];
+            return this->weapon.get().attribute_scalings_at_upgrade_levels[this->upgrade_level()];
         }
 
         const BaseAttackPower& base_attack_powers() const
         {
-            return this->weapon.get().base_attack_powers[this->upgrade_level()];
+            return this->weapon.get().base_attack_powers_at_upgrade_levels[this->upgrade_level()];
         }
     };
 
@@ -408,11 +426,12 @@ export namespace erdo::calculator
         double calculate_total_scaling(
             const bool is_ineffective_attack_power_type,
             const RelevantStats& effective_relevant_stats,
-            const AttributeScaling& scaling_attributes,
-            const AttributeScaling& attribute_scaling_at_upgrade_level,
+            const AttributeScalings& scaling_attributes,
+            const AttributeScalings& attribute_scalings_at_upgrade_level,
             const ScalingCurve& scaling_curve
         ) const
         {
+
             auto&& weapon = this->weapon.get();
 
             if (is_ineffective_attack_power_type)
@@ -431,9 +450,9 @@ export namespace erdo::calculator
                     if (attribute_correct != 0)
                     {
                         if (attribute_correct == 1)
-                            scaling = attribute_scaling_at_upgrade_level[attribute];
+                            scaling = attribute_scalings_at_upgrade_level[attribute];
                         else
-                            scaling = attribute_correct * attribute_scaling_at_upgrade_level[attribute] / weapon.attribute_scalings[0][attribute];
+                            scaling = attribute_correct * attribute_scalings_at_upgrade_level[attribute] / weapon.attribute_scalings_at_upgrade_levels[0][attribute];
 
                         if (scaling != 0.)
                             total_scaling += scaling * scaling_curve[effective_relevant_stats[attribute]];
@@ -450,7 +469,7 @@ export namespace erdo::calculator
             const RelevantStats& adjusted_relevant_stats,
             const IneffectiveAttributes& ineffective_attributes,
             const double& base_attack_power,
-            const AttributeScaling& attribute_scaling_at_upgrade_level
+            const AttributeScalings& attribute_scalings_at_upgrade_level
         )
         {
             const auto attack_power_type_integral = std::to_underlying(attack_power_type);
@@ -477,7 +496,7 @@ export namespace erdo::calculator
                 this->ineffective_attack_power_types[attack_power_type_integral],
                 is_damage_type ? adjusted_relevant_stats : relevant_stats,
                 scaling_attributes,
-                attribute_scaling_at_upgrade_level,
+                attribute_scalings_at_upgrade_level,
                 scaling_curve
             );
 
@@ -501,7 +520,7 @@ export namespace erdo::calculator
                 adjusted_relevant_stats,
                 this->ineffective_attributes,
                 this->base_attack_powers()[std::to_underlying(attack_power_type)],
-                this->attribute_scalings()
+                this->attribute_scalings_at_upgrade_level()
             );
         }
         void calculate_spell_scaling_inplace()
@@ -524,7 +543,7 @@ export namespace erdo::calculator
             auto relevant_stats = this->stats.relevant_stats();
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
-            auto&& attribute_scalings = this->attribute_scalings();
+            auto&& attribute_scalings_at_upgrade_level = this->attribute_scalings_at_upgrade_level();
             auto&& base_attack_powers = this->base_attack_powers();
 
             for (auto attack_power_type : enumerators_of<AttackPowerType>())
@@ -534,7 +553,7 @@ export namespace erdo::calculator
                     adjusted_relevant_stats,
                     this->ineffective_attributes,
                     base_attack_powers[std::to_underlying(attack_power_type)],
-                    attribute_scalings
+                    attribute_scalings_at_upgrade_level
                 );
 
             if (weapon.is_sorcery_or_incantation_tool)
@@ -552,9 +571,9 @@ export namespace erdo::calculator
 
         std::vector<std::string> calculate_scaling_tiers() const
         {
-            auto&& attribute_scalings = this->attribute_scalings();
-            std::vector<std::string> scaling_tiers{ attribute_scalings.size() };
-            for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings, scaling_tiers))
+            auto&& attribute_scalings_at_upgrade_level = this->attribute_scalings_at_upgrade_level();
+            std::vector<std::string> scaling_tiers{ attribute_scalings_at_upgrade_level.size() };
+            for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings_at_upgrade_level, scaling_tiers))
             {
                 for (auto&& [threshold, tier] : this->weapon.get().scaling_tiers)
                     if (scaling >= threshold)
@@ -581,8 +600,7 @@ export namespace erdo::calculator
             return attack_power_type != AttackPowerType::PHYSICAL && this->ineffective_attack_power_types[std::to_underlying(attack_power_type)];
         }
 
-        Attack(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
-            : FullAttackOptions{ attack_options, weapon, stats } { }
+        Attack(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options) : FullAttackOptions{ attack_options, weapon, stats } { }
 
         static Attack calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
         {
@@ -591,149 +609,6 @@ export namespace erdo::calculator
             return attack;
         }
     };
-
-
-    constexpr std::size_t get_stat_variation_count(const int attribute_points, const Stats &min_stats)
-    {
-        constexpr auto UPPER = 99;
-        const auto SUM = attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
-        std::size_t count = 0;
-
-        if (attribute_points > UPPER * min_stats.size())
-            throw std::invalid_argument(std::format("attribute_points must be <= {}", UPPER * min_stats.size()));
-
-        if (std::ranges::any_of(min_stats, [](auto v) { return v > UPPER; }))
-            throw std::invalid_argument(std::format("min_stats must be <= {}", UPPER));
-
-        auto min_relevant_stats = min_stats.relevant_stats();
-
-        for (auto i = min_relevant_stats[0]; i <= std::min(UPPER, SUM); ++i)
-        {
-            auto SUM_i = SUM - i;
-            for (auto j = min_relevant_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
-            {
-                auto SUM_i_j = SUM_i - j;
-
-                if (0ll == min_relevant_stats[4])
-                {
-                    auto a1 = std::max(min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER);
-                    auto b1 = std::min(UPPER, SUM_i_j - min_relevant_stats[3]);
-                    auto b1_a1_1 = b1 - a1 + 1;
-                    if (b1_a1_1 > 0)
-                        count += (1 - min_relevant_stats[3]) * b1_a1_1;
-
-                    auto a2 = a1;
-                    auto b2 = std::min(UPPER, SUM_i_j - UPPER - 1);
-                    auto b2_a2_1 = b2 - a2 + 1;
-                    if (b2_a2_1 > 0)
-                        count += UPPER * b2_a2_1;
-
-                    auto a3 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b3 = b1;
-                    auto b3_a3_1 = b3 - a3 + 1;
-                    if (b3_a3_1 > 0)
-                        count += SUM_i_j * b3_a3_1 - (a3 + b3) * b3_a3_1 / 2;
-
-                    auto a4 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - UPPER);
-                    auto b4 = std::min(UPPER, SUM_i_j - min_relevant_stats[3] - UPPER - 1);
-                    auto b4_a4_1 = b4 - a4 + 1;
-                    if (b4_a4_1 > 0)
-                        count += (UPPER + 1 - SUM_i_j + UPPER) * b4_a4_1 + (a4 + b4) * b4_a4_1 / 2;
-
-                    auto a5 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b5 = b4;
-                    auto b5_a5_1 = b5 - a5 + 1;
-                    if (b5_a5_1 > 0)
-                        count += SUM_i_j * b5_a5_1;
-                }
-                else
-                {
-                    auto a2 = std::max(min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER);
-                    auto b2 = std::min({UPPER, SUM_i_j - UPPER - min_relevant_stats[4], SUM_i_j - UPPER - 1});
-                    auto b2_a2_1 = b2 - a2 + 1;
-                    if (b2_a2_1 > 0)
-                        count += (1 + UPPER - min_relevant_stats[3]) * b2_a2_1;
-
-                    auto a3 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b3 = std::min(UPPER, SUM_i_j - UPPER - min_relevant_stats[4]);
-                    auto b3_a3_1 = b3 - a3 + 1;
-                    if (b3_a3_1 > 0)
-                        count += (1 + SUM_i_j - min_relevant_stats[3]) * b3_a3_1 - (a3 + b3) * b3_a3_1 / 1;
-
-                    auto a4 = std::max({min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER, SUM_i_j - min_relevant_stats[4] - UPPER + 1});
-                    auto b4 = std::min(UPPER, SUM_i_j - min_relevant_stats[4] - min_relevant_stats[3]);
-                    auto b4_a4_1 = b4 - a4 + 1;
-                    if (b4_a4_1 > 0)
-                        count += (SUM_i_j - min_relevant_stats[4] - min_relevant_stats[3] + 1) * b4_a4_1 - (a4 + b4) * b4_a4_1 / 2;
-
-                    auto a5 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - UPPER);
-                    auto b5 = std::min({UPPER, SUM_i_j - UPPER - 1 - min_relevant_stats[3], SUM_i_j - min_relevant_stats[4] - UPPER});
-                    auto b5_a5_1 = b5 - a5 + 1;
-                    if (b5_a5_1 > 0)
-                        count += (UPPER - SUM_i_j + UPPER + 1) * b5_a5_1 + (a5 + b5) * b5_a5_1 / 2;
-
-                    auto a7 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b7 = b5;
-                    auto b7_a7_1 = b7 - a7 + 1;
-                    if (b7_a7_1 > 0)
-                        count += (UPPER + 1) * b7_a7_1;
-
-                    auto a8 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - min_relevant_stats[4] + 1);
-                    auto b8 = std::min(UPPER, SUM_i_j - min_relevant_stats[3] - UPPER - 1);
-                    auto b8_a8_1 = b8 - a8 + 1;
-                    if (b8_a8_1 > 0)
-                        count += (UPPER - min_relevant_stats[4] + 1) * b8_a8_1;
-                }
-            }
-        }
-
-        return count;
-    }
-    std::vector<Stats> get_stat_variations(const int attribute_points, const Stats &min_stats)
-    {
-        constexpr auto UPPER = 99;
-        const auto SUM = attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
-
-        auto possible_occurances = get_stat_variation_count(attribute_points, min_stats);
-        if (possible_occurances == 0)
-            return {};
-
-        std::vector<Stats> stat_variations{ possible_occurances };
-        auto current_it = stat_variations.begin(); 
-
-        auto result = min_stats;
-        auto& i = result[irrelevant_attribute_count];
-        auto& j = result[irrelevant_attribute_count + 1];
-        auto& k = result[irrelevant_attribute_count + 2];
-        auto& l = result[irrelevant_attribute_count + 3];
-        auto& m = result[irrelevant_attribute_count + 4];
-
-        auto min_relevant_stats = min_stats.relevant_stats();
-        for (i = min_relevant_stats[0]; i <= std::min(UPPER, SUM); ++i)
-        {
-            auto SUM_i = SUM - i;
-            for (j = min_relevant_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
-            {
-                auto SUM_i_j = SUM_i - j;
-                for (k = min_relevant_stats[2]; k <= std::min(UPPER, SUM_i_j); ++k)
-                {
-                    auto SUM_i_j_k = SUM_i_j - k;
-                    for (l = min_relevant_stats[3]; l <= std::min(UPPER, SUM_i_j_k); ++l)
-                    {
-                        auto SUM_i_j_k_l = SUM_i_j_k - l;
-                        m = SUM_i_j_k_l;
-                        if (min_relevant_stats[4] <= m && m <= UPPER)
-                        {
-                            *current_it++ = result;
-                        }
-                    }
-                }
-            }
-        }
-
-        return stat_variations;
-    }
-
 } // namespace erdo::calculator
 
 template<>

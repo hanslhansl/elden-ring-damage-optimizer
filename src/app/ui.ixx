@@ -244,8 +244,8 @@ namespace erdo::ui
             for (auto& attribute : enumerator_strings_of<calculator::Attribute>())
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
-                attribute_spinbox->setMinimum(1);
-                attribute_spinbox->setMaximum(99);
+                attribute_spinbox->setMinimum(0);
+                attribute_spinbox->setMaximum(std::tuple_size_v<calculator::ScalingCurve> - 1);
                 this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute) + ":", attribute_spinbox);
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
@@ -488,7 +488,7 @@ namespace erdo::ui
             auto min_attribute_points = stats.attribute_points();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto max_free_attribute_points = max_attribute_points - min_attribute_points;
-            auto stat_variations = calculator::get_stat_variation_count(max_attribute_points, stats);
+            auto stat_variations = optimizer::get_stat_variation_count(stats, max_attribute_points);
 
             // base game / dlc filter
             auto selected_base_game_dlc = this->base_game_dlc_list->selectedItems();
@@ -543,38 +543,51 @@ namespace erdo::ui
 
         void optimize_brute_force()
         {
-            auto stats = this->get_character_stats();
             auto attack_options = this->get_attack_options();
+            auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-            auto stat_variations = calculator::get_stat_variations(max_attribute_points, stats);
 
-            static constexpr auto optimizer_callbacks = [](auto){
-                static constexpr auto [...enumerators] = enumerators_of<optimizer::Target>();
-                return std::array{ optimizer::brute_force<enumerators>.get_callback... };
-            }(1);
+            optimizer::visit_optimizer<optimizer::brute_force>(
+                this->optimize->target_combobox->currentIndex(),
+                [&](auto&& optimizer) {
+                    auto future = QtConcurrent::mapped(
+                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, max_attribute_points),
+                        [](const auto& task) { return Row(task()); }
+                    );
 
-            std::vector<Row> rows{};
-            if (stat_variations.size() > 0)
-            {
-                auto target_index = this->optimize->target_combobox->currentIndex();
-                auto&& callback = optimizer_callbacks.at(target_index)(stat_variations, attack_options);
-
-                auto future = QtConcurrent::mapped(
-                    this->filtered_active_weapon_data,
-                    [&](const calculator::Weapon& w){ return Row(callback(w)); }
-                );
-
-                if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
-                {
-                    rows.reserve(this->filtered_active_weapon_data.size());
-                    rows.append_range(future | std::views::as_rvalue);
+                    std::vector<Row> rows{};
+                    if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
+                    {
+                        rows.reserve(this->filtered_active_weapon_data.size());
+                        rows.append_range(future | std::views::as_rvalue);
+                    }
+                    this->weapon_table->model->set_rows(std::move(rows));
                 }
-            }
-            this->weapon_table->model->set_rows(std::move(rows));
+            );
         }
         void optimize_v2()
         {
-            
+            auto attack_options = this->get_attack_options();
+            auto min_stats = this->get_character_stats();
+            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
+
+            optimizer::visit_optimizer<optimizer::v2>(
+                this->optimize->target_combobox->currentIndex(),
+                [&](auto&& optimizer) {
+                    auto future = QtConcurrent::mapped(
+                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, max_attribute_points),
+                        [](const auto& task) { return Row(task()); }
+                    );
+
+                    std::vector<Row> rows{};
+                    if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
+                    {
+                        rows.reserve(this->filtered_active_weapon_data.size());
+                        rows.append_range(future | std::views::as_rvalue);
+                    }
+                    this->weapon_table->model->set_rows(std::move(rows));
+                }
+            );
         }
 
     public:
