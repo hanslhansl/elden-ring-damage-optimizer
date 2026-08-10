@@ -731,12 +731,10 @@ namespace erdo::ui
                 }
             }
 
-            QAction *action = new QAction(QString::fromStdString(action_text), this->menu_choose_weapon_data);
-            this->menu_choose_weapon_data->addAction(action);
+            auto action = this->menu_choose_weapon_data->addAction(QString::fromStdString(action_text), [this, dir]() { this->set_active_weapon_data(dir); });
             action->setCheckable(true);
-
             this->menu_weapon_data_group->addAction(action);
-            connect(action, &QAction::triggered, this, [this, dir]() { this->set_active_weapon_data(dir); });
+            
             return action;
         }
 
@@ -879,18 +877,14 @@ namespace erdo::ui
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            QAction* action = this->ui->menu_file->addAction("load weapon data from directory");
-            connect(action, &QAction::triggered, this, &MainWindow::load_weapon_data_from_directory);
-            action = this->ui->menu_file->addAction("generate weapon data from game data");
-            connect(action, &QAction::triggered, this, &MainWindow::generate_weapon_data_from_game_data);
+            this->ui->menu_file->addAction("load weapon data from directory", this, &MainWindow::load_weapon_data_from_directory);
+            this->ui->menu_file->addAction("generate weapon data from game data", this, &MainWindow::generate_weapon_data_from_game_data);
             this->ui->menu_file->addSeparator();
-            action = this->ui->menu_file->addAction("settings");
-            connect(action, &QAction::triggered, [](){ settings.show(); });
+            this->ui->menu_file->addAction("settings", [](){ settings.show(); });
 
-            action = this->ui->menu_help->addAction("about");
-            connect(action, &QAction::triggered, [](){
-                QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer"));
-            });
+            this->ui->menu_help->addAction("about erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
+            this->ui->menu_help->addAction("about qt", QApplication::aboutQt);
+
 
             // add tabs
             this->ui->tab_widget->addTab(stats, string_to_display("stats"));
