@@ -5,6 +5,8 @@ CPMAddPackage(
     VERSION 1.15
 )
 
+include(CheckIPOSupported)
+
 # set up core libraries
 function(configure_erdo_core_library target)
     add_library(${target} STATIC)
@@ -30,7 +32,19 @@ function(configure_erdo_core_library target)
         target_link_libraries(${target} PRIVATE stdc++exp) 
     endif()
 endfunction()
+
 configure_erdo_core_library(erdo_core)
+check_ipo_supported(
+    RESULT ipo_supported
+    OUTPUT ipo_error
+    LANGUAGES CXX
+)
+if(ipo_supported)
+    set_property(
+        TARGET erdo_core
+        PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+    )
+endif()
 
 function(copy_xml_data target)
     add_custom_command(TARGET ${target} POST_BUILD

@@ -32,7 +32,7 @@ namespace erdo::calculator
     struct OptimizerImplBase
     {
         // potentially provided more efficient implementation in the derived class
-        static void efficient_calculate_inplace(AttackRating& attack_rating)
+        static void calculate_inplace(AttackRating& attack_rating)
         {
             attack_rating.calculate_inplace();
         }
@@ -50,7 +50,7 @@ namespace erdo::calculator
         static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(std::to_underlying(target_));
         static constexpr auto attack_power_type_integral = std::to_underlying(attack_power_type);
 
-        static void efficient_calculate_inplace(AttackRating& attack_rating)
+        static void calculate_inplace(AttackRating& attack_rating)
         {
             attack_rating.calculate_attack_power_inplace(attack_power_type);
         }
@@ -64,7 +64,7 @@ namespace erdo::calculator
     template<>
     struct OptimizerImpl<OptimizationTarget::SPELL_SCALING> : OptimizerImplBase
     {
-        static void efficient_calculate_inplace(AttackRating& attack_rating)
+        static void calculate_inplace(AttackRating& attack_rating)
         {
             attack_rating.calculate_spell_scaling_inplace();
         }
@@ -103,7 +103,7 @@ namespace erdo::calculator
             for (const auto& stats : stat_variations)
             {
                 attack_rating.stats = stats;
-                OptimizerImpl::efficient_calculate_inplace(attack_rating);
+                OptimizerImpl::calculate_inplace(attack_rating);
 
                 if (best_value < OptimizerImpl::projection(attack_rating))
                 {

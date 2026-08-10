@@ -429,8 +429,6 @@ namespace erdo::ui
 
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
             // get character stats
             auto stats = this->get_character_stats();
 
@@ -451,10 +449,6 @@ namespace erdo::ui
             );
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
             this->weapon_table->model->set_rows(std::move(rows));
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("StatsTab::set_active_weapon_data: {} seconds", elapsed.count());
         }
         
         void calculate_weapon_stats()
@@ -468,8 +462,6 @@ namespace erdo::ui
             // temporary attack rating object to avoid copying the weapon data multiple times
             calculator::AttackRating attack_rating{ calculator::Weapon::dummy, stats, attack_options };
 
-            auto start = std::chrono::high_resolution_clock::now();
-
             this->weapon_table->model->update_rows(
                 this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::AttackRating&& {
                     attack_rating.weapon = w;
@@ -477,10 +469,6 @@ namespace erdo::ui
                     return std::move(attack_rating);
                 })
             );
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("StatsTab::calculate_weapon_stats: {} seconds", elapsed.count());
         }
     };
 
@@ -555,8 +543,6 @@ namespace erdo::ui
 
         void optimize_brute_force()
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
             auto stats = this->get_character_stats();
             auto attack_options = this->get_attack_options();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
@@ -585,11 +571,6 @@ namespace erdo::ui
                 }
             }
             this->weapon_table->model->set_rows(std::move(rows));
-            // this->weapon_table->resize_columns_to_contents();
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("OptimizeTab::optimize_brute_force: {} seconds", elapsed.count());
         }
         void optimize_v2()
         {
@@ -654,15 +635,9 @@ namespace erdo::ui
     
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
             this->prepare_optimization();
             this->weapon_table->model->set_rows({});
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("OptimizeTab::set_active_weapon_data: {} seconds", elapsed.count());
         }
     };
 
@@ -687,15 +662,9 @@ namespace erdo::ui
 
         void set_active_weapon_data(const std::filesystem::path& dir)
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
             auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
             execute_future_with_blocking_progress_bar<false>(future, this, "loading weapon data...");
             this->active_weapon_data = future.takeResult();
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::println("MainWindow::set_active_weapon_data: {} seconds", elapsed.count());
 
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
