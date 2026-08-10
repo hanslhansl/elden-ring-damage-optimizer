@@ -205,7 +205,7 @@ erdo::ui::SettingBuilder<T>::SettingBuilder(Settings& settings)
     auto widget = new T::widget_type{};
     this->value = settings.qsettings->value(T::name, T::default_value).template value<typename T::value_type>();
     T::initialize(widget, this->value);
-    settings.layout->addRow(string_to_display(T::display_name), widget);
+    settings.layout->addRow(QString::fromStdString(std::string(T::display_name)), widget);
 
     connect(widget, T::signal, [&](T::value_type new_value){
         this->value = new_value;

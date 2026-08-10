@@ -197,6 +197,7 @@ namespace erdo::ui
         
         export struct CharacterLevelSection : SectionBase<std::array<QVariant, 1>>
         {
+            static constexpr bool expand_section = true;
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 

@@ -27,14 +27,19 @@ import erdo.ui.weapons_table;
 
 namespace erdo::ui
 {
-    template<typename T>
-    bool execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget* parent, const QString& labelText, bool cancelable)
+    void critical_error(QWidget* parent, const QString& message)
+    {
+        QMessageBox::critical(parent, "Fatal Error", message);
+        QCoreApplication::exit(1);
+    }
+
+    template<bool cancelable, typename T>
+    auto execute_future_with_blocking_progress_bar(QFuture<T>& future, QWidget* parent, const QString& labelText)
     {
         QFutureWatcher<T> watcher;
         watcher.setFuture(future);
 
-        const QString cancelButtonText =
-            cancelable ? QObject::tr("Cancel") : QString{};
+        const QString cancelButtonText = cancelable ? QObject::tr("Cancel") : QString{};
 
         QProgressDialog progress(
             labelText,
@@ -196,7 +201,10 @@ namespace erdo::ui
 
         future.waitForFinished();
 
-        return !future.isCanceled();
+        if constexpr (cancelable)
+            return !future.isCanceled();
+        else if(!future.isValid())
+            critical_error(parent, "Unable to continue.");
     }
 
     class StatsTabBase : public QWidget, public Ui::StatsTab
@@ -570,9 +578,7 @@ namespace erdo::ui
                     [&](const calculator::Weapon& w){ return Row(callback(w)); }
                 );
 
-                auto success = execute_future_with_blocking_progress_bar(future, this, "optimizing...", true);
-
-                if (success)
+                if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
                 {
                     rows.reserve(this->filtered_active_weapon_data.size());
                     rows.append_range(future | std::views::as_rvalue);
@@ -684,7 +690,7 @@ namespace erdo::ui
             auto start = std::chrono::high_resolution_clock::now();
 
             auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
-            execute_future_with_blocking_progress_bar(future, this, "loading weapon data...", false);
+            execute_future_with_blocking_progress_bar<false>(future, this, "loading weapon data...");
             this->active_weapon_data = future.takeResult();
 
             auto end = std::chrono::high_resolution_clock::now();
@@ -797,13 +803,16 @@ namespace erdo::ui
             }
 
             auto future = QtConcurrent::run([&](){
-                witchy::run_witchy(
+                return witchy::run_witchy(
                     elden_ring_executable.parent_path(),
                     witchybdn_executable,
                     save_directory
                 );
             });
-            execute_future_with_blocking_progress_bar(future, this, "generating weapon data...", false);
+            execute_future_with_blocking_progress_bar<false>(future, this, "generating weapon data...");
+            auto expected = future.takeResult();
+            if (!expected)
+                QMessageBox::critical(this, "Error", QString::fromStdString(expected.error()));
         }
 
         void closeEvent(QCloseEvent *event) override
@@ -857,7 +866,7 @@ namespace erdo::ui
                     })
                 >>();
             if (weapon_data_directories.empty())
-                throw std::runtime_error("no weapon data directories found in xml_data directory");
+                critical_error(this, "no weapon data directories found in xml_data directory");
 
             // weapon data menu
             this->menu_choose_weapon_data = this->ui->menu_file->addMenu("choose weapon data");
