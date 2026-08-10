@@ -435,16 +435,16 @@ namespace erdo::ui
             // get attack options
             auto attack_options = this->get_attack_options();
 
-            // temporary attack rating object to avoid copying the weapon data multiple times
-            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, stats, attack_options };
+            // temporary attack object to avoid copying the weapon data multiple times
+            calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
             std::vector<Row> rows{};
             rows.reserve(active_weapon_data.size());
             rows.append_range(active_weapon_data
                 | std::views::transform([&](const calculator::Weapon& w) {
-                    attack_rating.weapon = w;
-                    attack_rating.calculate_inplace();
-                    return Row(std::move(attack_rating));
+                    attack.weapon = w;
+                    attack.calculate_inplace();
+                    return Row(std::move(attack));
                 })
             );
             this->StatsTabBase::set_active_weapon_data(active_weapon_data);
@@ -459,14 +459,14 @@ namespace erdo::ui
             // get attack options
             auto attack_options = this->get_attack_options();
 
-            // temporary attack rating object to avoid copying the weapon data multiple times
-            calculator::AttackRating attack_rating{ calculator::Weapon::dummy, stats, attack_options };
+            // temporary attack object to avoid copying the weapon data multiple times
+            calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
             this->weapon_table->model->update_rows(
-                this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::AttackRating&& {
-                    attack_rating.weapon = w;
-                    attack_rating.calculate_inplace();
-                    return std::move(attack_rating);
+                this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::Attack&& {
+                    attack.weapon = w;
+                    attack.calculate_inplace();
+                    return std::move(attack);
                 })
             );
         }
@@ -549,8 +549,8 @@ namespace erdo::ui
             auto stat_variations = calculator::get_stat_variations(max_attribute_points, stats);
 
             static constexpr auto optimizer_callbacks = [](auto){
-                static constexpr auto [...enumerators] = enumerators_of<calculator::OptimizationTarget>();
-                return std::array{ calculator::optimizers<enumerators>.get_callback... };
+                static constexpr auto [...enumerators] = enumerators_of<optimizer::Target>();
+                return std::array{ optimizer::brute_force<enumerators>.get_callback... };
             }(1);
 
             std::vector<Row> rows{};
@@ -624,9 +624,9 @@ namespace erdo::ui
             this->optimize->setupUi(opt_group);
 
             // optimize target combobox
-            for (const auto& target : enumerator_strings_of<calculator::OptimizationTarget>())
+            for (const auto& target : enumerator_strings_of<optimizer::Target>())
                 this->optimize->target_combobox->addItem(string_to_display(target));
-            this->optimize->target_combobox->setCurrentIndex(std::to_underlying(calculator::OptimizationTarget::TOTAL_ATTACK_POWER));
+            this->optimize->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
             connect(this->optimize->start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize_brute_force);

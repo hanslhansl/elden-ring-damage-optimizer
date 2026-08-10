@@ -383,7 +383,17 @@ export namespace erdo::calculator
         }
     };
 
-    class AttackRating : public FullAttackOptions
+    struct AttackRating
+    {
+        AttackPower total_attack_power;
+        AttackPowers attack_powers;
+        double spell_scaling;
+        TotalScalings total_scalings;
+        IneffectiveAttackPowerTypes ineffective_attack_power_types;
+        IneffectiveAttributes ineffective_attributes;
+    };
+
+    class Attack : public FullAttackOptions, public AttackRating
     {
         void calculate_ineffective_attributes_inplace(const RelevantStats& adjusted_relevant_stats)
         {
@@ -476,13 +486,6 @@ export namespace erdo::calculator
         }
     
     public:
-        AttackPower total_attack_power;
-        AttackPowers attack_powers;
-        double spell_scaling;
-        TotalScalings total_scalings;
-        IneffectiveAttackPowerTypes ineffective_attack_power_types;
-        IneffectiveAttributes ineffective_attributes;
-
         void calculate_attack_power_inplace(AttackPowerType attack_power_type)
         {
             auto&& weapon = this->weapon.get();
@@ -578,14 +581,14 @@ export namespace erdo::calculator
             return attack_power_type != AttackPowerType::PHYSICAL && this->ineffective_attack_power_types[std::to_underlying(attack_power_type)];
         }
 
-        AttackRating(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
+        Attack(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
             : FullAttackOptions{ attack_options, weapon, stats } { }
 
-        static AttackRating calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
+        static Attack calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
         {
-            AttackRating attack_rating{ weapon, stats, attack_options };
-            attack_rating.calculate_inplace();
-            return attack_rating;
+            Attack attack{ weapon, stats, attack_options };
+            attack.calculate_inplace();
+            return attack;
         }
     };
 

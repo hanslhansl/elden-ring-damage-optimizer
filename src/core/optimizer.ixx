@@ -5,11 +5,12 @@ import :calculator;
 
 import std;
 
+using namespace erdo::calculator;
 
 
-namespace erdo::calculator
+namespace erdo::optimizer
 {
-    export enum class OptimizationTarget
+    export enum class Target
     {
         PHYSICAL_ATTACK_POWER = std::to_underlying(AttackPowerType::PHYSICAL),
         MAGIC_ATTACK_POWER = std::to_underlying(AttackPowerType::MAGIC),
@@ -29,95 +30,114 @@ namespace erdo::calculator
         SPELL_SCALING,
     };
 
-    struct OptimizerImplBase
+    template<Target target>
+    struct ProjectionImpl;
+    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target)))
+    struct ProjectionImpl<target>
     {
-        // potentially provided more efficient implementation in the derived class
-        static void calculate_inplace(AttackRating& attack_rating)
-        {
-            attack_rating.calculate_inplace();
-        }
-
-        // has to be provided by the derived class
-        static double& projection(AttackRating& attack_rating);
-    };
-
-    template<OptimizationTarget target_>
-    struct OptimizerImpl;
-
-    template<OptimizationTarget target_> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target_)))
-    struct OptimizerImpl<target_> : OptimizerImplBase
-    {
-        static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(std::to_underlying(target_));
+        static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(std::to_underlying(target));
         static constexpr auto attack_power_type_integral = std::to_underlying(attack_power_type);
 
-        static void calculate_inplace(AttackRating& attack_rating)
-        {
-            attack_rating.calculate_attack_power_inplace(attack_power_type);
-        }
-
-        static double& projection(AttackRating& attack_rating)
+        static double& operator()(AttackRating& attack_rating)
         {
             return attack_rating.attack_powers[attack_power_type_integral][1];
         }
     };
-
     template<>
-    struct OptimizerImpl<OptimizationTarget::SPELL_SCALING> : OptimizerImplBase
+    struct ProjectionImpl<Target::SPELL_SCALING>
     {
-        static void calculate_inplace(AttackRating& attack_rating)
-        {
-            attack_rating.calculate_spell_scaling_inplace();
-        }
-
-        static double& projection(AttackRating& attack_rating)
+        static double& operator()(AttackRating& attack_rating)
         {
             return attack_rating.spell_scaling;
         }
     };
-
     template<>
-    struct OptimizerImpl<OptimizationTarget::TOTAL_ATTACK_POWER> : OptimizerImplBase
+    struct ProjectionImpl<Target::TOTAL_ATTACK_POWER>
     {
-        static double& projection(AttackRating& attack_rating)
+        static double& operator()(AttackRating& attack_rating)
         {
             return attack_rating.total_attack_power[1];
         }
     };
+    template<Target target>
+    struct Projection
+    {
+        using value_type = std::remove_reference_t<std::invoke_result_t<decltype(ProjectionImpl<target>::operator()), AttackRating&>>;
 
+        static value_type& operator()(AttackRating& attack_rating)
+        {
+            return ProjectionImpl<target>::operator()(attack_rating);
+        }
 
-    template<OptimizationTarget target_>
-    struct Optimizer
+        static const value_type& operator()(const AttackRating& attack_rating)
+        {
+            return ProjectionImpl<target>::operator()(const_cast<AttackRating&>(attack_rating));
+        }
+    };
+    export template<Target target>
+    constexpr Projection<target> projection{};
+
+    template<Target target>
+    struct BruteForceImpl
+    {
+        static void calculate_inplace(Attack& attack)
+        {
+            attack.calculate_inplace();
+        }
+    };
+    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target)))
+    struct BruteForceImpl<target>
+    {
+        static constexpr auto attack_power_type = ProjectionImpl<target>::attack_power_type;
+        static constexpr auto attack_power_type_integral = ProjectionImpl<target>::attack_power_type_integral;
+
+        static void calculate_inplace(Attack& attack)
+        {
+            attack.calculate_attack_power_inplace(attack_power_type);
+        }
+    };
+    template<>
+    struct BruteForceImpl<Target::SPELL_SCALING>
+    {
+        static void calculate_inplace(Attack& attack)
+        {
+            attack.calculate_spell_scaling_inplace();
+        }
+    };
+    template<Target target_>
+    struct BruteForce
     {
         static constexpr auto target = target_;
-        using OptimizerImpl = OptimizerImpl<target_>;
+        using BruteForceImpl = BruteForceImpl<target>;
 
-        static AttackRating optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
+        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
         {
             if (stat_variations.empty())
                 throw std::invalid_argument("stat_variations must not be empty");
 
-            AttackRating attack_rating{ weapon, {}, attack_options };
+            Attack attack{ weapon, {}, attack_options };
             Stats const* best_stats = nullptr;
-            auto best_value = std::numeric_limits<typename Projection::value_type>::lowest();
+            auto best_value = std::numeric_limits<typename Projection<target>::value_type>::lowest();
 
             for (const auto& stats : stat_variations)
             {
-                attack_rating.stats = stats;
-                OptimizerImpl::calculate_inplace(attack_rating);
+                attack.stats = stats;
+                BruteForceImpl::calculate_inplace(attack);
 
-                if (best_value < OptimizerImpl::projection(attack_rating))
+                auto new_value = projection<target>(attack);
+                if (best_value < new_value)
                 {
                     best_stats = &stats;
-                    best_value = OptimizerImpl::projection(attack_rating);
+                    best_value = new_value;
                 }
             }
 
-            attack_rating.stats = *best_stats;
-            attack_rating.calculate_inplace();
-            return attack_rating;
+            attack.stats = *best_stats;
+            attack.calculate_inplace();
+            return attack;
         }
 
-        static std::vector<std::function<AttackRating()>> get_tasks(
+        static std::vector<std::function<Attack()>> get_tasks(
             const std::vector<std::reference_wrapper<const calculator::Weapon>>& weapons,
             const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
@@ -126,13 +146,13 @@ namespace erdo::calculator
             if (stat_variations.empty())
                 throw std::invalid_argument("stat_variations must not be empty");
 
-            std::vector<std::function<AttackRating()>> tasks;
+            std::vector<std::function<Attack()>> tasks;
             tasks.reserve(weapons.size());
 
             for (const auto& weapon : weapons)
             {
                 tasks.emplace_back([&, weapon] {
-                    return Optimizer::optimize_weapon(
+                    return BruteForce::optimize_weapon(
                         weapon,
                         attack_options,
                         stat_variations
@@ -143,7 +163,7 @@ namespace erdo::calculator
             return tasks;
         }
 
-        static std::function<AttackRating(const Weapon&)> get_callback(
+        static std::function<Attack(const Weapon&)> get_callback(
             const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
         )
@@ -152,7 +172,7 @@ namespace erdo::calculator
                 throw std::invalid_argument("stat_variations must not be empty");
 
             return [&](const Weapon& weapon) {
-                return Optimizer::optimize_weapon(
+                return BruteForce::optimize_weapon(
                     weapon,
                     attack_options,
                     stat_variations
@@ -160,7 +180,7 @@ namespace erdo::calculator
             };
         }
 
-        static std::vector<AttackRating> run_synchronously(
+        static std::vector<Attack> run_synchronously(
             const std::vector<std::reference_wrapper<const Weapon>>& weapons,
             const std::vector<Stats>& stat_variations,
             const AttackOptions& attack_options
@@ -169,12 +189,12 @@ namespace erdo::calculator
             if (stat_variations.empty())
                 throw std::invalid_argument("stat_variations must not be empty");
             
-            std::vector<AttackRating> attack_ratings;
-            attack_ratings.reserve(weapons.size());
-            attack_ratings.append_range(
+            std::vector<Attack> attacks;
+            attacks.reserve(weapons.size());
+            attacks.append_range(
                 weapons
                 | std::views::transform([&](const calculator::Weapon& w) {
-                    return Optimizer::optimize_weapon(
+                    return BruteForce::optimize_weapon(
                         w,
                         attack_options,
                         stat_variations
@@ -182,45 +202,77 @@ namespace erdo::calculator
                 })
             );
 
-            return attack_ratings;
+            return attacks;
+        }
+    };
+    export template<Target target>
+    constexpr BruteForce<target> brute_force{};
+
+    template<Target target>
+    struct V2Impl
+    {
+        static void calculate_inplace(Attack& attack)
+        {
+            attack.calculate_inplace();
+        }
+    };
+    template<Target target_>
+    struct V2
+    {
+        static constexpr auto target = target_;
+        using V2Impl = V2Impl<target>;
+
+        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
+        {
+            
         }
 
-        static constexpr struct Projection
+        static std::vector<std::function<Attack()>> get_tasks(
+            const std::vector<std::reference_wrapper<const calculator::Weapon>>& weapons,
+            const std::vector<Stats>& stat_variations,
+            const AttackOptions& attack_options
+        )
         {
-            using value_type = std::remove_reference_t<std::invoke_result_t<decltype(OptimizerImpl::projection), AttackRating&>>;
+            
+        }
 
-            static value_type& operator()(AttackRating& attack_rating)
-            {
-                return OptimizerImpl::projection(attack_rating);
-            }
+        static std::function<Attack(const Weapon&)> get_callback(
+            const std::vector<Stats>& stat_variations,
+            const AttackOptions& attack_options
+        )
+        {
+        
+        }
 
-            static const value_type& operator()(const AttackRating& attack_rating)
-            {
-                return OptimizerImpl::projection(const_cast<AttackRating&>(attack_rating));
-            }
-        } projection{};
+        static std::vector<Attack> run_synchronously(
+            const std::vector<std::reference_wrapper<const Weapon>>& weapons,
+            const std::vector<Stats>& stat_variations,
+            const AttackOptions& attack_options
+        )
+        {
+            
+        }
     };
-
-    export template<OptimizationTarget target>
-    constexpr Optimizer<target> optimizers{};
+    export template<Target target>
+    constexpr V2<target> v2{};
 }
 
 using namespace erdo;
 template<>
-constexpr std::array<std::pair<calculator::OptimizationTarget, std::string_view>, 14> enum_string_mapping<calculator::OptimizationTarget> = {
-    std::pair{calculator::OptimizationTarget::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
-    std::pair{calculator::OptimizationTarget::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
-    std::pair{calculator::OptimizationTarget::SPELL_SCALING, "SPELL_SCALING"},
+constexpr std::array<std::pair<optimizer::Target, std::string_view>, 14> enum_string_mapping<optimizer::Target> = {
+    std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
+    std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
+    std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
+    std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
+    std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
+    std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
+    std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
+    std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
+    std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
+    std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
+    std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
+    std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
+    std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
+    std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
 };
 

@@ -58,9 +58,9 @@ namespace erdo::ui
             static constexpr bool draw_section_seperators = false;
             static constexpr bool expand_section = false;
 
-            explicit SectionBase(const calculator::AttackRating& attack_rating) { }
+            explicit SectionBase(const calculator::Attack& attack) { }
 
-            void update(const calculator::AttackRating& attack_rating) { }
+            void update(const calculator::Attack& attack) { }
         };
 
         export struct NameSection : SectionBase<std::array<std::array<QVariant, 3>, 1>>
@@ -68,19 +68,19 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("name") };
 
             using SectionBase::SectionBase;
-            explicit NameSection(const calculator::AttackRating& attack_rating)
+            explicit NameSection(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 if (settings.display_base_names_instead_of_full_names)
-                    (*this)[0][0] = string_to_display(weapon.qualified_base_name(attack_rating.upgrade_level()));
+                    (*this)[0][0] = string_to_display(weapon.qualified_base_name(attack.upgrade_level()));
                 else
-                    (*this)[0][0] = string_to_display(weapon.qualified_name(attack_rating.upgrade_level()));
+                    (*this)[0][0] = string_to_display(weapon.qualified_name(attack.upgrade_level()));
 
                 if (settings.sort_by_base_names_instead_of_full_names)
                     (*this)[0][1] = string_to_display(weapon.base_name);
@@ -126,9 +126,9 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("affinity") };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit AffinitySection(const calculator::AttackRating& attack_rating)
+            explicit AffinitySection(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 (*this)[0][0] = string_to_display(enum_to_string(weapon.affinity));
                 (*this)[0][1] = std::to_underlying(weapon.affinity);
@@ -139,9 +139,9 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("type") };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit TypeSection(const calculator::AttackRating& attack_rating)
+            explicit TypeSection(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 (*this)[0][0] = string_to_display(enum_to_string(weapon.type));
                 (*this)[0][1] = std::to_underlying(weapon.type);
@@ -153,9 +153,9 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
 
             using SectionBase::SectionBase;
-            explicit BaseGameDLCSection(const calculator::AttackRating& attack_rating)
+            explicit BaseGameDLCSection(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 (*this)[0][0] = string_to_display(weapon.dlc ? "dlc" : "base game");
                 (*this)[0][1] = weapon.dlc;
@@ -181,9 +181,9 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("base name") };
 
             using SectionBase::SectionBase;
-            explicit BaseNameSection(const calculator::AttackRating& attack_rating)
+            explicit BaseNameSection(const calculator::Attack& attack)
             {
-                (*this)[0] = string_to_display(attack_rating.weapon.get().base_name);
+                (*this)[0] = string_to_display(attack.weapon.get().base_name);
             }
 
             QVariant data(int column, int role) const
@@ -204,14 +204,14 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names { string_to_display("character level") };
 
             using SectionBase::SectionBase;
-            explicit CharacterLevelSection(const calculator::AttackRating& attack_rating)
+            explicit CharacterLevelSection(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
-                (*this)[0] = attack_rating.stats.character_level();
+                (*this)[0] = attack.stats.character_level();
             }
 
             QVariant data(int column, int role) const
@@ -255,16 +255,16 @@ namespace erdo::ui
             inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
 
             using DataSection::DataSection;
-            explicit SpellScaling(const calculator::AttackRating& attack_rating)
+            explicit SpellScaling(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
-                (*this)[0][0] = format_number(attack_rating.spell_scaling * 100);
-                (*this)[0][1] = attack_rating.spell_scaling * 100;
-                (*this)[0][2] = foreground_color(attack_rating.is_spell_scaling_ineffective());
+                (*this)[0][0] = format_number(attack.spell_scaling * 100);
+                (*this)[0][1] = attack.spell_scaling * 100;
+                (*this)[0][2] = foreground_color(attack.is_spell_scaling_ineffective());
             }
         };
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
@@ -282,16 +282,16 @@ namespace erdo::ui
             }();
 
             using DataSection::DataSection;
-            explicit AttackPowers(const calculator::AttackRating& attack_rating)
+            explicit AttackPowers(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
                 for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                    attack_rating.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
-                    attack_rating.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                    attack.attack_powers | std::views::take(enumerators_of<calculator::DamageType>().size()),
+                    attack.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
                     arr[0] = /*format_number(ap[0]) + "/" +*/ format_number(ap[1]);
@@ -299,9 +299,9 @@ namespace erdo::ui
                     arr[2] = foreground_color(is_ineffective);
                 }
 
-                this->back()[0] = format_number(attack_rating.total_attack_power[1]);
-                this->back()[1] = attack_rating.total_attack_power[1];
-                this->back()[2] = foreground_color(attack_rating.is_total_attack_power_ineffective());
+                this->back()[0] = format_number(attack.total_attack_power[1]);
+                this->back()[1] = attack.total_attack_power[1];
+                this->back()[2] = foreground_color(attack.is_total_attack_power_ineffective());
             }
         };
 
@@ -323,16 +323,16 @@ namespace erdo::ui
             inline static const QString header_section_title = "status effects";
 
             using EnumDataSection::EnumDataSection;
-            explicit StatusEffects(const calculator::AttackRating& attack_rating)
+            explicit StatusEffects(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
                 for (auto&& [ap, is_ineffective, arr] : std::views::zip(
-                    attack_rating.attack_powers | std::views::drop(enumerators_of<calculator::DamageType>().size()),
-                    attack_rating.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
+                    attack.attack_powers | std::views::drop(enumerators_of<calculator::DamageType>().size()),
+                    attack.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
                     arr[0] = format_number(ap[1]);
@@ -347,19 +347,19 @@ namespace erdo::ui
             inline static const QString header_section_title = "attribute scaling";
 
             using EnumDataSection::EnumDataSection;
-            explicit AttributeScalings(const calculator::AttackRating& attack_rating)
+            explicit AttributeScalings(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 for (auto&& [attribute_scaling, scaling_tier, is_ineffective, arr] : std::views::zip(
-                    attack_rating.attribute_scalings(),
-                    attack_rating.calculate_scaling_tiers(),
-                    attack_rating.ineffective_attributes,
+                    attack.attribute_scalings(),
+                    attack.calculate_scaling_tiers(),
+                    attack.ineffective_attributes,
                     *this))
                 {
                     if (scaling_tier.empty())
@@ -377,18 +377,18 @@ namespace erdo::ui
             inline static const QString header_section_title = "attribute requirements";
 
             using EnumDataSection::EnumDataSection;
-            explicit Requirements(const calculator::AttackRating& attack_rating)
+            explicit Requirements(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
-                auto&& weapon = attack_rating.weapon.get();
+                auto&& weapon = attack.weapon.get();
 
                 for (auto&& [requirement, is_ineffective, arr] : std::views::zip(
                     weapon.requirements,
-                    attack_rating.ineffective_attributes,
+                    attack.ineffective_attributes,
                     *this))
                 {
                     arr[0] = format_number(requirement);
@@ -403,16 +403,16 @@ namespace erdo::ui
             inline static const QString header_section_title = "character stats";
 
             using EnumDataSection::EnumDataSection;
-            explicit Stats(const calculator::AttackRating& attack_rating)
+            explicit Stats(const calculator::Attack& attack)
             {
-                this->update(attack_rating);
+                this->update(attack);
             }
 
-            void update(const calculator::AttackRating& attack_rating)
+            void update(const calculator::Attack& attack)
             {
                 for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-                    attack_rating.stats.relevant_stats(),
-                    attack_rating.ineffective_attributes,
+                    attack.stats.relevant_stats(),
+                    attack.ineffective_attributes,
                     *this))
                 {
                     arr[0] = stat;
@@ -429,7 +429,7 @@ namespace erdo::ui
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
         using _tuple_base::_tuple_base;
 
-        calculator::AttackRating attack_rating { calculator::Weapon::dummy, {}, {} };
+        calculator::Attack attack { calculator::Weapon::dummy, {}, {} };
 
         static constexpr std::array section_sizes = { std::tuple_size_v<Args>... };
         static constexpr std::array cumulative_section_sizes = []() {
@@ -476,18 +476,18 @@ namespace erdo::ui
         }
 
         BasicRow() = default;
-        explicit BasicRow(calculator::AttackRating&& attack_rating) : _tuple_base(Args(attack_rating)...), attack_rating{ std::move(attack_rating) } { }
+        explicit BasicRow(calculator::Attack&& attack) : _tuple_base(Args(attack)...), attack{ std::move(attack) } { }
 
-        void update(calculator::AttackRating&& attack_rating)
+        void update(calculator::Attack&& attack)
         {
-            this->attack_rating = std::move(attack_rating);
+            this->attack = std::move(attack);
             this->update();
         }
         void update()
         {
             std::apply(
                 [&](auto&&...args) {
-                    (std::forward<decltype(args)>(args).update(this->attack_rating),...);
+                    (std::forward<decltype(args)>(args).update(this->attack),...);
                 },
                 *this
             );
@@ -542,7 +542,7 @@ namespace erdo::ui
 
             connect(&settings.display_base_names_instead_of_full_names, settings.display_base_names_instead_of_full_names.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                    std::get<sections::NameSection>(row).update(row.attack);
                 emit dataChanged(
                     this->index(0, Row::section_index_offsets[name_section_index]),
                     this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
@@ -551,7 +551,7 @@ namespace erdo::ui
             });
             connect(&settings.sort_by_base_names_instead_of_full_names, settings.sort_by_base_names_instead_of_full_names.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                    std::get<sections::NameSection>(row).update(row.attack);
                 emit dataChanged(
                     this->index(0, Row::section_index_offsets[name_section_index]),
                     this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
@@ -561,7 +561,7 @@ namespace erdo::ui
             
             connect(&settings.link_to_fextralife_instead_of_fandom, settings.link_to_fextralife_instead_of_fandom.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack_rating);
+                    std::get<sections::NameSection>(row).update(row.attack);
                 emit dataChanged(
                     this->index(0, Row::section_index_offsets[name_section_index]),
                     this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
@@ -605,10 +605,10 @@ namespace erdo::ui
             this->endResetModel();
         }
 
-        void update_rows(std::ranges::range auto&& attack_ratings)
+        void update_rows(std::ranges::range auto&& attacks)
         {
-            for (auto&& [attack_rating, row] : std::views::zip(attack_ratings, this->rows))
-                row.update(std::move(attack_rating));
+            for (auto&& [attack, row] : std::views::zip(attacks, this->rows))
+                row.update(std::move(attack));
             emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
         }
     };

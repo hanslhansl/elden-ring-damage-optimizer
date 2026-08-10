@@ -42,7 +42,7 @@ TEST_CASE("calculation - total attack power 1")
 
     auto total_attack_powers = weapons
         | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, stats, attack_options); })
-        | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
+        | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_1.size());
@@ -61,7 +61,7 @@ TEST_CASE("calculation - total attack power 2")
 
     auto total_attack_powers = weapons
         | std::views::transform([&](const calculator::Weapon& w){ return calculator::AttackRating::calculate(w, stats, attack_options); })
-        | std::views::transform(calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>.projection)
+        | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
     CHECK(total_attack_powers.size() == expected_total_attack_powers_2.size());
@@ -94,7 +94,7 @@ TEST_CASE("stat variations")
     CHECK(stat_variations.size() == expected_stat_variation_count);
 }
 
-TEST_CASE("optimization - total attack power")
+TEST_CASE("optimization - brute force - total attack power")
 {
     auto stat_variations = calculator::get_stat_variations(
         91,
@@ -105,14 +105,14 @@ TEST_CASE("optimization - total attack power")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::AttackRating> attack_ratings{};
-    constexpr auto optimizer = calculator::optimizers<calculator::OptimizationTarget::TOTAL_ATTACK_POWER>;
+    constexpr auto optimizer = optimizer::brute_force<optimizer::Target::TOTAL_ATTACK_POWER>;
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
         attack_ratings = optimizer.run_synchronously(weapons, stat_variations, attack_options);
     };
-    std::ranges::sort(attack_ratings, {}, optimizer.projection);
+    std::ranges::sort(attack_ratings, {}, optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>);
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Fire Duelist Greataxe");
@@ -124,7 +124,7 @@ TEST_CASE("optimization - total attack power")
     );
 }
 
-TEST_CASE("optimization - spell scaling")
+TEST_CASE("optimization - brute force - spell scaling")
 {
     auto stat_variations = calculator::get_stat_variations(
         91,
@@ -135,14 +135,14 @@ TEST_CASE("optimization - spell scaling")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::AttackRating> attack_ratings{};
-    constexpr auto optimizer = calculator::optimizers<calculator::OptimizationTarget::SPELL_SCALING>;
+    constexpr auto optimizer = optimizer::brute_force<optimizer::Target::SPELL_SCALING>;
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
         attack_ratings = optimizer.run_synchronously(weapons, stat_variations, attack_options);
     };
-    std::ranges::sort(attack_ratings, {}, optimizer.projection);
+    std::ranges::sort(attack_ratings, {}, optimizer::projection<optimizer::Target::SPELL_SCALING>);
     auto&& attack_rating = attack_ratings.back();
 
     CHECK(attack_rating.weapon.get().full_name == "Demi-Human Queen's Staff");
