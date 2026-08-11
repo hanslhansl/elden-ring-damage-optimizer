@@ -478,18 +478,11 @@ namespace erdo::ui
 
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
-        QLabel* max_free_attribute_points_label{};
+        QLabel* free_attribute_points_label{};
         std::unique_ptr<Ui::OptimizeWidget> optimize = std::make_unique<Ui::OptimizeWidget>();
 
         void prepare_optimization()
         {
-            auto stats = this->get_character_stats();
-
-            auto min_attribute_points = stats.attribute_points();
-            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-            auto max_free_attribute_points = max_attribute_points - min_attribute_points;
-            auto stat_variations = optimizer::get_stat_variation_count(stats, max_attribute_points);
-
             // base game / dlc filter
             auto selected_base_game_dlc = this->base_game_dlc_list->selectedItems();
             std::unordered_set<bool> base_game_dlc_set;
@@ -534,9 +527,15 @@ namespace erdo::ui
                 })
             );
 
+            auto stats = this->get_character_stats();
+            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
+            auto free_attribute_points = max_attribute_points - stats.attribute_points();
+            auto stat_variations = optimizer::get_stat_variation_count(free_attribute_points, stats.relevant_stats());
+
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
-            this->max_free_attribute_points_label->setText(QString::number(max_free_attribute_points));
+            this->free_attribute_points_label->setText(QString::number(free_attribute_points));
             this->optimize->stat_variations_label->setText(QString::number(stat_variations));
+            
             this->optimize->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
             this->optimize->variations_label->setText(QString::number(this->filtered_active_weapon_data.size() * stat_variations));
         }
@@ -545,13 +544,14 @@ namespace erdo::ui
         {
             auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
-            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
+            auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value()) - min_stats.attribute_points();
 
-            optimizer::visit_optimizer<optimizer::brute_force>(
-                this->optimize->target_combobox->currentIndex(),
-                [&](auto&& optimizer) {
+            visit_enum(
+                (optimizer::Target)this->optimize->target_combobox->currentIndex(),
+                [&](auto integral_constant) {
+                    constexpr auto optimizer = optimizer::BruteForce<integral_constant.value>{};
                     auto future = QtConcurrent::mapped(
-                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, max_attribute_points),
+                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, free_attribute_points),
                         [](const auto& task) { return Row(task()); }
                     );
 
@@ -571,9 +571,10 @@ namespace erdo::ui
             auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
 
-            optimizer::visit_optimizer<optimizer::v2>(
-                this->optimize->target_combobox->currentIndex(),
-                [&](auto&& optimizer) {
+            visit_enum(
+                (optimizer::Target)this->optimize->target_combobox->currentIndex(),
+                [&](auto integral_constant) {
+                    constexpr auto optimizer = optimizer::V2<integral_constant.value>{};
                     auto future = QtConcurrent::mapped(
                         optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, max_attribute_points),
                         [](const auto& task) { return Row(task()); }
@@ -611,7 +612,7 @@ namespace erdo::ui
 
             // attribute points label
             max_character_stats_layout->addRow(string_to_display("max attribute points:"), this->max_attribute_points_label = new QLabel());
-            max_character_stats_layout->addRow(string_to_display("max free attribute points:"), this->max_free_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow(string_to_display("max free attribute points:"), this->free_attribute_points_label = new QLabel());
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);

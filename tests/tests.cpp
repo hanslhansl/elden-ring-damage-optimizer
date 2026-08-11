@@ -72,12 +72,21 @@ TEST_CASE("calculation - total attack power 2")
 
 TEST_CASE("stat variations")
 {
-    auto expected_stat_variation_count = 1365;
+    const auto expected_stat_variation_count = 1365;
+    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto free_attribute_points = 11;
 
-    auto stat_variation_count = optimizer::get_stat_variation_count(
-        calculator::character_class_stats.at("wretch"),
-        91
-    );
+    std::size_t stat_variation_count;
+#ifdef ENABLE_BENCHMARKS
+    BENCHMARK("optimizer::get_stat_variation_count")
+#endif
+    {
+        stat_variation_count = optimizer::get_stat_variation_count(
+            free_attribute_points,
+            min_relevant_stats
+        );
+    };
     CHECK(stat_variation_count == expected_stat_variation_count);
     
     std::vector<calculator::Stats> stat_variations{};
@@ -86,11 +95,10 @@ TEST_CASE("stat variations")
 #endif
     {
         stat_variations = optimizer::get_stat_variations(
-            calculator::character_class_stats.at("wretch"),
-            91
+            free_attribute_points,
+            min_stats
         );
     };
-
     CHECK(stat_variations.size() == expected_stat_variation_count);
 }
 
@@ -99,12 +107,16 @@ TEST_CASE("optimization - brute force - total attack power")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::Attack> attacks{};
-    constexpr auto optimizer = optimizer::brute_force<optimizer::Target::TOTAL_ATTACK_POWER>;
+    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto free_attribute_points = 11;
+
+    constexpr auto optimizer = optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, calculator::character_class_stats.at("wretch"), 91);
+        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
     };
     std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>);
     auto&& attack = attacks.back();
@@ -123,12 +135,16 @@ TEST_CASE("optimization - brute force - spell scaling")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::Attack> attacks{};
-    constexpr auto optimizer = optimizer::brute_force<optimizer::Target::SPELL_SCALING>;
+    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto free_attribute_points = 11;
+
+    constexpr auto optimizer = optimizer::BruteForce<optimizer::Target::SPELL_SCALING>{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, calculator::character_class_stats.at("wretch"), 91);
+        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
     };
     std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::SPELL_SCALING>);
     auto&& attack = attacks.back();
@@ -147,12 +163,16 @@ TEST_CASE("optimization - v2 - total attack power")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::Attack> attacks{};
-    constexpr auto optimizer = optimizer::v2<optimizer::Target::TOTAL_ATTACK_POWER>;
+    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto free_attribute_points = 11;
+
+    constexpr auto optimizer = optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, calculator::character_class_stats.at("wretch"), 91);
+        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
     };
     std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>);
     auto&& attack = attacks.back();
@@ -171,12 +191,16 @@ TEST_CASE("optimization - v2 - spell scaling")
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
     std::vector<calculator::Attack> attacks{};
-    constexpr auto optimizer = optimizer::v2<optimizer::Target::SPELL_SCALING>;
+    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto free_attribute_points = 11;
+
+    constexpr auto optimizer = optimizer::V2<optimizer::Target::SPELL_SCALING>{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, calculator::character_class_stats.at("wretch"), 91);
+        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
     };
     std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::SPELL_SCALING>);
     auto&& attack = attacks.back();

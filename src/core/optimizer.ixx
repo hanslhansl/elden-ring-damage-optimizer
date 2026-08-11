@@ -1,5 +1,6 @@
 module;
 #include <array>
+#include <optional>
 export module erdo:optimizer;
 import :calculator;
 
@@ -10,108 +11,79 @@ using namespace erdo::calculator;
 
 namespace erdo::optimizer
 {
-    export constexpr std::size_t get_stat_variation_count(const Stats &min_stats, const int max_attribute_points)
+    export std::size_t get_stat_variation_count(const std::size_t free_attribute_points, const RelevantStats min_relevant_stats)
     {
-        constexpr auto UPPER = 99;
-        const auto SUM = max_attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
-        std::size_t count = 0;
+        const auto A = free_attribute_points;
+        const auto T = min_relevant_stats;
+        constexpr std::size_t M = 99;
+        constexpr auto P = decltype(min_relevant_stats)::extent;
 
-        if (max_attribute_points > UPPER * min_stats.size())
-            throw std::invalid_argument(std::format("max_attribute_points must be <= {}", UPPER * min_stats.size()));
+        // Restkapazitäten
+        std::array<decltype(min_relevant_stats)::value_type, P> capacity{};
 
-        if (std::ranges::any_of(min_stats, [](auto v) { return v > UPPER; }))
-            throw std::invalid_argument(std::format("min_stats must be <= {}", UPPER));
+        std::size_t totalCapacity = 0;
 
-        auto min_relevant_stats = min_stats.relevant_stats();
-
-        for (auto i = min_relevant_stats[0]; i <= std::min(UPPER, SUM); ++i)
+        for (std::size_t i = 0; i < P; ++i)
         {
-            auto SUM_i = SUM - i;
-            for (auto j = min_relevant_stats[1]; j <= std::min(UPPER, SUM_i); ++j)
+            if (T[i] < 0 || T[i] > M)
             {
-                auto SUM_i_j = SUM_i - j;
-
-                if (0ll == min_relevant_stats[4])
-                {
-                    auto a1 = std::max(min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER);
-                    auto b1 = std::min(UPPER, SUM_i_j - min_relevant_stats[3]);
-                    auto b1_a1_1 = b1 - a1 + 1;
-                    if (b1_a1_1 > 0)
-                        count += (1 - min_relevant_stats[3]) * b1_a1_1;
-
-                    auto a2 = a1;
-                    auto b2 = std::min(UPPER, SUM_i_j - UPPER - 1);
-                    auto b2_a2_1 = b2 - a2 + 1;
-                    if (b2_a2_1 > 0)
-                        count += UPPER * b2_a2_1;
-
-                    auto a3 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b3 = b1;
-                    auto b3_a3_1 = b3 - a3 + 1;
-                    if (b3_a3_1 > 0)
-                        count += SUM_i_j * b3_a3_1 - (a3 + b3) * b3_a3_1 / 2;
-
-                    auto a4 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - UPPER);
-                    auto b4 = std::min(UPPER, SUM_i_j - min_relevant_stats[3] - UPPER - 1);
-                    auto b4_a4_1 = b4 - a4 + 1;
-                    if (b4_a4_1 > 0)
-                        count += (UPPER + 1 - SUM_i_j + UPPER) * b4_a4_1 + (a4 + b4) * b4_a4_1 / 2;
-
-                    auto a5 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b5 = b4;
-                    auto b5_a5_1 = b5 - a5 + 1;
-                    if (b5_a5_1 > 0)
-                        count += SUM_i_j * b5_a5_1;
-                }
-                else
-                {
-                    auto a2 = std::max(min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER);
-                    auto b2 = std::min({UPPER, SUM_i_j - UPPER - min_relevant_stats[4], SUM_i_j - UPPER - 1});
-                    auto b2_a2_1 = b2 - a2 + 1;
-                    if (b2_a2_1 > 0)
-                        count += (1 + UPPER - min_relevant_stats[3]) * b2_a2_1;
-
-                    auto a3 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b3 = std::min(UPPER, SUM_i_j - UPPER - min_relevant_stats[4]);
-                    auto b3_a3_1 = b3 - a3 + 1;
-                    if (b3_a3_1 > 0)
-                        count += (1 + SUM_i_j - min_relevant_stats[3]) * b3_a3_1 - (a3 + b3) * b3_a3_1 / 1;
-
-                    auto a4 = std::max({min_relevant_stats[2], SUM_i_j - min_relevant_stats[3] - UPPER, SUM_i_j - min_relevant_stats[4] - UPPER + 1});
-                    auto b4 = std::min(UPPER, SUM_i_j - min_relevant_stats[4] - min_relevant_stats[3]);
-                    auto b4_a4_1 = b4 - a4 + 1;
-                    if (b4_a4_1 > 0)
-                        count += (SUM_i_j - min_relevant_stats[4] - min_relevant_stats[3] + 1) * b4_a4_1 - (a4 + b4) * b4_a4_1 / 2;
-
-                    auto a5 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - UPPER);
-                    auto b5 = std::min({UPPER, SUM_i_j - UPPER - 1 - min_relevant_stats[3], SUM_i_j - min_relevant_stats[4] - UPPER});
-                    auto b5_a5_1 = b5 - a5 + 1;
-                    if (b5_a5_1 > 0)
-                        count += (UPPER - SUM_i_j + UPPER + 1) * b5_a5_1 + (a5 + b5) * b5_a5_1 / 2;
-
-                    auto a7 = std::max(min_relevant_stats[2], SUM_i_j - UPPER);
-                    auto b7 = b5;
-                    auto b7_a7_1 = b7 - a7 + 1;
-                    if (b7_a7_1 > 0)
-                        count += (UPPER + 1) * b7_a7_1;
-
-                    auto a8 = std::max(min_relevant_stats[2], SUM_i_j - UPPER - min_relevant_stats[4] + 1);
-                    auto b8 = std::min(UPPER, SUM_i_j - min_relevant_stats[3] - UPPER - 1);
-                    auto b8_a8_1 = b8 - a8 + 1;
-                    if (b8_a8_1 > 0)
-                        count += (UPPER - min_relevant_stats[4] + 1) * b8_a8_1;
-                }
+                throw std::invalid_argument("T[i] muss zwischen 0 und M liegen.");
             }
+
+            capacity[i] = M - T[i];
+            totalCapacity += capacity[i];
         }
 
-        return count;
-    }
-    export std::vector<Stats> get_stat_variations(const Stats &min_stats, const int max_attribute_points)
-    {
-        constexpr auto UPPER = 99;
-        const auto SUM = max_attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
+        if (A < 0)
+        {
+            throw std::invalid_argument("A darf nicht negativ sein.");
+        }
 
-        auto possible_occurances = get_stat_variation_count(min_stats, max_attribute_points);
+        if (A > totalCapacity)
+        {
+            return 0;
+        }
+
+        // dp[a] = Anzahl Möglichkeiten, a Äpfel
+        // auf die bisher betrachteten Personen zu verteilen.
+        std::vector<std::size_t> dp(A + 1, 0);
+        std::vector<std::size_t> next(A + 1, 0);
+
+        dp[0] = 1;
+
+        for (auto C : capacity)
+        {
+
+            long long window = 0;
+
+            for (long long a = 0; a <= A; ++a)
+            {
+
+                // dp[a] + dp[a-1] + ... + dp[a-C]
+                window += dp[a];
+
+                auto dfhdf = a - C - 1;
+                if (a - C - 1 >= 0)
+                {
+                    window -= dp[a - C - 1];
+                }
+
+                next[a] = window;
+            }
+
+            dp.swap(next);
+        }
+
+        return dp[A];
+    }
+    export std::vector<Stats> get_stat_variations(const std::size_t free_attribute_points, const Stats &min_stats)
+    {
+        constexpr std::size_t UPPER = 99;
+        auto max_attribute_points = free_attribute_points + std::ranges::fold_left(min_stats, 0, std::plus<>{});
+        const auto SUM = max_attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<>{});
+        auto min_relevant_stats = min_stats.relevant_stats();
+
+        auto possible_occurances = get_stat_variation_count(free_attribute_points, min_relevant_stats);
         if (possible_occurances == 0)
             return {};
 
@@ -125,7 +97,6 @@ namespace erdo::optimizer
         auto& l = result[irrelevant_attribute_count + 3];
         auto& m = result[irrelevant_attribute_count + 4];
 
-        auto min_relevant_stats = min_stats.relevant_stats();
         for (i = min_relevant_stats[0]; i <= std::min(UPPER, SUM); ++i)
         {
             auto SUM_i = SUM - i;
@@ -150,7 +121,6 @@ namespace erdo::optimizer
 
         return stat_variations;
     }
-
 
     export enum class Target
     {
@@ -246,11 +216,14 @@ namespace erdo::optimizer
     template<Target target>
     constexpr EfficientCalculateAttack<target> efficient_calculate_attack{};
 
-    template<Target target_>
-    struct BruteForce
+    template<template <Target> typename O, Target target_>
+    struct OptimizerBase
     {
         static constexpr auto target = target_;
-        
+        static constexpr auto projection = optimizer::projection<target>;
+        static constexpr auto efficient_calculate_attack = optimizer::efficient_calculate_attack<target>;
+        using Optimizer = O<target>;
+
         static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
         {
             if (stat_variations.empty())
@@ -264,9 +237,9 @@ namespace erdo::optimizer
             for (const auto& stats : stat_variations)
             {
                 attack.stats = stats;
-                efficient_calculate_attack<target>(attack);
+                efficient_calculate_attack(attack);
 
-                auto new_value = projection<target>(attack);
+                auto new_value = projection(attack);
                 if (best_value < new_value)
                 {
                     best_stats = &stats;
@@ -278,13 +251,37 @@ namespace erdo::optimizer
             attack.calculate_inplace();
             return attack;
         }
-
+    
         static auto get_tasks(const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int max_attribute_points)
         {
-            auto stat_variations = std::make_shared<std::vector<Stats>>(get_stat_variations(min_stats, max_attribute_points));
-            auto enable = !stat_variations->empty();
+            auto view = Optimizer::get_task_view(weapons, attack_options, min_stats, max_attribute_points);
 
-            auto view = weapons | std::views::transform([&, stat_variations=std::move(stat_variations)](const Weapon& w){
+            static_assert(std::ranges::sized_range<decltype(*view)>);
+
+            if (view)
+                return *view | std::ranges::to<std::vector>();
+            return decltype(*view | std::ranges::to<std::vector>()){};
+        }
+    
+        static std::vector<Attack> run_synchronously(
+            const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int max_attribute_points
+        )
+        {
+            return Optimizer::get_task_view(weapons, attack_options, min_stats, max_attribute_points)
+                | std::views::join
+                | std::views::transform([](const auto& task) { return task(); })
+                | std::ranges::to<std::vector>();
+        }
+    };
+
+    export template<Target target>
+    struct BruteForce : OptimizerBase<BruteForce, target>
+    {
+        static auto get_task_view(const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int free_attribute_points)
+        {
+            auto stat_variations = std::make_shared<std::vector<Stats>>(get_stat_variations(free_attribute_points, min_stats));
+
+            auto view = weapons | std::views::transform([&, stat_variations=stat_variations](const Weapon& w){
                 return [&, stat_variations] {
                     return BruteForce::optimize_weapon(
                         w,
@@ -294,58 +291,29 @@ namespace erdo::optimizer
                 };
             });
 
-            decltype(view | std::ranges::to<std::vector>()) tasks{};
-
-            if(enable)
-            {
-                tasks.reserve(std::ranges::size(weapons));
-                tasks.append_range(view);
-            }
-
-            return tasks;
-        }
-
-        static std::vector<Attack> run_synchronously(
-            const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int max_attribute_points
-        )
-        {
-            std::vector<Attack> attacks;
-            attacks.reserve(std::ranges::size(weapons));
-            attacks.append_range(
-                BruteForce::get_tasks(weapons, attack_options, min_stats, max_attribute_points)
-                    | std::views::transform([](const auto& task) { return task(); })
-            );
-            return attacks;
+            if(!stat_variations->empty())
+                return std::optional(std::move(view));
+            return decltype(std::optional(std::move(view))){std::nullopt};
         }
     };
+
     export template<Target target>
-    constexpr BruteForce<target> brute_force{};
-
-    template<Target target_>
-    struct V2
+    struct V2 : OptimizerBase<V2, target>
     {
-        static constexpr auto target = target_;
-
-        static std::vector<Stats> get_stat_variations(const Stats &min_stats, const int max_attribute_points, const NonscalingAttributes& nonscaling_attributes)
+        static std::vector<Stats> get_stat_variations(const Stats &min_stats, const int free_attribute_points, const NonscalingAttributes& nonscaling_attributes)
         {
-            return optimizer::get_stat_variations(min_stats, max_attribute_points);
+            return optimizer::get_stat_variations(free_attribute_points, min_stats);
         }
 
-        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
-        {
-            return BruteForce<target>::optimize_weapon(weapon, attack_options, stat_variations);
-        }
-
-        static auto get_tasks(const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int max_attribute_points)
+        static auto get_task_view(const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int free_attribute_points)
         {
             auto stat_variations_map = std::make_shared<std::map<NonscalingAttributes, std::vector<Stats>>>();
-            auto enable = get_stat_variation_count(min_stats, max_attribute_points) > 0;
 
-            auto view = weapons | std::views::transform([&, stat_variations_map=std::move(stat_variations_map)](const calculator::Weapon& w) {
+            auto view = weapons | std::views::transform([&, stat_variations_map](const calculator::Weapon& w) {
                 auto [it, inserted] = stat_variations_map->try_emplace(w.nonscaling_attributes);
                 auto&& stat_variations = it->second;
                 if (inserted)
-                    stat_variations = V2::get_stat_variations(min_stats, max_attribute_points, w.nonscaling_attributes);
+                    stat_variations = V2::get_stat_variations(min_stats, free_attribute_points, w.nonscaling_attributes);
 
                 return [&, stat_variations_map](){
                     return V2::optimize_weapon(
@@ -356,32 +324,11 @@ namespace erdo::optimizer
                 };
             });
 
-            decltype(view | std::ranges::to<std::vector>()) tasks{};
-
-            if(enable)
-            {
-                tasks.reserve(std::ranges::size(weapons));
-                tasks.append_range(view);
-            }
-
-            return tasks;
-        }
-
-        static std::vector<Attack> run_synchronously(
-            const std::ranges::sized_range auto& weapons, const AttackOptions& attack_options, const Stats &min_stats, const int max_attribute_points
-        )
-        {
-            std::vector<Attack> attacks;
-            attacks.reserve(std::ranges::size(weapons));
-            attacks.append_range(
-                V2::get_tasks(weapons, attack_options, min_stats, max_attribute_points)
-                    | std::views::transform([](const auto& task) { return task(); })
-            );
-            return attacks;
+            if(get_stat_variation_count(free_attribute_points, min_stats.relevant_stats()) > 0)
+                return std::optional(std::move(view));
+            return decltype(std::optional(std::move(view))){std::nullopt};
         }
     };
-    export template<Target target>
-    constexpr V2<target> v2{};
 }
 
 using namespace erdo;
@@ -402,20 +349,3 @@ constexpr std::array<std::pair<optimizer::Target, std::string_view>, 14> enum_st
     std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
     std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
 };
-
-namespace erdo::optimizer
-{
-    export template<template <Target> auto o, std::size_t I = 0, typename F>
-    constexpr void visit_optimizer(std::size_t i, F&& f)
-    {
-        if constexpr (I < enumerators_of<Target>().size())
-        {
-            if (i == I)
-                std::forward<F>(f)(o<integral_to_enum<Target>(I)>);
-            else
-                visit_optimizer<o, I + 1>(i, std::forward<F>(f));
-        }
-        else
-            throw std::out_of_range("invalid optimizer index");
-    }
-}
