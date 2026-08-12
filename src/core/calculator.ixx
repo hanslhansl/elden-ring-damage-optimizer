@@ -300,7 +300,16 @@ export namespace erdo::calculator
         ScalingTiers scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        int upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers_at_upgrade_levels);
+        int upgrade_level_index = [&]() {
+            if (this->base_attack_powers_at_upgrade_levels.size() == 1)
+                return 0;
+            else if (this->base_attack_powers_at_upgrade_levels.size() == 11)
+                return 2;
+            else if (this->base_attack_powers_at_upgrade_levels.size() == 26)
+                return 1;
+            else
+                throw std::runtime_error("invalid base attack power size");
+        }();
         // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
         // attributes which this weapon does not scale with, i.e. which don't affect its attack rating in any way
@@ -308,25 +317,28 @@ export namespace erdo::calculator
             NonscalingAttributes result{};
             for (auto attribute : enumerator_integrals_of<calculator::RelevantAttribute>())
             {
-                bool ineffective =
-                    std::ranges::all_of(this->base_attack_powers_at_upgrade_levels, [this](const BaseAttackPowers& base_attack_powers){
-                        return std::ranges::all_of(base_attack_powers, [this](double base_attack_power){
-                            return base_attack_power != 0 || this->is_sorcery_or_incantation_tool;
-                        });
-                    })
-                    &&
-                    std::ranges::all_of(this->attack_power_attribute_scaling, [&](const AttributeScalings& attribute_scalings){
-                        return this->requirements[attribute] != 0 || attribute_scalings[attribute] != 0;
-                    });
-                ;
+                result[attribute] = std::ranges::all_of(enumerator_integrals_of<calculator::AttackPowerType>(), [&](int apt){
+                    auto&& attribute_correct = this->attack_power_attribute_scaling[apt][attribute];
 
-                auto nonscaling =
-                    std::ranges::all_of(this->attack_power_attribute_scaling, [&](const AttributeScalings &scaling) { return scaling[attribute] == 0; })
-                    ||
-                    std::ranges::all_of(this->attribute_scalings_at_upgrade_levels, [&](const AttributeScalings &scaling) { return scaling[attribute] == 0; })
-                ;
+                    // If attribute_correct is 0, this attribute is ignored for both scaling and penalty for this apt
+                    if (attribute_correct == 0.)
+                        return true;
 
-                result[attribute] = ineffective || nonscaling;
+                    auto can_trigger_penalty = this->requirements[attribute] > 0;
+                    for (auto upgrade_level = 0; upgrade_level < this->base_attack_powers_at_upgrade_levels.size(); ++upgrade_level)
+                    {
+                        // 1. Direct Scaling Dependency
+                        if (this->attribute_scalings_at_upgrade_levels[upgrade_level][attribute] != 0.)
+                            return false;
+
+                        // 2. Ineffectiveness Penalty Dependency
+                        auto&& base_attack_power = this->base_attack_powers_at_upgrade_levels[upgrade_level][apt];
+                        if ((base_attack_power != 0. || this->is_sorcery_or_incantation_tool) && can_trigger_penalty)
+                            return false;
+                    }
+
+                    return true;
+                });
             }
             return result;
         }();
