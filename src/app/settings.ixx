@@ -52,6 +52,17 @@ namespace erdo::ui
             spinbox->setValue(value);
         }
     };
+    struct AttributeLevelLimit : SpinBoxSetting<AttributeLevelLimit>
+    {
+        using typename SpinBoxSetting<AttributeLevelLimit>::value_type;
+
+        constexpr static std::string_view name = "attribute_level_limit";
+        constexpr static std::string_view display_name = "attribute level limit (ingame: 99)";
+
+        constexpr static value_type default_value = 99;
+        constexpr static value_type minimum_value = 0;
+        constexpr static value_type maximum_value = 148;
+    };
     struct DecimalPlaces : SpinBoxSetting<DecimalPlaces>
     {
         using typename SpinBoxSetting<DecimalPlaces>::value_type;
@@ -124,6 +135,8 @@ namespace erdo::ui
         friend class SettingBuilder;
 
     public:
+        SettingBuilder<AttributeLevelLimit> attribute_level_limit{ *this };
+
         SettingBuilder<DecimalPlaces> decimal_places{ *this };
         SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ *this };
         SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ *this };

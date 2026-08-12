@@ -1047,15 +1047,15 @@ namespace erdo::ui
             connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
             connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
 
-            if (settings.hide_base_game_dlc_column)
-                this->hide_section<sections::BaseGameDLCSection>();
-            connect(&settings.hide_base_game_dlc_column, settings.hide_base_game_dlc_column.changed_member_pointer, [this](){
+            auto lambda = [this](){
                 if (settings.hide_base_game_dlc_column)
                     this->hide_section<sections::BaseGameDLCSection>();
                 else
                     this->show_section<sections::BaseGameDLCSection>();
                 this->resize_columns_to_contents();
-            });
+            };
+            lambda();
+            connect(&settings.hide_base_game_dlc_column, settings.hide_base_game_dlc_column.changed_member_pointer, lambda);
         }
 
         void resize_columns_to_contents()

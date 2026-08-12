@@ -17,6 +17,7 @@ const auto& get_weapons()
     std::call_once(flag, [] {
         auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
         data = parser::load_weapons(xml_data_directory);
+        std::ranges::sort(data, {}, &calculator::Weapon::full_name);
         data_reference.reserve(data.size());
         data_reference.append_range(data);
     });
@@ -24,12 +25,17 @@ const auto& get_weapons()
     return data_reference;
 }
 
-const std::vector<double> expected_total_attack_powers_1 {
-    #include "excpected_total_attack_powers_1.inc"
+const std::vector<double> excpected_calculation_total_attack_power_1 {
+    #include "excpected_calculation_total_attack_power_1.inc"
 };
-
-const std::vector<double> expected_total_attack_powers_2 {
-    #include "excpected_total_attack_powers_2.inc"
+const std::vector<double> excpected_calculation_total_attack_power_2 {
+    #include "excpected_calculation_total_attack_power_2.inc"
+};
+const std::vector<double> excpected_optimization_total_attack_power {
+    #include "excpected_optimization_total_attack_power.inc"
+};
+const std::vector<double> excpected_optimization_spell_scaling {
+    #include "excpected_optimization_spell_scaling.inc"
 };
 
 
@@ -45,9 +51,9 @@ TEST_CASE("calculation - total attack power 1")
         | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
-    CHECK(total_attack_powers.size() == expected_total_attack_powers_1.size());
+    REQUIRE(total_attack_powers.size() == excpected_calculation_total_attack_power_1.size());
 
-    for (auto [actual, expected] : std::views::zip(total_attack_powers, expected_total_attack_powers_1))
+    for (auto [actual, expected] : std::views::zip(total_attack_powers, excpected_calculation_total_attack_power_1))
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
@@ -64,9 +70,9 @@ TEST_CASE("calculation - total attack power 2")
         | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
-    CHECK(total_attack_powers.size() == expected_total_attack_powers_2.size());
+    REQUIRE(total_attack_powers.size() == excpected_calculation_total_attack_power_2.size());
 
-    for (auto [actual, expected] : std::views::zip(total_attack_powers, expected_total_attack_powers_2))
+    for (auto [actual, expected] : std::views::zip(total_attack_powers, excpected_calculation_total_attack_power_2))
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
@@ -75,6 +81,7 @@ TEST_CASE("stat variations")
     const auto expected_stat_variation_count = 1365;
     const auto min_stats = calculator::character_class_stats.at("wretch");
     const auto min_relevant_stats = min_stats.relevant_stats();
+    const auto max_relevant_stats = make_filled_array<calculator::RelevantStats>(99);
     const auto free_attribute_points = 11;
 
     std::size_t stat_variation_count;
@@ -84,10 +91,11 @@ TEST_CASE("stat variations")
     {
         stat_variation_count = optimizer::get_stat_variation_count(
             free_attribute_points,
-            min_relevant_stats
+            min_relevant_stats,
+            max_relevant_stats
         );
     };
-    CHECK(stat_variation_count == expected_stat_variation_count);
+    REQUIRE(stat_variation_count == expected_stat_variation_count);
     
     std::vector<calculator::Stats> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
@@ -96,120 +104,89 @@ TEST_CASE("stat variations")
     {
         stat_variations = optimizer::get_stat_variations(
             free_attribute_points,
-            min_stats
+            min_stats,
+            max_relevant_stats
         );
     };
-    CHECK(stat_variations.size() == expected_stat_variation_count);
+    REQUIRE(stat_variations.size() == expected_stat_variation_count);
 }
 
-TEST_CASE("optimization - brute force - total attack power")
+
+void test_optimization(auto optimizer, auto projection, std::string_view expected_weapon_full_name, const calculator::Stats& expected_stats, const std::vector<double>& expected_values)
 {
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    std::vector<calculator::Attack> attacks{};
     const auto min_stats = calculator::character_class_stats.at("wretch");
     const auto min_relevant_stats = min_stats.relevant_stats();
     const auto free_attribute_points = 11;
+    const auto max_stat = 99;
 
-    constexpr auto optimizer = optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>{};
+    std::vector<calculator::Attack> attacks{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
+        attacks = optimizer.run_synchronously(weapons, attack_options, free_attribute_points, min_stats, max_stat);
     };
-    std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>);
-    auto&& attack = attacks.back();
+    REQUIRE(attacks.size() == expected_values.size());
 
-    CHECK(attack.weapon.get().full_name == "Fire Duelist Greataxe");
-    CHECK(attack.stats == calculator::Stats{ 10, 10, 10, 21, 10, 10, 10, 10 });
+    for (auto&& [attack, expected] : std::views::zip(attacks, expected_values))
+    {
+        auto&& weapon = attack.weapon.get();
+        CAPTURE(weapon.full_name);
+        CAPTURE(attack.stats);
+        CAPTURE(min_stats);
+        CHECK_THAT(
+            projection(attack),
+            Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
+        );
+    }
 
-    auto expected = 734.8908832256299;
-    CHECK_THAT(attack.total_attack_power.at(1),
-        Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
+    auto&& attack = std::ranges::max(attacks, {}, projection);
+    CHECK(attack.weapon.get().full_name == expected_weapon_full_name);
+    CHECK(attack.stats == expected_stats);
+}
+
+TEST_CASE("optimization - brute force - total attack power")
+{
+    test_optimization(
+        optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>{},
+        optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>,
+        "Fire Duelist Greataxe",
+        { 10, 10, 10, 21, 10, 10, 10, 10 },
+        excpected_optimization_total_attack_power
     );
 }
 
 TEST_CASE("optimization - brute force - spell scaling")
 {
-    auto&& weapons = get_weapons();
-    calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    std::vector<calculator::Attack> attacks{};
-    const auto min_stats = calculator::character_class_stats.at("wretch");
-    const auto min_relevant_stats = min_stats.relevant_stats();
-    const auto free_attribute_points = 11;
-
-    constexpr auto optimizer = optimizer::BruteForce<optimizer::Target::SPELL_SCALING>{};
-#ifdef ENABLE_BENCHMARKS
-    BENCHMARK("optimizer.run_synchronously")
-#endif
-    {
-        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
-    };
-    std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::SPELL_SCALING>);
-    auto&& attack = attacks.back();
-
-    CHECK(attack.weapon.get().full_name == "Demi-Human Queen's Staff");
-    CHECK(attack.stats == calculator::Stats{ 10, 10, 10, 10, 10, 21, 10, 10 });
-
-    auto expected = 1.9225000000000001;
-    CHECK_THAT(attack.spell_scaling,
-        Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
+    test_optimization(
+        optimizer::BruteForce<optimizer::Target::SPELL_SCALING>{},
+        optimizer::projection<optimizer::Target::SPELL_SCALING>,
+        "Demi-Human Queen's Staff",
+        { 10, 10, 10, 10, 10, 21, 10, 10 },
+        excpected_optimization_spell_scaling
     );
 }
 
 TEST_CASE("optimization - v2 - total attack power")
 {
-    auto&& weapons = get_weapons();
-    calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    std::vector<calculator::Attack> attacks{};
-    const auto min_stats = calculator::character_class_stats.at("wretch");
-    const auto min_relevant_stats = min_stats.relevant_stats();
-    const auto free_attribute_points = 11;
-
-    constexpr auto optimizer = optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>{};
-#ifdef ENABLE_BENCHMARKS
-    BENCHMARK("optimizer.run_synchronously")
-#endif
-    {
-        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
-    };
-    std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>);
-    auto&& attack = attacks.back();
-
-    CHECK(attack.weapon.get().full_name == "Fire Duelist Greataxe");
-    CHECK(attack.stats == calculator::Stats{ 10, 10, 10, 21, 10, 10, 10, 10 });
-
-    auto expected = 734.8908832256299;
-    CHECK_THAT(attack.total_attack_power.at(1),
-        Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
+    test_optimization(
+        optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>{},
+        optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>,
+        "Fire Duelist Greataxe",
+        { 10, 10, 10, 21, 10, 10, 10, 10 },
+        excpected_optimization_total_attack_power
     );
 }
 
 TEST_CASE("optimization - v2 - spell scaling")
 {
-    auto&& weapons = get_weapons();
-    calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    std::vector<calculator::Attack> attacks{};
-    const auto min_stats = calculator::character_class_stats.at("wretch");
-    const auto min_relevant_stats = min_stats.relevant_stats();
-    const auto free_attribute_points = 11;
-
-    constexpr auto optimizer = optimizer::V2<optimizer::Target::SPELL_SCALING>{};
-#ifdef ENABLE_BENCHMARKS
-    BENCHMARK("optimizer.run_synchronously")
-#endif
-    {
-        attacks = optimizer.run_synchronously(weapons, attack_options, min_stats, free_attribute_points);
-    };
-    std::ranges::sort(attacks, {}, optimizer::projection<optimizer::Target::SPELL_SCALING>);
-    auto&& attack = attacks.back();
-
-    CHECK(attack.weapon.get().full_name == "Demi-Human Queen's Staff");
-    CHECK(attack.stats == calculator::Stats{ 10, 10, 10, 10, 10, 21, 10, 10 });
-
-    auto expected = 1.9225000000000001;
-    CHECK_THAT(attack.spell_scaling,
-        Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
+    test_optimization(
+        optimizer::V2<optimizer::Target::SPELL_SCALING>{},
+        optimizer::projection<optimizer::Target::SPELL_SCALING>,
+        "Demi-Human Queen's Staff",
+        { 10, 10, 10, 10, 10, 21, 10, 10 },
+        excpected_optimization_spell_scaling
     );
 }

@@ -176,4 +176,28 @@ export namespace erdo
             return result_type(std::forward<Default>(default_));
         return result_type(it->second);
     }
+
+    template<std::size_t N, typename T>
+    constexpr std::array<T, N> make_filled_array(const T& value)
+    {
+        std::array<T, N> arr{};
+        arr.fill(value);
+        return arr;
+    }
+    template<typename T>
+        requires std::same_as<T, std::array<typename T::value_type, std::declval<T>().size()>>
+    constexpr T make_filled_array(const typename T::value_type& value)
+    {
+        T arr{};
+        arr.fill(value);
+        return arr;
+    }
+    template<typename T>
+        requires std::same_as<T, std::span<typename T::element_type, T::extent>>
+    constexpr std::array<typename T::value_type, T::extent> make_filled_array(const typename T::value_type& value)
+    {
+        std::array<typename T::value_type, T::extent> arr{};
+        arr.fill(value);
+        return arr;
+    }
 }

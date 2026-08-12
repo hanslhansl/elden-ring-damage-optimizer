@@ -9,11 +9,6 @@ import std;
 
 export namespace erdo::calculator
 {
-    struct Weapon;
-    using UpgradeLevels = std::array<int, 3>; // free handed, normal, somber
-
-    constexpr bool isVanilla = true;
-
     enum class RelevantAttribute {
         STRENGTH,
         DEXTERITY,
@@ -135,17 +130,18 @@ export namespace erdo::calculator
     }
 
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
-    using RelevantStatsArray = std::array<int, enumerators_of<RelevantAttribute>().size()>;
-    using RelevantStats = std::span<const int, enumerators_of<RelevantAttribute>().size()>;
-    struct Stats : std::array<int, enumerators_of<Attribute>().size()>
+    using RelevantStatsArray = std::array<unsigned int, enumerators_of<RelevantAttribute>().size()>;
+    using RelevantStats = std::span<const unsigned int, enumerators_of<RelevantAttribute>().size()>;
+    using IrrelevantStats = std::span<const unsigned int, irrelevant_attribute_count>;
+    struct Stats : std::array<unsigned int, enumerators_of<Attribute>().size()>
     {
         constexpr RelevantStats relevant_stats() const
         {
             return RelevantStats{ this->begin() + irrelevant_attribute_count, this->end() };
         }
-        constexpr std::span<const int, irrelevant_attribute_count> irrelevant_stats() const
+        constexpr IrrelevantStats irrelevant_stats() const
         {
-            return std::span<const int, irrelevant_attribute_count>{
+            return IrrelevantStats{
                 this->begin(),
                 this->begin() + irrelevant_attribute_count
             };
@@ -153,7 +149,7 @@ export namespace erdo::calculator
 
         constexpr int attribute_points() const
         {
-            return std::ranges::fold_left(*this, 0, std::plus<>{});
+            return std::ranges::fold_left(*this, 0, std::plus<int>{});
         }
         constexpr int character_level() const
         {
@@ -175,6 +171,7 @@ export namespace erdo::calculator
         {"idus knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     };
 
+    using UpgradeLevels = std::array<unsigned int, 3>; // free handed, normal, somber
     using ScalingCurve = std::array<double, 149>;
     using ScalingCurves = std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()>;
     using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
@@ -182,8 +179,8 @@ export namespace erdo::calculator
     using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
     using IneffectiveAttackPowerTypes = std::array<bool, enumerators_of<AttackPowerType>().size()>;
     using IneffectiveAttributes = std::array<bool, enumerators_of<RelevantAttribute>().size()>;
-    using BaseAttackPower = std::array<double, enumerators_of<AttackPowerType>().size()>;
-    using BaseAttackPowersAtUpgradeLevels = std::vector<BaseAttackPower>;
+    using BaseAttackPowers = std::array<double, enumerators_of<AttackPowerType>().size()>;
+    using BaseAttackPowersAtUpgradeLevels = std::vector<BaseAttackPowers>;
     using ScalingTiers = std::array<std::pair<double, std::string>, 6>;
     using AttributeScalingsAtUpgradeLevels = std::vector<AttributeScalings>;
     using NonscalingAttributes = IneffectiveAttributes;
@@ -197,7 +194,7 @@ export namespace erdo::calculator
     constexpr auto defaultDamageCalcCorrectGraphId = 0;
     constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
-    long long calculate_upgrade_level_index(const auto& base_attack_powers) {
+    constexpr auto calculate_upgrade_level_index(const auto& base_attack_powers) {
         if (base_attack_powers.size() == 1)
             return 0;
         else if (base_attack_powers.size() == 11)
@@ -303,18 +300,34 @@ export namespace erdo::calculator
         ScalingTiers scaling_tiers;
 
         // the index of the upgrade level for this weapon
-        long long upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers_at_upgrade_levels);
+        int upgrade_level_index = calculate_upgrade_level_index(this->base_attack_powers_at_upgrade_levels);
         // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;
         // attributes which this weapon does not scale with, i.e. which don't affect its attack rating in any way
         NonscalingAttributes nonscaling_attributes = [&](){
-            NonscalingAttributes result;
+            NonscalingAttributes result{};
             for (auto attribute : enumerator_integrals_of<calculator::RelevantAttribute>())
-                result[attribute] = std::ranges::all_of(this->attack_power_attribute_scaling, [&](auto &&scaling) {
-                    return scaling[attribute] == 0;
-                }) || std::ranges::all_of(this->attribute_scalings_at_upgrade_levels, [&](auto &&scaling) {
-                    return scaling[attribute] == 0;
-                });
+            {
+                bool ineffective =
+                    std::ranges::all_of(this->base_attack_powers_at_upgrade_levels, [this](const BaseAttackPowers& base_attack_powers){
+                        return std::ranges::all_of(base_attack_powers, [this](double base_attack_power){
+                            return base_attack_power != 0 || this->is_sorcery_or_incantation_tool;
+                        });
+                    })
+                    &&
+                    std::ranges::all_of(this->attack_power_attribute_scaling, [&](const AttributeScalings& attribute_scalings){
+                        return this->requirements[attribute] != 0 || attribute_scalings[attribute] != 0;
+                    });
+                ;
+
+                auto nonscaling =
+                    std::ranges::all_of(this->attack_power_attribute_scaling, [&](const AttributeScalings &scaling) { return scaling[attribute] == 0; })
+                    ||
+                    std::ranges::all_of(this->attribute_scalings_at_upgrade_levels, [&](const AttributeScalings &scaling) { return scaling[attribute] == 0; })
+                ;
+
+                result[attribute] = ineffective || nonscaling;
+            }
             return result;
         }();
 
@@ -395,7 +408,7 @@ export namespace erdo::calculator
             return this->weapon.get().attribute_scalings_at_upgrade_levels[this->upgrade_level()];
         }
 
-        const BaseAttackPower& base_attack_powers() const
+        const BaseAttackPowers& base_attack_powers() const
         {
             return this->weapon.get().base_attack_powers_at_upgrade_levels[this->upgrade_level()];
         }
@@ -468,7 +481,7 @@ export namespace erdo::calculator
             const RelevantStats& relevant_stats,
             const RelevantStats& adjusted_relevant_stats,
             const IneffectiveAttributes& ineffective_attributes,
-            const double& base_attack_power,
+            const BaseAttackPowers& base_attack_powers,
             const AttributeScalings& attribute_scalings_at_upgrade_level
         )
         {
@@ -478,13 +491,14 @@ export namespace erdo::calculator
             auto&& weapon = this->weapon.get();
             auto&& scaling_attributes = weapon.attack_power_attribute_scaling[attack_power_type_integral];
             auto&& scaling_curve = weapon.attack_power_scaling_curves[attack_power_type_integral];
+            auto&& base_attack_power = base_attack_powers[attack_power_type_integral];
 
             this->ineffective_attack_power_types[attack_power_type_integral] = false;
-            if (base_attack_power || weapon.is_sorcery_or_incantation_tool)
+            if (base_attack_power != 0 || weapon.is_sorcery_or_incantation_tool)
             {
                 for (auto&& [ineffective_attribute, scaling_attribute] : std::views::zip(ineffective_attributes, scaling_attributes))
                 {
-                    if (ineffective_attribute && scaling_attribute)
+                    if (ineffective_attribute && scaling_attribute != 0)
                     {
                         this->ineffective_attack_power_types[attack_power_type_integral] = true;
                         break;
@@ -519,7 +533,7 @@ export namespace erdo::calculator
                 relevant_stats,
                 adjusted_relevant_stats,
                 this->ineffective_attributes,
-                this->base_attack_powers()[std::to_underlying(attack_power_type)],
+                this->base_attack_powers(),
                 this->attribute_scalings_at_upgrade_level()
             );
         }
@@ -552,7 +566,7 @@ export namespace erdo::calculator
                     relevant_stats,
                     adjusted_relevant_stats,
                     this->ineffective_attributes,
-                    base_attack_powers[std::to_underlying(attack_power_type)],
+                    base_attack_powers,
                     attribute_scalings_at_upgrade_level
                 );
 

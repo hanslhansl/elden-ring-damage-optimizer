@@ -25,6 +25,13 @@ import erdo.ui.settings;
 import erdo.ui.weapons_table;
 
 
+export namespace erdo::ui
+{
+    int run_ui(int argc, char *argv[]);
+}
+
+module : private;
+
 namespace erdo::ui
 {
     void critical_error(QWidget* parent, const QString& message)
@@ -245,7 +252,11 @@ namespace erdo::ui
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(0);
-                attribute_spinbox->setMaximum(std::tuple_size_v<calculator::ScalingCurve> - 1);
+
+                auto lambda = [attribute_spinbox]() { attribute_spinbox->setMaximum(settings.attribute_level_limit); };
+                lambda();
+                connect(&settings.attribute_level_limit, settings.attribute_level_limit.changed_member_pointer, lambda);
+
                 this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute) + ":", attribute_spinbox);
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
@@ -472,14 +483,13 @@ namespace erdo::ui
         }
     };
 
-    class OptimizeTab : public StatsTabBase
+    class OptimizeTab : public StatsTabBase, public Ui::OptimizeWidget
     {
         std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_weapon_data{};
 
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
-        std::unique_ptr<Ui::OptimizeWidget> optimize = std::make_unique<Ui::OptimizeWidget>();
 
         void prepare_optimization()
         {
@@ -527,56 +537,37 @@ namespace erdo::ui
                 })
             );
 
-            auto stats = this->get_character_stats();
+            auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-            auto free_attribute_points = max_attribute_points - stats.attribute_points();
-            auto stat_variations = optimizer::get_stat_variation_count(free_attribute_points, stats.relevant_stats());
+            auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
+            auto stat_variations = optimizer::get_stat_variation_count(
+                free_attribute_points,
+                min_stats.relevant_stats(),
+                make_filled_array<calculator::RelevantStats>(settings.attribute_level_limit)
+            );
 
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
             this->free_attribute_points_label->setText(QString::number(free_attribute_points));
-            this->optimize->stat_variations_label->setText(QString::number(stat_variations));
+            this->stat_variations_label->setText(QString::number(stat_variations));
             
-            this->optimize->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
-            this->optimize->variations_label->setText(QString::number(this->filtered_active_weapon_data.size() * stat_variations));
+            this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
+            this->variations_label->setText(QString::number(this->filtered_active_weapon_data.size() * stat_variations));
         }
 
-        void optimize_brute_force()
+        template<template <optimizer::Target> typename Optimizer>
+        void optimize()
         {
             auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
-            auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value()) - min_stats.attribute_points();
+            auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value())
+                - min_stats.attribute_points();
 
             visit_enum(
-                (optimizer::Target)this->optimize->target_combobox->currentIndex(),
+                (optimizer::Target)this->target_combobox->currentIndex(),
                 [&](auto integral_constant) {
-                    constexpr auto optimizer = optimizer::BruteForce<integral_constant.value>{};
+                    constexpr auto optimizer = Optimizer<integral_constant.value>{};
                     auto future = QtConcurrent::mapped(
-                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, free_attribute_points),
-                        [](const auto& task) { return Row(task()); }
-                    );
-
-                    std::vector<Row> rows{};
-                    if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
-                    {
-                        rows.reserve(this->filtered_active_weapon_data.size());
-                        rows.append_range(future | std::views::as_rvalue);
-                    }
-                    this->weapon_table->model->set_rows(std::move(rows));
-                }
-            );
-        }
-        void optimize_v2()
-        {
-            auto attack_options = this->get_attack_options();
-            auto min_stats = this->get_character_stats();
-            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-
-            visit_enum(
-                (optimizer::Target)this->optimize->target_combobox->currentIndex(),
-                [&](auto integral_constant) {
-                    constexpr auto optimizer = optimizer::V2<integral_constant.value>{};
-                    auto future = QtConcurrent::mapped(
-                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, min_stats, max_attribute_points),
+                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, free_attribute_points, min_stats, settings.attribute_level_limit),
                         [](const auto& task) { return Row(task()); }
                     );
 
@@ -635,16 +626,16 @@ namespace erdo::ui
             auto opt_group = new QGroupBox();
             temp_layout->addWidget(opt_group);
             temp_layout->addStretch(1);
-            this->optimize->setupUi(opt_group);
+            this->Ui::OptimizeWidget::setupUi(opt_group);
 
             // optimize target combobox
             for (const auto& target : enumerator_strings_of<optimizer::Target>())
-                this->optimize->target_combobox->addItem(string_to_display(target));
-            this->optimize->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
+                this->target_combobox->addItem(string_to_display(target));
+            this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
-            connect(this->optimize->start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize_brute_force);
-            connect(this->optimize->start_v2_button, &QPushButton::clicked, this, &OptimizeTab::optimize_v2);
+            connect(this->start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize<optimizer::BruteForce>);
+            connect(this->start_v2_button, &QPushButton::clicked, this, &OptimizeTab::optimize<optimizer::V2>);
         }
     
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
@@ -888,18 +879,19 @@ namespace erdo::ui
             settings.endGroup();
         }
     };
+}
 
-    export int run_ui(int argc, char *argv[]) {
-        QApplication app(argc, argv);
-        app.setOrganizationName("hanslhansl");
-        app.setApplicationName("elden-ring-damage-optimizer");
-        settings.initialize();
+int erdo::ui::run_ui(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+    app.setOrganizationName("hanslhansl");
+    app.setApplicationName("elden-ring-damage-optimizer");
+    settings.initialize();
 
-        MainWindow window{};
-        window.show();
+    MainWindow window{};
+    window.show();
 
-        return app.exec();
-    }
+    return app.exec();
 }
 
 #include "ui.moc"
