@@ -487,6 +487,15 @@ namespace erdo::ui
     {
         std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_weapon_data{};
 
+        decltype([](auto){
+            static constexpr auto [...targets] = enumerators_of<optimizer::Target>();
+            return std::type_identity<std::variant<std::monostate, optimizer::BruteForce<targets>...>>{};
+        }(1))::type brute_force_optimizer;
+        decltype([](auto){
+            static constexpr auto [...targets] = enumerators_of<optimizer::Target>();
+            return std::type_identity<std::variant<std::monostate, optimizer::V2<targets>...>>{};
+        }(1))::type v2_optimizer;
+
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
@@ -537,6 +546,7 @@ namespace erdo::ui
                 })
             );
 
+            auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
@@ -548,38 +558,64 @@ namespace erdo::ui
 
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
             this->free_attribute_points_label->setText(QString::number(free_attribute_points));
-            this->stat_variations_label->setText(QString::number(stat_variations));
-            
+
             this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
-            this->variations_label->setText(QString::number(this->filtered_active_weapon_data.size() * stat_variations));
+
+            visit_enum(
+                (optimizer::Target)this->target_combobox->currentIndex(),
+                [&](auto integral_constant) {
+                    this->brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
+                        this->filtered_active_weapon_data,
+                        attack_options,
+                        free_attribute_points,
+                        min_stats,
+                        settings.attribute_level_limit
+                    };
+                    auto brute_force_total_stat_variation_count = std::get<optimizer::BruteForce<integral_constant.value>>(this->brute_force_optimizer).total_stat_variation_count;
+                    this->brute_force_variations_label->setText(QString::number(brute_force_total_stat_variation_count / this->filtered_active_weapon_data.size()));
+                    this->brute_force_iterations_label->setText(QString::number(brute_force_total_stat_variation_count));
+
+                    this->v2_optimizer = optimizer::V2<integral_constant.value>{
+                        this->filtered_active_weapon_data,
+                        attack_options,
+                        free_attribute_points,
+                        min_stats,
+                        settings.attribute_level_limit
+                    };
+                    auto v2_total_stat_variation_count = std::get<optimizer::V2<integral_constant.value>>(this->v2_optimizer).total_stat_variation_count;
+                    this->v2_variations_label->setText(QString::number(v2_total_stat_variation_count / this->filtered_active_weapon_data.size()));
+                    this->v2_iterations_label->setText(QString::number(v2_total_stat_variation_count));
+                }
+            );
         }
 
-        template<template <optimizer::Target> typename Optimizer>
-        void optimize()
+        void optimize(const auto& optimizer)
         {
             auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
             auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value())
                 - min_stats.attribute_points();
 
-            visit_enum(
-                (optimizer::Target)this->target_combobox->currentIndex(),
-                [&](auto integral_constant) {
-                    constexpr auto optimizer = Optimizer<integral_constant.value>{};
+            optimizer.visit([&](const auto& optimizer) {
+                if constexpr (!std::same_as<std::decay_t<decltype(optimizer)>, std::monostate>)
+                {
                     auto future = QtConcurrent::mapped(
-                        optimizer.get_tasks(this->filtered_active_weapon_data, attack_options, free_attribute_points, min_stats, settings.attribute_level_limit),
-                        [](const auto& task) { return Row(task()); }
+                        this->filtered_active_weapon_data,
+                        [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
                     );
 
                     std::vector<Row> rows{};
                     if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
                     {
                         rows.reserve(this->filtered_active_weapon_data.size());
-                        rows.append_range(future | std::views::as_rvalue);
+                        rows.append_range(
+                            future
+                            | std::views::as_rvalue
+                        );
                     }
                     this->weapon_table->model->set_rows(std::move(rows));
                 }
-            );
+            });
         }
 
     public:
@@ -634,8 +670,8 @@ namespace erdo::ui
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
-            connect(this->start_brute_force_button, &QPushButton::clicked, this, &OptimizeTab::optimize<optimizer::BruteForce>);
-            connect(this->start_v2_button, &QPushButton::clicked, this, &OptimizeTab::optimize<optimizer::V2>);
+            connect(this->start_brute_force_button, &QPushButton::clicked, [this](){ this->optimize(this->brute_force_optimizer); });
+            connect(this->start_v2_button, &QPushButton::clicked, [this](){ this->optimize(this->v2_optimizer); });
         }
     
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)

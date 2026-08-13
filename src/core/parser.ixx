@@ -483,11 +483,6 @@ namespace erdo::parser
             weapons.emplace_back(std::move(w));
         }
 
-        auto nonscaling_attributes = weapons
-            | std::views::transform(&calculator::Weapon::nonscaling_attributes)
-            | std::ranges::to<std::set>();
-        std::println("nonscaling attributes: {}", nonscaling_attributes.size());
-
         std::ranges::sort(weapons, {}, &calculator::Weapon::full_name);
         std::println("found {} weapons", weapons.size());
         return weapons;

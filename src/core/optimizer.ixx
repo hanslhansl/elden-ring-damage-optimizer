@@ -239,48 +239,32 @@ namespace erdo::optimizer
             return attack;
         }
     
-        static std::vector<Attack> run_synchronously(
-            const std::ranges::sized_range auto& weapons,
-            const AttackOptions& attack_options,
-            const int& free_attribute_points,
-            const Stats &min_stats,
-            const int& max_stat
-        )
+        std::vector<Attack> run_synchronously(const std::ranges::sized_range auto& weapons) const
         {
-            return Optimizer::get_tasks(weapons, attack_options, free_attribute_points, min_stats, max_stat)
-                | std::views::transform([](const auto& task) { return task(); })
+            return weapons
+                | std::views::transform(*static_cast<const Optimizer*>(this))
                 | std::ranges::to<std::vector>();
         }
+   
+        std::size_t total_stat_variation_count = 0;
     };
 
     export template<Target target>
     struct BruteForce : OptimizerBase<BruteForce, target>
     {
-        static auto get_tasks(
-            const std::ranges::sized_range auto& weapons,
-            const AttackOptions& attack_options,
-            const int& free_attribute_points,
-            const Stats &min_stats,
-            const int& max_stat
-        )
+        std::vector<Stats> stat_variations{};
+        AttackOptions attack_options;
+
+        BruteForce(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const Stats &min_stats, int max_stat)
+            : attack_options{ attack_options }
         {
-            auto stat_variations = std::make_shared<std::vector<Stats>>(
-                get_stat_variations(free_attribute_points, min_stats, make_filled_array<RelevantStats>(max_stat))
-            );
+            this->stat_variations = get_stat_variations(free_attribute_points, min_stats, make_filled_array<RelevantStats>(max_stat));
+            this->total_stat_variation_count = this->stat_variations.size() * weapons.size();
+        }
 
-            auto lambda = [&](){
-                return weapons
-                    | std::views::transform([&](const Weapon& w){
-                        return [&, stat_variations] {
-                            return BruteForce::optimize_weapon(w, attack_options, *stat_variations);
-                        };
-                    })
-                    | std::ranges::to<std::vector>();
-            };
-
-            if (stat_variations->empty())
-                return decltype(lambda()){};
-            return lambda();
+        Attack operator()(const Weapon& weapon) const
+        {
+            return this->optimize_weapon(weapon, this->attack_options, this->stat_variations);
         }
     };
 
@@ -319,57 +303,33 @@ namespace erdo::optimizer
             return optimized_stat_variations;
         }
 
-        static auto get_tasks(
-            const std::ranges::sized_range auto& weapons,
-            const AttackOptions& attack_options,
-            const int& free_attribute_points,
-            const Stats &min_stats,
-            const int& max_stat
-        )
+        std::map<NonscalingAttributes, std::vector<Stats>> optimized_stat_variations_map{};
+        AttackOptions attack_options;
+
+        V2(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const Stats &min_stats, int max_stat)
+            : attack_options{ attack_options }
         {
             auto min_relevant_stats = min_stats.relevant_stats();
             auto max_relevant_stats = make_filled_array<RelevantStats>(max_stat);
-            auto optimized_stat_variations_map = std::make_shared<std::map<NonscalingAttributes, std::vector<Stats>>>();
-            
-            // std::size_t total_stat_variation_count = 0;
 
-            auto lambda = [&](){
-                return weapons
-                    | std::views::transform([&](const calculator::Weapon& w) {
-                        auto [it, inserted] = optimized_stat_variations_map->try_emplace(w.nonscaling_attributes);
-                        auto&& optimized_stat_variations = it->second;
-                        if (inserted)
-                            optimized_stat_variations = V2::get_optimized_stat_variations(free_attribute_points, min_stats, max_relevant_stats, w.nonscaling_attributes);
-                        // total_stat_variation_count += optimized_stat_variations.size();
+            if (get_stat_variation_count(free_attribute_points, min_relevant_stats, max_relevant_stats) != 0)
+            {
+                for (auto&& weapon : weapons)
+                {
+                    auto&& nonscaling_attributes = std::invoke(&Weapon::nonscaling_attributes, weapon);
+                    auto [it, inserted] = this->optimized_stat_variations_map.try_emplace(nonscaling_attributes);
+                    auto&& optimized_stat_variations = it->second;
+                    if (inserted)
+                        optimized_stat_variations = V2::get_optimized_stat_variations(free_attribute_points, min_stats, max_relevant_stats, nonscaling_attributes);
+                    this->total_stat_variation_count += optimized_stat_variations.size();
+                }
+            }
+        }
 
-                        // if (w.full_name == "Fire Duelist Greataxe")
-                        // {
-                        //     RelevantStatsArray optimized_max_relevant_stats{};
-                        //     for (auto&& [min_relevant_stat, max_relevant_stat, nonscaling_attribute, optimized_max_relevant_stat] :
-                        //         std::views::zip(min_stats.relevant_stats(), max_relevant_stats, w.nonscaling_attributes, optimized_max_relevant_stats)
-                        //     )
-                        //         optimized_max_relevant_stat = nonscaling_attribute ? min_relevant_stat : max_relevant_stat;
-                        //     std::println("Fire Duelist Greataxe");
-                        //     std::println("min_stats: {}", min_stats);
-                        //     std::println("max_relevant_stats: {}", max_relevant_stats);
-                        //     std::println("optimized_max_relevant_stats: {}", optimized_max_relevant_stats);
-                        //     std::println("stat variation count: {}", optimized_stat_variations.size());
-                        //     std::println("stat_variations:");
-                        //     for (const auto& x : optimized_stat_variations)
-                        //         std::println("{}", x);
-                        // }
-
-                        return [&, optimized_stat_variations_map](){
-                            return V2::optimize_weapon(w, attack_options, optimized_stat_variations);
-                        };
-                    })
-                    | std::ranges::to<std::vector>();
-            };
-
-            if (get_stat_variation_count(free_attribute_points, min_relevant_stats, max_relevant_stats) == 0)
-                return decltype(lambda()){};
-            // std::println("average stat variation count: {}", (double)total_stat_variation_count / (double)weapons.size());
-            return lambda();
+        Attack operator()(const Weapon& weapon) const
+        {
+            auto&& optimized_stat_variations = this->optimized_stat_variations_map.at(weapon.nonscaling_attributes);
+            return this->optimize_weapon(weapon, attack_options, optimized_stat_variations);
         }
     };
 }

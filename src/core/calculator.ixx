@@ -325,19 +325,40 @@ export namespace erdo::calculator
                         return true;
 
                     auto can_trigger_penalty = this->requirements[attribute] > 0;
+                    std::vector<bool> independant_at_upgrade_levels{};
                     for (auto upgrade_level = 0; upgrade_level < this->base_attack_powers_at_upgrade_levels.size(); ++upgrade_level)
                     {
                         // 1. Direct Scaling Dependency
                         if (this->attribute_scalings_at_upgrade_levels[upgrade_level][attribute] != 0.)
-                            return false;
+                        {
+                            // return false;
+                            independant_at_upgrade_levels.push_back(false);
+                            continue;
+                        }
 
                         // 2. Ineffectiveness Penalty Dependency
                         auto&& base_attack_power = this->base_attack_powers_at_upgrade_levels[upgrade_level][apt];
                         if ((base_attack_power != 0. || this->is_sorcery_or_incantation_tool) && can_trigger_penalty)
-                            return false;
+                        {
+                            // return false;
+                            independant_at_upgrade_levels.push_back(false);
+                            continue;
+                        }
+
+                        independant_at_upgrade_levels.push_back(true);
                     }
 
-                    return true;
+                    if (std::ranges::all_of(independant_at_upgrade_levels, [&](auto x) {return x == true;}))
+                        return true;
+                    else if (std::ranges::all_of(independant_at_upgrade_levels, [&](auto x) {return x == false;}))
+                        return false;
+
+                    throw std::runtime_error(std::format("inconsistent independance of apt {} from attribute {} for {} at upgrade levels: {}",
+                        enum_to_string((AttackPowerType)apt),
+                        enum_to_string((Attribute)attribute),
+                        this->full_name,
+                        independant_at_upgrade_levels
+                    ));
                 });
             }
             return result;

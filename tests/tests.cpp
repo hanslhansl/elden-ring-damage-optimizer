@@ -111,8 +111,8 @@ TEST_CASE("stat variations")
     REQUIRE(stat_variations.size() == expected_stat_variation_count);
 }
 
-
-void test_optimization(auto optimizer, auto projection, std::string_view expected_weapon_full_name, const calculator::Stats& expected_stats, const std::vector<double>& expected_values)
+template<typename Optimizer>
+void test_optimization(std::string_view expected_weapon_full_name, const calculator::Stats& expected_stats, const std::vector<double>& expected_values)
 {
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
@@ -122,11 +122,12 @@ void test_optimization(auto optimizer, auto projection, std::string_view expecte
     const auto max_stat = 99;
 
     std::vector<calculator::Attack> attacks{};
+    Optimizer optimizer{weapons, attack_options, free_attribute_points, min_stats, max_stat};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
     {
-        attacks = optimizer.run_synchronously(weapons, attack_options, free_attribute_points, min_stats, max_stat);
+        attacks = optimizer.run_synchronously(weapons);
     };
     REQUIRE(attacks.size() == expected_values.size());
 
@@ -137,21 +138,19 @@ void test_optimization(auto optimizer, auto projection, std::string_view expecte
         CAPTURE(attack.stats);
         CAPTURE(min_stats);
         CHECK_THAT(
-            projection(attack),
+            optimizer.projection(attack),
             Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9)
         );
     }
 
-    auto&& attack = std::ranges::max(attacks, {}, projection);
+    auto&& attack = std::ranges::max(attacks, {}, optimizer.projection);
     CHECK(attack.weapon.get().full_name == expected_weapon_full_name);
     CHECK(attack.stats == expected_stats);
 }
 
 TEST_CASE("optimization - brute force - total attack power")
 {
-    test_optimization(
-        optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>{},
-        optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>,
+    test_optimization<optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>>(
         "Fire Duelist Greataxe",
         { 10, 10, 10, 21, 10, 10, 10, 10 },
         excpected_optimization_total_attack_power
@@ -160,9 +159,7 @@ TEST_CASE("optimization - brute force - total attack power")
 
 TEST_CASE("optimization - brute force - spell scaling")
 {
-    test_optimization(
-        optimizer::BruteForce<optimizer::Target::SPELL_SCALING>{},
-        optimizer::projection<optimizer::Target::SPELL_SCALING>,
+    test_optimization<optimizer::BruteForce<optimizer::Target::SPELL_SCALING>>(
         "Demi-Human Queen's Staff",
         { 10, 10, 10, 10, 10, 21, 10, 10 },
         excpected_optimization_spell_scaling
@@ -171,9 +168,7 @@ TEST_CASE("optimization - brute force - spell scaling")
 
 TEST_CASE("optimization - v2 - total attack power")
 {
-    test_optimization(
-        optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>{},
-        optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>,
+    test_optimization<optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>>(
         "Fire Duelist Greataxe",
         { 10, 10, 10, 21, 10, 10, 10, 10 },
         excpected_optimization_total_attack_power
@@ -182,9 +177,7 @@ TEST_CASE("optimization - v2 - total attack power")
 
 TEST_CASE("optimization - v2 - spell scaling")
 {
-    test_optimization(
-        optimizer::V2<optimizer::Target::SPELL_SCALING>{},
-        optimizer::projection<optimizer::Target::SPELL_SCALING>,
+    test_optimization<optimizer::V2<optimizer::Target::SPELL_SCALING>>(
         "Demi-Human Queen's Staff",
         { 10, 10, 10, 10, 10, 21, 10, 10 },
         excpected_optimization_spell_scaling
