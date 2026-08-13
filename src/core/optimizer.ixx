@@ -15,11 +15,12 @@ namespace erdo::optimizer
         const auto U = max_relevant_stats;
         constexpr auto P = min_relevant_stats.extent;
 
+        if (A < 0)
+            return 0;
+
         // Restkapazitäten
         std::array<int, P> capacity{};
-
         int totalCapacity = 0;
-
         for (int i = 0; i < P; ++i)
         {
             if (L[i] > U[i])

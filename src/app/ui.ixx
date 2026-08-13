@@ -599,6 +599,16 @@ namespace erdo::ui
             optimizer.visit([&](const auto& optimizer) {
                 if constexpr (!std::same_as<std::decay_t<decltype(optimizer)>, std::monostate>)
                 {
+                    if(optimizer.total_stat_variation_count == 0)
+                    {
+                        QMessageBox::warning(
+                            this,
+                            "no valid stat variations",
+                            "there are no valid stat variations for the given min character attributes and max character level."
+                        );
+                        return;
+                    }
+
                     auto future = QtConcurrent::mapped(
                         this->filtered_active_weapon_data,
                         [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
