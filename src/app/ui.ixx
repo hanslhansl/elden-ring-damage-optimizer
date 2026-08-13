@@ -46,7 +46,7 @@ namespace erdo::ui
         QFutureWatcher<T> watcher;
         watcher.setFuture(future);
 
-        const QString cancelButtonText = cancelable ? QObject::tr("Cancel") : QString{};
+        const QString cancelButtonText = cancelable ? "cancel" : QString{};
 
         QProgressDialog progress(
             labelText,
@@ -58,7 +58,7 @@ namespace erdo::ui
         progress.setWindowModality(Qt::ApplicationModal);
         progress.setMinimumDuration(0);
 
-        if (!cancelable)
+        // if (!cancelable)
             progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
 
         // We provide our own progress text, so hide QProgressBar's "xx%" overlay.
@@ -129,23 +129,20 @@ namespace erdo::ui
 
                     if (now - lastEtaUpdate >= 1000)
                     {
-                        const double averageMsPerTask =
-                            double(now) / double(completed);
+                        const double averageMsPerTask = double(now) / double(completed);
 
                         const qint64 remainingMs =
                             qRound64(
                                 averageMsPerTask *
                                 double(total - completed));
 
-                        cachedEta =
-                            formatDuration(remainingMs / 1000);
+                        cachedEta = formatDuration(remainingMs / 1000);
 
                         lastEtaUpdate = now;
                     }
 
                     if (!cachedEta.isEmpty())
-                        status += QObject::tr(" • ETA %1")
-                                    .arg(cachedEta);
+                        status += QObject::tr(" • ETA %1").arg(cachedEta);
                 }
 
                 text += '\n' + status;
@@ -196,11 +193,16 @@ namespace erdo::ui
             &progress,
             &QDialog::accept);
 
+        QObject::disconnect(&progress, &QProgressDialog::canceled, nullptr, nullptr);
         QObject::connect(
             &progress,
             &QProgressDialog::canceled,
             [&]()
             {
+                // future.cancel();
+                progress.setCancelButton(nullptr);
+                progress.setLabelText("canceling…");
+                progress.setRange(0, 0);
                 future.cancel();
             });
 
