@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>917</width>
-    <height>627</height>
+    <width>921</width>
+    <height>635</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,7 +22,7 @@
         <locale language="English" country="AmericanSamoa"/>
        </property>
        <property name="title">
-        <string>character stats</string>
+        <string>character attributes</string>
        </property>
        <layout class="QFormLayout" name="character_stats_layout">
         <item row="0" column="0">

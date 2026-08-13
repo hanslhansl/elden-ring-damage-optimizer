@@ -59,7 +59,7 @@ namespace erdo::ui
         progress.setMinimumDuration(0);
 
         // if (!cancelable)
-            progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+        progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
 
         // We provide our own progress text, so hide QProgressBar's "xx%" overlay.
         if (auto* bar = progress.findChild<QProgressBar*>())
@@ -633,7 +633,7 @@ namespace erdo::ui
     public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
-            this->character_stats_box->setTitle(string_to_display("min character stats"));
+            this->character_stats_box->setTitle(string_to_display("min character attributes"));
 
             auto max_character_stats_box = new QGroupBox(string_to_display("max character stats"));
             this->second_vertical_layout->insertWidget(1, max_character_stats_box);

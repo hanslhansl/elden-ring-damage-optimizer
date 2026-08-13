@@ -400,7 +400,7 @@ namespace erdo::ui
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
             static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "character stats";
+            inline static const QString header_section_title = "character attributes";
 
             using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::Attack& attack)

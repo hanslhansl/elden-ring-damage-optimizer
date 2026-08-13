@@ -194,16 +194,6 @@ export namespace erdo::calculator
     constexpr auto defaultDamageCalcCorrectGraphId = 0;
     constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
-    constexpr auto calculate_upgrade_level_index(const auto& base_attack_powers) {
-        if (base_attack_powers.size() == 1)
-            return 0;
-        else if (base_attack_powers.size() == 11)
-            return 2;
-        else if (base_attack_powers.size() == 26)
-            return 1;
-        else
-            throw std::runtime_error("invalid base attack power size");
-    }
 
     struct Weapon
     {
