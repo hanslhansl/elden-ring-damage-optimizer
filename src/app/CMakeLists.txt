@@ -33,7 +33,9 @@ target_link_libraries(erdo PRIVATE
 )
 copy_xml_data(erdo)
 
-install(TARGETS erdo)
+install(TARGETS erdo
+    RUNTIME DESTINATION .
+)
 
 if(NOT QT_FEATURE_static)
     qt_generate_deploy_app_script(
@@ -42,4 +44,50 @@ if(NOT QT_FEATURE_static)
         NO_COMPILER_RUNTIME
     )
     install(SCRIPT ${deploy_script})
+
+    install(CODE [[
+        set(_root "${CMAKE_INSTALL_PREFIX}")
+        set(bin_dir "${_root}/bin")
+
+        if(EXISTS "${bin_dir}")
+            file(GLOB bin_files "${bin_dir}/*")
+
+            foreach(file IN LISTS bin_files)
+                get_filename_component(name "${file}" NAME)
+                file(RENAME
+                    "${file}"
+                    "${_root}/${name}"
+                )
+            endforeach()
+
+            file(REMOVE_RECURSE "${bin_dir}")
+        endif()
+
+        file(REMOVE_RECURSE "${_bin}")
+
+        # Fix qt.conf for the new location.
+        set(_qt_conf "${_root}/qt.conf")
+
+        if(EXISTS "${_qt_conf}")
+            file(READ "${_qt_conf}" _qt_conf_content)
+
+            string(REPLACE
+                "Prefix = .."
+                "Prefix = ."
+                _qt_conf_content
+                "${_qt_conf_content}"
+            )
+
+            file(WRITE
+                "${_qt_conf}"
+                "${_qt_conf_content}"
+            )
+        endif()
+    ]])
 endif()
+
+set(CPACK_GENERATOR "ZIP")
+set(CPACK_PACKAGE_NAME "elden-ring-damage-optimizer")
+set(CPACK_PACKAGE_VERSION "3.0.0")
+
+include(CPack)
