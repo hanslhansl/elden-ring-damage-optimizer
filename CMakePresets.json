@@ -1,0 +1,58 @@
+﻿{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "Base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/build/${presetName}/install"
+    },
+
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24",
+      "hidden": true,
+      "inherits": "Base",
+      "toolchainFile": "F:/Qt/Qt-6.11.1-STATIC-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake",
+      "environment": {
+        
+      }
+    },
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-Debug",
+      "inherits": "Qt-6.11.1-STATIC-LLVM24",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-Release",
+      "inherits": "Qt-6.11.1-STATIC-LLVM24",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-RelWithDebInfo",
+      "inherits": "Qt-6.11.1-STATIC-LLVM24",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-Debug",
+      "configurePreset": "Qt-6.11.1-STATIC-LLVM24-Debug"
+    },
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-Release",
+      "configurePreset": "Qt-6.11.1-STATIC-LLVM24-Release"
+    },
+    {
+      "name": "Qt-6.11.1-STATIC-LLVM24-RelWithDebInfo",
+      "configurePreset": "Qt-6.11.1-STATIC-LLVM24-RelWithDebInfo"
+    }
+  ]
+}

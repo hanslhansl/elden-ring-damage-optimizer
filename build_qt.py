@@ -13,6 +13,7 @@ from pathlib import Path
 COMPILER_BIN = r".../bin"
 QT_SOURCE = r".../Qt/6.11.1/Src"
 INSTALL_PREFIX = r"..."
+BUILD_STATIC = True
 
 
 BUILD_DIR = f"{INSTALL_PREFIX}-build"
@@ -25,7 +26,6 @@ NINJA_BIN = None    # None: get from PATH
 
 # Qt configure options
 QT_SUBMODULES = "qtbase,qtsvg,qttools"
-BUILD_STATIC = True
 QT_USE_ORIGINAL_COMPILER = True # if true, the generated qt.toolchain.cmake file will set the C/CXX to the compiler used to build Qt itself
 
 SYSTEM_PATHS = [

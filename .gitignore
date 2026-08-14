@@ -6,7 +6,6 @@
 # custom
 /build
 /.vscode
-CMakePresets.json
 
 # User-specific files
 *.rsuser
