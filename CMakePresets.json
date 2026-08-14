@@ -10,13 +10,20 @@
     },
 
     {
+      "name": "Qt-6.11.1-LLVM24",
+      "hidden": true,
+      "inherits": "Base",
+      "toolchainFile": "F:/Qt/Qt-6.11.1-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake",
+      "environment": {
+        "PATH": "F:/Qt/Qt-6.11.1-LLVM24/bin;$penv{PATH}"
+      }
+    },
+
+    {
       "name": "Qt-6.11.1-STATIC-LLVM24",
       "hidden": true,
       "inherits": "Base",
       "toolchainFile": "F:/Qt/Qt-6.11.1-STATIC-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake",
-      "environment": {
-        
-      }
     },
     {
       "name": "Qt-6.11.1-STATIC-LLVM24-Debug",
