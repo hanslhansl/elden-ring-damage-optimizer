@@ -39,6 +39,7 @@ if(NOT QT_FEATURE_static)
     qt_generate_deploy_app_script(
         TARGET erdo
         OUTPUT_SCRIPT deploy_script
+        NO_COMPILER_RUNTIME
     )
     install(SCRIPT ${deploy_script})
 endif()
