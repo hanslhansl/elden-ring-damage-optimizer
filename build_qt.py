@@ -13,7 +13,7 @@ from pathlib import Path
 COMPILER_BIN = r".../bin"
 QT_SOURCE = r".../Qt/6.11.1/Src"
 INSTALL_PREFIX = r"..."
-BUILD_STATIC = True
+BUILD_STATIC = False
 
 
 BUILD_DIR = f"{INSTALL_PREFIX}-build"
