@@ -54,7 +54,8 @@ namespace erdo::witchy
         parser::GR_MenuTextFile
     };
 
-    std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {}) {
+    std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, std::ranges::range auto&& copied_uxm_file_paths, std::filesystem::path location = {})
+    {
         auto s = std::format("\"{} --passive --parallel", quote_path(witchy_exe_path));
         if (!location.empty())
             s += std::format(" --location {}", quote_path(location));
@@ -67,11 +68,16 @@ namespace erdo::witchy
         );
     }
 
-    export std::expected<void, std::string> run_witchy(const std::filesystem::path& unpacked_uxm_files_directory, const std::filesystem::path& witchy_exe_path, const std::filesystem::path& save_to_directory) {
-
+    export std::expected<std::string, std::string> run_witchy(
+        const std::filesystem::path& unpacked_uxm_files_directory,
+        const std::filesystem::path& witchy_exe_path,
+        const std::filesystem::path& save_to_directory
+    ) try
+    {
         // create temporary directory
         auto temp_dir = std::filesystem::temp_directory_path() / "elden-ring-damage-optimizer";
         std::filesystem::create_directory(temp_dir);
+        auto temp_dir_quoted = quote_path(temp_dir);
 
         // copy needed uxm files to temporary directory
         auto copied_uxm_file_paths = needed_uxm_files
@@ -82,13 +88,13 @@ namespace erdo::witchy
                 return uxm_file_temp_path;
             })
             | std::ranges::to<std::vector>();
-        std::println("copied needed uxm files to temporary directory {}", quote_path(temp_dir));
+        std::println("copied needed uxm files to temporary directory {}", temp_dir_quoted);
 
         // unpack uxm files inplace (temporary directory)
         auto result = std::system(witchy_cmd(witchy_exe_path, copied_uxm_file_paths).c_str());
         if (result != 0)
             return std::unexpected(std::format("WitchyBND failed with exit code {}", result));
-        std::println("unpacked uxm files to temporary directory {}", quote_path(temp_dir));
+        std::println("unpacked uxm files to temporary directory {}", temp_dir_quoted);
             
         // get version from /regulation-bin/_witchy-bnd4.xml
         auto version = xml::get_element_value<std::string>(
@@ -113,9 +119,9 @@ namespace erdo::witchy
                 "only {} out of {} needed unpacked files were found in the temporary directory {}",
                 needed_unpacked_file_paths.size(),
                 needed_unpacked_files.size(),
-                quote_path(temp_dir)
+                temp_dir_quoted
             ));
-        std::println("found {} needed unpacked files in the temporary directory {}", needed_unpacked_file_paths.size(), quote_path(temp_dir));
+        std::println("found {} needed unpacked files in the temporary directory {}", needed_unpacked_file_paths.size(), temp_dir_quoted);
 
         // convert needed unpacked files to xml
         auto xml_files_directory = temp_dir / "xml_data";
@@ -138,9 +144,13 @@ namespace erdo::witchy
 
         // remove temporary directory
         std::filesystem::remove_all(temp_dir);
-        std::println("removed temporary directory {}", quote_path(temp_dir));
+        std::println("removed temporary directory {}", temp_dir_quoted);
 
         std::println("\nsuccessfully unpacked and converted uxm files to xml in {}", quote_path(full_save_to_directory));
-        return {};
+        return std::format("successfully unpacked and converted uxm files to xml in {}", quote_path(full_save_to_directory));
+    }
+    catch (const std::exception& e)
+    {
+        return std::unexpected(e.what());
     }
 }

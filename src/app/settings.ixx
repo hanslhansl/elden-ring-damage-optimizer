@@ -183,7 +183,7 @@ namespace erdo::ui
                     auto&& [key, widget] = this->widgets[i];
                     auto&& [_, display_name] = key;
 
-                    form_layout->addRow(QString::fromStdString(std::string(display_name)), widget);
+                    form_layout->addRow(QString::fromStdString(std::string(display_name) + ":"), widget);
                 }
             }
 

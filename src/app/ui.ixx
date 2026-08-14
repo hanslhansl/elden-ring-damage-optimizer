@@ -786,36 +786,27 @@ namespace erdo::ui
                 this,
                 "select eldenring.exe",
                 QDir::homePath(),
-                "elden ring executable (eldenring.exe)"
+                "elden ring executable (eldenring.exe);;all executables (*.exe);;all files (*)"
             );
             if (file_name.isEmpty())
                 return;
             auto elden_ring_executable = std::filesystem::path(file_name.toStdString());
-            if (elden_ring_executable.filename() != "eldenring.exe")
-            {
-                QMessageBox::critical(this, "invalid file", "please select eldenring.exe");
-                return;
-            }
 
             file_name = QFileDialog::getOpenFileName(
                 this,
                 "select WitchyBND.exe",
                 QDir::homePath(),
-                "WitchyBND executable (WitchyBND.exe)"
+                "WitchyBND executable (WitchyBND.exe);;all executables (*.exe);;all files (*)"
             );
             if (file_name.isEmpty())
                 return;
             auto witchybdn_executable = std::filesystem::path(file_name.toStdString());
-            if (witchybdn_executable.filename() != "WitchyBND.exe")
-            {
-                QMessageBox::critical(this, "invalid file", "please select WitchyBND.exe");
-                return;
-            }
 
+            auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
             QString directory = QFileDialog::getExistingDirectory(
                 this,
                 "select a save directory",
-                QDir::homePath(),
+                xml_data_directory.string().c_str(),
                 QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
             );
             if (directory.isEmpty())
@@ -836,8 +827,10 @@ namespace erdo::ui
             });
             execute_future_with_blocking_progress_bar<false>(future, this, "generating weapon data...");
             auto expected = future.takeResult();
-            if (!expected)
-                QMessageBox::critical(this, "Error", QString::fromStdString(expected.error()));
+            if (expected)
+                QMessageBox::information(this, "success", QString::fromStdString(expected.value()));
+            else
+                QMessageBox::critical(this, "error", QString::fromStdString(expected.error()));
         }
 
         void closeEvent(QCloseEvent *event) override
