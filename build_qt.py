@@ -113,7 +113,7 @@ def main():
             INSTALL_PREFIX,
 
             "-release",
-            "-static" if BUILD_STATIC else "-shared -force-debug-info -separate-debug-info",
+            *(("-static",) if BUILD_STATIC else ("-shared", "-force-debug-info", "-separate-debug-info")),
             "-opensource",
             "-confirm-license",
 

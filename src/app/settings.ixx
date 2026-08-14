@@ -46,7 +46,7 @@ namespace erdo::ui
     {
         using value_type = int;
         using widget_type = QSpinBox;
-        static constexpr auto signal = &QSpinBox::valueChanged;
+        inline static const auto signal = &QSpinBox::valueChanged;
         constexpr static std::string_view section_name = "general";
 
         static void initialize(widget_type* spinbox, value_type value)
@@ -84,7 +84,7 @@ namespace erdo::ui
     {
         using value_type = bool;
         using widget_type = QCheckBox;
-        static constexpr auto signal = &QCheckBox::toggled;
+        inline static const auto signal = &QCheckBox::toggled;
         constexpr static std::string_view section_name = "general";
 
         static void initialize(widget_type* checkbox, value_type value)
