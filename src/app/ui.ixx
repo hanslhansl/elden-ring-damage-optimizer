@@ -259,7 +259,10 @@ namespace erdo::ui
                 lambda();
                 connect(&settings.attribute_level_limit, settings.attribute_level_limit.changed_member_pointer, lambda);
 
-                this->character_stats_layout->insertRow(this->character_stats_layout->rowCount() - 1, string_to_display(attribute) + ":", attribute_spinbox);
+                this->character_stats_layout->insertRow(
+                    this->character_stats_layout->rowCount() - 1,
+                    string_to_display(attribute) + ":", attribute_spinbox
+                );
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
                     auto&& stats = this->get_character_stats();
@@ -288,19 +291,21 @@ namespace erdo::ui
             // base game / dlc
             for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"base game", "dlc"}))
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->base_game_dlc_list);
+                auto item = new QListWidgetItem(str, this->base_game_dlc_list);
                 item->setData(Qt::UserRole, val);
             }
 
             // weapon type list widget
-            for (auto&& [type, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Type>(), enumerator_strings_of<calculator::Weapon::Type>()))
+            for (auto&& [type, str]
+                : std::views::zip(enumerator_integrals_of<calculator::Weapon::Type>(), enumerator_strings_of<calculator::Weapon::Type>()))
             {
                 auto item = new QListWidgetItem(string_to_display(str), this->type_list);
                 item->setData(Qt::UserRole, type);
             }
 
             // weapon affinity list widget
-            for (auto&& [affinity, str] : std::views::zip(enumerator_integrals_of<calculator::Weapon::Affinity>(), enumerator_strings_of<calculator::Weapon::Affinity>()))
+            for (auto&& [affinity, str]
+                : std::views::zip(enumerator_integrals_of<calculator::Weapon::Affinity>(), enumerator_strings_of<calculator::Weapon::Affinity>()))
             {
                 auto item = new QListWidgetItem(string_to_display(str), this->affinity_list);
                 item->setData(Qt::UserRole, affinity);
@@ -633,16 +638,16 @@ namespace erdo::ui
     public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
-            this->character_stats_box->setTitle(string_to_display("min character attributes"));
+            this->character_stats_box->setTitle("min character attributes");
 
-            auto max_character_stats_box = new QGroupBox(string_to_display("max character stats"));
+            auto max_character_stats_box = new QGroupBox("max character stats");
             this->second_vertical_layout->insertWidget(1, max_character_stats_box);
 
             auto max_character_stats_layout = new QFormLayout();
             max_character_stats_box->setLayout(max_character_stats_layout);
 
             // max character level label
-            max_character_stats_layout->addRow(string_to_display("max character level:"), this->max_character_level_spinbox = new QSpinBox());
+            max_character_stats_layout->addRow("max character level:", this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
             calculator::Stats max_stats{};
             max_stats.fill(99);
@@ -650,8 +655,8 @@ namespace erdo::ui
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, this, &OptimizeTab::prepare_optimization);
 
             // attribute points label
-            max_character_stats_layout->addRow(string_to_display("max attribute points:"), this->max_attribute_points_label = new QLabel());
-            max_character_stats_layout->addRow(string_to_display("max free attribute points:"), this->free_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow("max attribute points:", this->max_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow("max free attribute points:", this->free_attribute_points_label = new QLabel());
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);
@@ -852,27 +857,6 @@ namespace erdo::ui
         {
             // setup
             this->ui->setupUi(this);
-            this->setWindowTitle(string_to_display(this->windowTitle()));
-            for (QWidget *w : findChildren<QWidget *>())
-            {
-                if (auto tab = qobject_cast<QTabWidget *>(w)) {
-                    for (int i = 0; i < tab->count(); ++i) {
-                        tab->setTabText(i, string_to_display(tab->tabText(i)));
-                    }
-                }
-                else if (auto label = qobject_cast<QLabel *>(w)) {
-                    label->setText(string_to_display(label->text()));
-                }
-                else if (auto button = qobject_cast<QAbstractButton *>(w)) {
-                    button->setText(string_to_display(button->text()));
-                }
-                else if (auto box = qobject_cast<QGroupBox *>(w)) {
-                    box->setTitle(string_to_display(box->title()));
-                }
-                else if (auto menu = qobject_cast<QMenu *>(w)) {
-                    menu->setTitle(string_to_display(menu->title()));
-                }
-            }
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()).make_preferred();
@@ -909,9 +893,9 @@ namespace erdo::ui
 
 
             // add tabs
-            this->ui->tab_widget->addTab(stats, string_to_display("stats"));
-            this->ui->tab_widget->addTab(optimize, string_to_display("optimize"));
-            this->ui->tab_widget->addTab(plot, string_to_display("plot"));
+            this->ui->tab_widget->addTab(stats, "stats");
+            this->ui->tab_widget->addTab(optimize, "optimize");
+            this->ui->tab_widget->addTab(plot, "plot");
 
             // restore geometry and state
             QSettings settings{};

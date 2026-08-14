@@ -6,6 +6,8 @@ module;
 #include <QRegularExpression>
 #include <QFormLayout>
 #include <QDialog>
+#include <QLabel>
+#include <qtabwidget.h>
 export module erdo.ui.settings;
 
 import std;
@@ -28,6 +30,7 @@ namespace erdo::ui
     template<typename T>
     struct SettingBuilder : SettingBuilderBase
     {
+
         T::value_type value;
 
         SettingBuilder(Settings& settings);
@@ -44,6 +47,7 @@ namespace erdo::ui
         using value_type = int;
         using widget_type = QSpinBox;
         static constexpr auto signal = &QSpinBox::valueChanged;
+        constexpr static std::string_view section_name = "general";
 
         static void initialize(widget_type* spinbox, value_type value)
         {
@@ -67,6 +71,7 @@ namespace erdo::ui
     {
         using typename SpinBoxSetting<DecimalPlaces>::value_type;
 
+        constexpr static std::string_view section_name = "weapon table";
         constexpr static std::string_view name = "decimal_places";
         constexpr static std::string_view display_name = "decimal places";
 
@@ -80,6 +85,7 @@ namespace erdo::ui
         using value_type = bool;
         using widget_type = QCheckBox;
         static constexpr auto signal = &QCheckBox::toggled;
+        constexpr static std::string_view section_name = "general";
 
         static void initialize(widget_type* checkbox, value_type value)
         {
@@ -90,6 +96,7 @@ namespace erdo::ui
     {
         using typename CheckBoxSetting::value_type;
 
+        constexpr static std::string_view section_name = "weapon table";
         constexpr static std::string_view name = "display_base_names_instead_of_full_names";
         constexpr static std::string_view display_name = "display base names instead of full names";
 
@@ -99,6 +106,7 @@ namespace erdo::ui
     {
         using typename CheckBoxSetting::value_type;
 
+        constexpr static std::string_view section_name = "weapon table";
         constexpr static std::string_view name = "sort_by_base_names_instead_of_full_names";
         constexpr static std::string_view display_name = "sort by base names instead of full names";
 
@@ -108,6 +116,7 @@ namespace erdo::ui
     {
         using typename CheckBoxSetting::value_type;
 
+        constexpr static std::string_view section_name = "weapon table";
         constexpr static std::string_view name = "hide_base_game_dlc_column";
         constexpr static std::string_view display_name = "hide base game/dlc column";
 
@@ -117,6 +126,7 @@ namespace erdo::ui
     {
         using typename CheckBoxSetting::value_type;
 
+        constexpr static std::string_view section_name = "weapon table";
         constexpr static std::string_view name = "link_to_fextralife_instead_of_fandom";
         constexpr static std::string_view display_name = "link to Fextralife instead of Fandom";
 
@@ -127,7 +137,7 @@ namespace erdo::ui
     {
         bool is_initialized = false;
 
-        QFormLayout* layout{};
+        std::vector<std::pair<std::array<std::string_view, 2>, QWidget*>> widgets{};
         std::unique_ptr<QSettings> qsettings{};
         QDialog* dialog{};
 
@@ -144,8 +154,41 @@ namespace erdo::ui
         SettingBuilder<LinkToFextralifeInsteadOfFandom> link_to_fextralife_instead_of_fandom{ *this };
 
         Settings(int) {};
-        Settings() : is_initialized{ true }, layout{ new QFormLayout{} }, dialog{ new QDialog{} }, qsettings{ std::make_unique<QSettings>() }
+        Settings() : is_initialized{ true }, dialog{ new QDialog{} }, qsettings{ std::make_unique<QSettings>() }
         {
+            auto tab_widget = new QTabWidget{};
+
+            std::vector<std::string_view> section_names;
+            std::unordered_map<std::string_view, std::vector<std::size_t>> sections;
+            for (std::size_t i = 0; i < this->widgets.size(); ++i)
+            {
+                auto key = this->widgets[i].first[0];
+
+                if (sections.find(key) == sections.end())
+                    section_names.push_back(key);
+
+                sections[key].push_back(i);
+            }
+
+            for (auto&& section_name : section_names)
+            {
+                auto tab = new QWidget{};
+                auto form_layout = new QFormLayout{};
+                tab->setLayout(form_layout);
+
+                tab_widget->addTab(tab, QString::fromStdString(std::string(section_name)));
+
+                for (auto i : sections[section_name])
+                {
+                    auto&& [key, widget] = this->widgets[i];
+                    auto&& [_, display_name] = key;
+
+                    form_layout->addRow(QString::fromStdString(std::string(display_name)), widget);
+                }
+            }
+
+            auto layout = new QVBoxLayout{};
+            layout->addWidget(tab_widget);
             this->dialog->setLayout(layout);
             this->dialog->setWindowTitle("settings");
         }
@@ -218,7 +261,6 @@ erdo::ui::SettingBuilder<T>::SettingBuilder(Settings& settings)
     auto widget = new T::widget_type{};
     this->value = settings.qsettings->value(T::name, T::default_value).template value<typename T::value_type>();
     T::initialize(widget, this->value);
-    settings.layout->addRow(QString::fromStdString(std::string(T::display_name)), widget);
 
     connect(widget, T::signal, [&](T::value_type new_value){
         this->value = new_value;
@@ -226,6 +268,8 @@ erdo::ui::SettingBuilder<T>::SettingBuilder(Settings& settings)
         settings.qsettings->sync();
         emit this->changed();
     });
+
+    settings.widgets.push_back({{T::section_name, T::display_name}, widget});
 }
 
 void erdo::ui::Settings::initialize()

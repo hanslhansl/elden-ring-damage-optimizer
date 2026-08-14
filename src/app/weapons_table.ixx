@@ -15,6 +15,7 @@ import std;
 import erdo;
 import erdo.ui.settings;
 
+using namespace std::literals;
 
 namespace erdo::ui
 {
@@ -65,7 +66,7 @@ namespace erdo::ui
 
         export struct NameSection : SectionBase<std::array<std::array<QVariant, 3>, 1>>
         {
-            inline const static std::vector<QString> column_names { string_to_display("name") };
+            static constexpr std::array column_names { "name" };
 
             using SectionBase::SectionBase;
             explicit NameSection(const calculator::Attack& attack)
@@ -123,7 +124,7 @@ namespace erdo::ui
         };
         export struct AffinitySection : BinaryTextSection
         {
-            inline const static std::vector<QString> column_names { string_to_display("affinity") };
+            static constexpr std::array column_names { "affinity" };
 
             using BinaryTextSection::BinaryTextSection;
             explicit AffinitySection(const calculator::Attack& attack)
@@ -136,7 +137,7 @@ namespace erdo::ui
         };
         export struct TypeSection : BinaryTextSection
         {
-            inline const static std::vector<QString> column_names { string_to_display("type") };
+            static constexpr std::array column_names { "type" };
 
             using BinaryTextSection::BinaryTextSection;
             explicit TypeSection(const calculator::Attack& attack)
@@ -150,14 +151,14 @@ namespace erdo::ui
         
         export struct BaseGameDLCSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
-            inline const static std::vector<QString> column_names { string_to_display("base game\ndlc") };
+            static constexpr std::array column_names { "base game\ndlc" };
 
             using SectionBase::SectionBase;
             explicit BaseGameDLCSection(const calculator::Attack& attack)
             {
                 auto&& weapon = attack.weapon.get();
 
-                (*this)[0][0] = string_to_display(weapon.dlc ? "dlc" : "base game");
+                (*this)[0][0] = weapon.dlc ? "dlc" : "base game";
                 (*this)[0][1] = weapon.dlc;
             }
 
@@ -178,7 +179,7 @@ namespace erdo::ui
 
         export struct BaseNameSection : SectionBase<std::array<QVariant, 1>>
         {
-            inline const static std::vector<QString> column_names { string_to_display("base name") };
+            static constexpr std::array column_names { "base name" };
 
             using SectionBase::SectionBase;
             explicit BaseNameSection(const calculator::Attack& attack)
@@ -201,7 +202,7 @@ namespace erdo::ui
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
-            inline const static std::vector<QString> column_names { string_to_display("character level") };
+            static constexpr std::array column_names { "character level" };
 
             using SectionBase::SectionBase;
             explicit CharacterLevelSection(const calculator::Attack& attack)
@@ -252,7 +253,7 @@ namespace erdo::ui
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
-            inline const static std::vector<QString> column_names = { string_to_display("spell scaling") };
+            static constexpr std::array column_names = { "spell scaling" };
 
             using DataSection::DataSection;
             explicit SpellScaling(const calculator::Attack& attack)
@@ -275,7 +276,7 @@ namespace erdo::ui
             inline static const QString header_section_title = "attack power";
             inline const static std::vector<QString> column_names = [](){
                 auto result = enumerator_strings_of<calculator::DamageType>()
-                    | std::views::transform([](std::string_view e){ return string_to_display(e); })
+                    | std::views::transform(string_to_display)
                     | std::ranges::to<std::vector>();
                 result.emplace_back("total");
                 return result;
@@ -314,7 +315,7 @@ namespace erdo::ui
             static constexpr bool draw_section_seperators = true;
             
             inline const static std::vector<QString> column_names = enumerator_strings_of<enum_type>()
-                | std::views::transform([](std::string_view e){ return string_to_display(e); })
+                | std::views::transform(string_to_display)
                 | std::ranges::to<std::vector>();
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
