@@ -284,7 +284,7 @@ namespace erdo::ui
 
             // character level label
             this->character_level_label->setText(QString::number(this->get_character_stats().character_level()));
-            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::Stats& stats){
+            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::AttributeLevels& stats){
                 this->character_level_label->setText(QString::number(stats.character_level()));
             });
 
@@ -316,9 +316,9 @@ namespace erdo::ui
             this->main_layout->addWidget(this->weapon_table, 1);
         };
 
-        calculator::Stats get_character_stats() const
+        calculator::AttributeLevels get_character_stats() const
         {
-            calculator::Stats stats{};
+            calculator::AttributeLevels stats{};
             for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, stats))
                 stat = spinbox->value();
             return stats;
@@ -362,7 +362,7 @@ namespace erdo::ui
         }
     
     signals:
-        void character_stats_changed(const calculator::Stats& stats);
+        void character_stats_changed(const calculator::AttributeLevels& stats);
     };
 
     class StatsTab : public StatsTabBase
@@ -441,8 +441,8 @@ namespace erdo::ui
             );
 
             // weapon table view
-            this->weapon_table->hide_section<sections::Stats>();
-            this->weapon_table->hide_section<sections::CharacterLevelSection>();
+            this->weapon_table->set_section_hidden<sections::Stats>(true);
+            this->weapon_table->set_section_hidden<sections::CharacterLevelSection>(true);
         }
 
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
@@ -560,7 +560,7 @@ namespace erdo::ui
             auto stat_variations = optimizer::get_stat_variation_count(
                 free_attribute_points,
                 min_stats.relevant_stats(),
-                make_filled_array<calculator::RelevantStats>(settings.attribute_level_limit)
+                make_filled_array<calculator::RelevantAttributeLevels>(settings.attribute_level_limit)
             );
 
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
@@ -649,7 +649,7 @@ namespace erdo::ui
             // max character level label
             max_character_stats_layout->addRow("max character level:", this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
-            calculator::Stats max_stats{};
+            calculator::AttributeLevels max_stats{};
             max_stats.fill(99);
             this->max_character_level_spinbox->setMaximum(max_stats.character_level());
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, this, &OptimizeTab::prepare_optimization);

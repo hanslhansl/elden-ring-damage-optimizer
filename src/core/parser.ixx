@@ -459,7 +459,7 @@ namespace erdo::parser
                 ? weaponNames.at(uninfusedWeapon.at("id"))
                 : dlcWeaponNames.at(uninfusedWeapon.at("id"));
             
-            calculator::RelevantStatsArray required_relevant_stats{};
+            calculator::RelevantAttributeLevelsArray required_relevant_stats{};
             for (auto attribute : enumerators_of<calculator::RelevantAttribute>())
                 required_relevant_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
 

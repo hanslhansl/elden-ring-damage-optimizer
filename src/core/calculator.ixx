@@ -130,18 +130,18 @@ export namespace erdo::calculator
     }
 
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
-    using RelevantStatsArray = std::array<unsigned int, enumerators_of<RelevantAttribute>().size()>;
-    using RelevantStats = std::span<const unsigned int, enumerators_of<RelevantAttribute>().size()>;
-    using IrrelevantStats = std::span<const unsigned int, irrelevant_attribute_count>;
-    struct Stats : std::array<unsigned int, enumerators_of<Attribute>().size()>
+    using RelevantAttributeLevelsArray = std::array<unsigned int, enumerators_of<RelevantAttribute>().size()>;
+    using RelevantAttributeLevels = std::span<const unsigned int, enumerators_of<RelevantAttribute>().size()>;
+    using IrrelevantAttributeLevels = std::span<const unsigned int, irrelevant_attribute_count>;
+    struct AttributeLevels : std::array<unsigned int, enumerators_of<Attribute>().size()>
     {
-        constexpr RelevantStats relevant_stats() const
+        constexpr RelevantAttributeLevels relevant_stats() const
         {
-            return RelevantStats{ this->begin() + irrelevant_attribute_count, this->end() };
+            return RelevantAttributeLevels{ this->begin() + irrelevant_attribute_count, this->end() };
         }
-        constexpr IrrelevantStats irrelevant_stats() const
+        constexpr IrrelevantAttributeLevels irrelevant_stats() const
         {
-            return IrrelevantStats{
+            return IrrelevantAttributeLevels{
                 this->begin(),
                 this->begin() + irrelevant_attribute_count
             };
@@ -156,7 +156,7 @@ export namespace erdo::calculator
             return attribute_points_to_character_level(this->attribute_points());
         }
     };
-    const std::map<std::string, Stats> character_class_stats{
+    const std::map<std::string, AttributeLevels> character_class_stats{
         {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
         {"bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
         {"astrologer", {9, 12, 15, 8, 12, 16, 7, 9}},
@@ -277,7 +277,7 @@ export namespace erdo::calculator
         // the affinity of the weapon, e.g. Affinity.HEAVY
         Affinity affinity;
         // stat requirements necessary to use the weapon effectively (without an attack rating penalty)
-        RelevantStatsArray requirements;
+        RelevantAttributeLevelsArray requirements;
         // scaling amount at each upgrade level (0-10 or 0-25) for each player attribute (e.g. Attribute.STRENGTH)
         AttributeScalingsAtUpgradeLevels attribute_scalings_at_upgrade_levels;
         // base attack power at each upgrade level for each attack power type
@@ -397,11 +397,11 @@ export namespace erdo::calculator
     struct FullAttackOptions : AttackOptions
     {
         std::reference_wrapper<const Weapon> weapon;
-        Stats stats;
+        AttributeLevels stats;
 
-        RelevantStatsArray adjust_stats_for_two_handing() const
+        RelevantAttributeLevelsArray adjust_stats_for_two_handing() const
         {
-            RelevantStatsArray adjusted_relevant_stats{};
+            RelevantAttributeLevelsArray adjusted_relevant_stats{};
             std::ranges::copy(this->stats.relevant_stats(), adjusted_relevant_stats.begin());
 
             auto effective_two_handing = this->two_handing;
@@ -449,7 +449,7 @@ export namespace erdo::calculator
 
     class Attack : public FullAttackOptions, public AttackRating
     {
-        void calculate_ineffective_attributes_inplace(const RelevantStats& adjusted_relevant_stats)
+        void calculate_ineffective_attributes_inplace(const RelevantAttributeLevels& adjusted_relevant_stats)
         {
             for (auto&& [ineffective_attribute, adjusted_stat, requirement] : std::views::zip(
                 this->ineffective_attributes,
@@ -461,7 +461,7 @@ export namespace erdo::calculator
 
         double calculate_total_scaling(
             const bool is_ineffective_attack_power_type,
-            const RelevantStats& effective_relevant_stats,
+            const RelevantAttributeLevels& effective_relevant_stats,
             const AttributeScalings& scaling_attributes,
             const AttributeScalings& attribute_scalings_at_upgrade_level,
             const ScalingCurve& scaling_curve
@@ -501,8 +501,8 @@ export namespace erdo::calculator
 
         void calculate_attack_power(
             const AttackPowerType attack_power_type,
-            const RelevantStats& relevant_stats,
-            const RelevantStats& adjusted_relevant_stats,
+            const RelevantAttributeLevels& relevant_stats,
+            const RelevantAttributeLevels& adjusted_relevant_stats,
             const IneffectiveAttributes& ineffective_attributes,
             const BaseAttackPowers& base_attack_powers,
             const AttributeScalings& attribute_scalings_at_upgrade_level
@@ -637,9 +637,9 @@ export namespace erdo::calculator
             return attack_power_type != AttackPowerType::PHYSICAL && this->ineffective_attack_power_types[std::to_underlying(attack_power_type)];
         }
 
-        Attack(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options) : FullAttackOptions{ attack_options, weapon, stats } { }
+        Attack(const Weapon& weapon, const AttributeLevels& stats, const AttackOptions& attack_options) : FullAttackOptions{ attack_options, weapon, stats } { }
 
-        static Attack calculate(const Weapon& weapon, const Stats& stats, const AttackOptions& attack_options)
+        static Attack calculate(const Weapon& weapon, const AttributeLevels& stats, const AttackOptions& attack_options)
         {
             Attack attack{ weapon, stats, attack_options };
             attack.calculate_inplace();

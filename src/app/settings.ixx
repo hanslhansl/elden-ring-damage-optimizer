@@ -92,36 +92,6 @@ namespace erdo::ui
             checkbox->setChecked(value);
         }
     };
-    struct DisplayBaseNamesInsteadOfFullNames : CheckBoxSetting
-    {
-        using typename CheckBoxSetting::value_type;
-
-        constexpr static std::string_view section_name = "weapon table";
-        constexpr static std::string_view name = "display_base_names_instead_of_full_names";
-        constexpr static std::string_view display_name = "display base names instead of full names";
-
-        constexpr static value_type default_value = false;
-    };
-    struct SortByBaseNamesInsteadOfFullNames : CheckBoxSetting
-    {
-        using typename CheckBoxSetting::value_type;
-
-        constexpr static std::string_view section_name = "weapon table";
-        constexpr static std::string_view name = "sort_by_base_names_instead_of_full_names";
-        constexpr static std::string_view display_name = "sort by base names instead of full names";
-
-        constexpr static value_type default_value = false;
-    };
-    struct HideBaseGameDLCColumn : CheckBoxSetting
-    {
-        using typename CheckBoxSetting::value_type;
-
-        constexpr static std::string_view section_name = "weapon table";
-        constexpr static std::string_view name = "hide_base_game_dlc_column";
-        constexpr static std::string_view display_name = "hide base game/dlc column";
-
-        constexpr static value_type default_value = false;
-    };
     struct LinkToFextralifeInsteadOfFandom : CheckBoxSetting
     {
         using typename CheckBoxSetting::value_type;
@@ -148,9 +118,6 @@ namespace erdo::ui
         SettingBuilder<AttributeLevelLimit> attribute_level_limit{ *this };
 
         SettingBuilder<DecimalPlaces> decimal_places{ *this };
-        SettingBuilder<DisplayBaseNamesInsteadOfFullNames> display_base_names_instead_of_full_names{ *this };
-        SettingBuilder<SortByBaseNamesInsteadOfFullNames> sort_by_base_names_instead_of_full_names{ *this };
-        SettingBuilder<HideBaseGameDLCColumn> hide_base_game_dlc_column{ *this };
         SettingBuilder<LinkToFextralifeInsteadOfFandom> link_to_fextralife_instead_of_fandom{ *this };
 
         Settings(int) {};

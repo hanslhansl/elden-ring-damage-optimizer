@@ -8,7 +8,7 @@ using namespace erdo::calculator;
 
 namespace erdo::optimizer
 {
-    export std::size_t get_stat_variation_count(const int free_attribute_points, const RelevantStats& min_relevant_stats, const RelevantStats& max_relevant_stats)
+    export std::size_t get_stat_variation_count(const int free_attribute_points, const RelevantAttributeLevels& min_relevant_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
         const auto A = free_attribute_points;
         const auto L = min_relevant_stats;
@@ -60,7 +60,7 @@ namespace erdo::optimizer
 
         return dp[A];
     }
-    export std::vector<Stats> get_stat_variations(const int free_attribute_points, const Stats &min_stats, const RelevantStats& max_relevant_stats)
+    export std::vector<AttributeLevels> get_stat_variations(const int free_attribute_points, const AttributeLevels &min_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
         auto max_attribute_points = free_attribute_points + min_stats.attribute_points();
         const auto SUM = max_attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<int>{});
@@ -70,7 +70,7 @@ namespace erdo::optimizer
         if (possible_occurances == 0)
             return {};
 
-        std::vector<Stats> stat_variations{ possible_occurances };
+        std::vector<AttributeLevels> stat_variations{ possible_occurances };
         auto current_it = stat_variations.begin(); 
 
         auto result = min_stats;
@@ -212,13 +212,13 @@ namespace erdo::optimizer
         static constexpr auto efficient_calculate_attack = optimizer::efficient_calculate_attack<target>;
         using Optimizer = O<target>;
 
-        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<Stats>& stat_variations)
+        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<AttributeLevels>& stat_variations)
         {
             if (stat_variations.empty())
                 throw std::invalid_argument("stat_variations must not be empty.");
 
             Attack attack{ weapon, {}, attack_options };
-            Stats const* best_stats = nullptr;
+            AttributeLevels const* best_stats = nullptr;
             auto best_value = std::numeric_limits<typename Projection<target>::value_type>::lowest();
 
             for (const auto& stats : stat_variations)
@@ -253,13 +253,17 @@ namespace erdo::optimizer
     export template<Target target>
     struct BruteForce : OptimizerBase<BruteForce, target>
     {
-        std::vector<Stats> stat_variations{};
+        std::vector<AttributeLevels> stat_variations{};
         AttackOptions attack_options;
 
-        BruteForce(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const Stats &min_stats, int max_stat)
+        BruteForce(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const AttributeLevels &min_stats, int max_stat)
             : attack_options{ attack_options }
         {
-            this->stat_variations = get_stat_variations(free_attribute_points, min_stats, make_filled_array<RelevantStats>(max_stat));
+            this->stat_variations = get_stat_variations(
+                free_attribute_points,
+                min_stats,
+                make_filled_array<RelevantAttributeLevels>(max_stat)
+            );
             this->total_stat_variation_count = this->stat_variations.size() * weapons.size();
         }
 
@@ -272,14 +276,14 @@ namespace erdo::optimizer
     export template<Target target>
     struct V2 : OptimizerBase<V2, target>
     {
-        static RelevantStatsArray get_optimized_max_relevant_stats(
+        static RelevantAttributeLevelsArray get_optimized_max_relevant_stats(
             const int free_attribute_points,
-            const RelevantStats &min_relevant_stats,
-            const RelevantStats& max_relevant_stats,
+            const RelevantAttributeLevels &min_relevant_stats,
+            const RelevantAttributeLevels& max_relevant_stats,
             const NonscalingAttributes& nonscaling_attributes
         )
         {
-            RelevantStatsArray optimized_max_relevant_stats{};
+            RelevantAttributeLevelsArray optimized_max_relevant_stats{};
             for (auto&& [min_relevant_stat, max_relevant_stat, nonscaling_attribute, optimized_max_relevant_stat] :
                 std::views::zip(min_relevant_stats, max_relevant_stats, nonscaling_attributes, optimized_max_relevant_stats)
             )
@@ -287,10 +291,10 @@ namespace erdo::optimizer
             return optimized_max_relevant_stats;
         }
 
-        static std::vector<Stats> get_optimized_stat_variations(
+        static std::vector<AttributeLevels> get_optimized_stat_variations(
             const int free_attribute_points,
-            const Stats &min_stats,
-            const RelevantStats& max_relevant_stats,
+            const AttributeLevels &min_stats,
+            const RelevantAttributeLevels& max_relevant_stats,
             const NonscalingAttributes& nonscaling_attributes
         )
         {
@@ -304,14 +308,14 @@ namespace erdo::optimizer
             return optimized_stat_variations;
         }
 
-        std::map<NonscalingAttributes, std::vector<Stats>> optimized_stat_variations_map{};
+        std::map<NonscalingAttributes, std::vector<AttributeLevels>> optimized_stat_variations_map{};
         AttackOptions attack_options;
 
-        V2(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const Stats &min_stats, int max_stat)
+        V2(std::ranges::sized_range auto&& weapons, const AttackOptions& attack_options, int free_attribute_points, const AttributeLevels &min_stats, int max_stat)
             : attack_options{ attack_options }
         {
             auto min_relevant_stats = min_stats.relevant_stats();
-            auto max_relevant_stats = make_filled_array<RelevantStats>(max_stat);
+            auto max_relevant_stats = make_filled_array<RelevantAttributeLevels>(max_stat);
 
             if (get_stat_variation_count(free_attribute_points, min_relevant_stats, max_relevant_stats) != 0)
             {

@@ -44,7 +44,7 @@ TEST_CASE("calculation - total attack power 1")
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::Stats stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
+    calculator::AttributeLevels stats{ 10, 10, 10, 21, 10, 10, 10, 10 };
 
     auto total_attack_powers = weapons
         | std::views::transform([&](const calculator::Weapon& w){ return calculator::Attack::calculate(w, stats, attack_options); })
@@ -62,7 +62,7 @@ TEST_CASE("calculation - total attack power 2")
     auto&& weapons = get_weapons();
 
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    calculator::Stats stats{};
+    calculator::AttributeLevels stats{};
     stats.fill(70);
 
     auto total_attack_powers = weapons
@@ -81,7 +81,7 @@ TEST_CASE("stat variations")
     const auto expected_stat_variation_count = 1365;
     const auto min_stats = calculator::character_class_stats.at("wretch");
     const auto min_relevant_stats = min_stats.relevant_stats();
-    const auto max_relevant_stats = make_filled_array<calculator::RelevantStats>(99);
+    const auto max_relevant_stats = make_filled_array<calculator::RelevantAttributeLevels>(99);
     const auto free_attribute_points = 11;
 
     std::size_t stat_variation_count;
@@ -97,7 +97,7 @@ TEST_CASE("stat variations")
     };
     REQUIRE(stat_variation_count == expected_stat_variation_count);
     
-    std::vector<calculator::Stats> stat_variations{};
+    std::vector<calculator::AttributeLevels> stat_variations{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::get_stat_variations")
 #endif
@@ -112,7 +112,7 @@ TEST_CASE("stat variations")
 }
 
 template<typename Optimizer>
-void test_optimization(std::string_view expected_weapon_full_name, const calculator::Stats& expected_stats, const std::vector<double>& expected_values)
+void test_optimization(std::string_view expected_weapon_full_name, const calculator::AttributeLevels& expected_stats, const std::vector<double>& expected_values)
 {
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};

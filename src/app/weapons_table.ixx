@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <QTimer>
 #include <qabstractitemmodel.h>
+#include <qmenu.h>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -55,9 +56,9 @@ namespace erdo::ui
             using _tuple_base<T>::_tuple_base;
 
             static constexpr bool draw_section_header_labels_rotated = false;
-            static constexpr bool has_header_section_title = false;
             static constexpr bool draw_section_seperators = false;
             static constexpr bool expand_section = false;
+            static constexpr std::string_view section_name = "";
 
             explicit SectionBase(const calculator::Attack& attack) { }
 
@@ -78,15 +79,8 @@ namespace erdo::ui
             {
                 auto&& weapon = attack.weapon.get();
 
-                if (settings.display_base_names_instead_of_full_names)
-                    (*this)[0][0] = string_to_display(weapon.qualified_base_name(attack.upgrade_level()));
-                else
-                    (*this)[0][0] = string_to_display(weapon.qualified_name(attack.upgrade_level()));
-
-                if (settings.sort_by_base_names_instead_of_full_names)
-                    (*this)[0][1] = string_to_display(weapon.base_name);
-                else
-                    (*this)[0][1] = string_to_display(weapon.full_name);
+                (*this)[0][0] = string_to_display(weapon.qualified_name(attack.upgrade_level()));
+                (*this)[0][1] = string_to_display(weapon.full_name);
 
                 if (settings.link_to_fextralife_instead_of_fandom)
                     (*this)[0][2] = QUrl(QString::fromStdString(weapon.fextralife_link()));
@@ -272,8 +266,7 @@ namespace erdo::ui
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
-            static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "attack power";
+            static constexpr std::string_view section_name = "attack power";
             inline const static std::vector<QString> column_names = [](){
                 auto result = enumerator_strings_of<calculator::DamageType>()
                     | std::views::transform(string_to_display)
@@ -320,8 +313,7 @@ namespace erdo::ui
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
-            static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "status effects";
+            static constexpr std::string_view section_name = "status effects";
 
             using EnumDataSection::EnumDataSection;
             explicit StatusEffects(const calculator::Attack& attack)
@@ -344,8 +336,7 @@ namespace erdo::ui
         };
         export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "attribute scaling";
+            static constexpr std::string_view section_name = "attribute scaling";
 
             using EnumDataSection::EnumDataSection;
             explicit AttributeScalings(const calculator::Attack& attack)
@@ -374,8 +365,7 @@ namespace erdo::ui
         };
         export struct Requirements : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "attribute requirements";
+            static constexpr std::string_view section_name = "attribute requirements";
 
             using EnumDataSection::EnumDataSection;
             explicit Requirements(const calculator::Attack& attack)
@@ -400,8 +390,7 @@ namespace erdo::ui
         };
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr bool has_header_section_title = true;
-            inline static const QString header_section_title = "character attributes";
+            static constexpr std::string_view section_name = "character attributes";
 
             using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::Attack& attack)
@@ -443,8 +432,14 @@ namespace erdo::ui
             std::ranges::copy(cumulative_section_sizes | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
             return result;
         }();
-        static constexpr std::size_t total_size = std::accumulate(section_sizes.begin(), section_sizes.end(), 0);
-        
+        static constexpr std::size_t total_size = std::ranges::fold_left(section_sizes, 0, std::plus{});
+        static constexpr std::array column_index_to_section_index = []() {
+            std::array<std::size_t, total_size> result{};
+            for (std::size_t section_index = 0; section_index < sizeof...(Args); ++section_index)
+                std::ranges::fill(result | std::views::drop(section_index_offsets[section_index]) | std::views::take(section_sizes[section_index]), section_index);
+            return result;
+        }();
+
         static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
         static constexpr std::array draw_column_header_label_rotated = [](){
             std::array draw_section_header_labels_rotated = { Args::draw_section_header_labels_rotated... };
@@ -464,6 +459,8 @@ namespace erdo::ui
             
             return result;
         }();
+
+        inline static const std::array section_names = { QString::fromStdString(std::string(Args::section_name))... };
 
         static const QString& column_name(int column)
         {
@@ -511,6 +508,7 @@ namespace erdo::ui
 
     export using Row = BasicRow<
         sections::NameSection,
+        sections::BaseNameSection,
         sections::AffinitySection,
         sections::TypeSection,
         sections::SpellScaling,
@@ -520,9 +518,7 @@ namespace erdo::ui
         sections::Requirements,
         sections::Stats,
         sections::CharacterLevelSection,
-        sections::BaseGameDLCSection,
-
-        sections::BaseNameSection
+        sections::BaseGameDLCSection
     >;
 
     export struct RowModel : QAbstractTableModel
@@ -540,26 +536,6 @@ namespace erdo::ui
             });
 
             static constexpr auto name_section_index = tuple_index_v<sections::NameSection, Row>;
-
-            connect(&settings.display_base_names_instead_of_full_names, settings.display_base_names_instead_of_full_names.changed_member_pointer, [this](){
-                for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack);
-                emit dataChanged(
-                    this->index(0, Row::section_index_offsets[name_section_index]),
-                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
-                    { Qt::DisplayRole }
-                );
-            });
-            connect(&settings.sort_by_base_names_instead_of_full_names, settings.sort_by_base_names_instead_of_full_names.changed_member_pointer, [this](){
-                for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack);
-                emit dataChanged(
-                    this->index(0, Row::section_index_offsets[name_section_index]),
-                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
-                    {  Qt::UserRole }
-                );
-            });
-            
             connect(&settings.link_to_fextralife_instead_of_fandom, settings.link_to_fextralife_instead_of_fandom.changed_member_pointer, [this](){
                 for (auto&& row : this->rows)
                     std::get<sections::NameSection>(row).update(row.attack);
@@ -664,8 +640,20 @@ namespace erdo::ui
         explicit RotatedHeaderView(Qt::Orientation orientation, Rotation rotation = Rotation::CounterClockwise, QWidget *parent = nullptr)
             : QHeaderView(orientation, parent), rotation(rotation)
         {
-            // this->setSectionsMovable(true);
             this->setSectionsClickable(true);
+        }
+
+        bool is_section_hidden(std::size_t section_index) const
+        {
+            return this->isSectionHidden(Row::section_index_offsets[section_index]);
+        }
+        void set_section_hidden(std::size_t section_index, bool hide)
+        {
+            for (auto && index : std::views::iota(
+                Row::section_index_offsets[section_index],
+                Row::cumulative_section_sizes[section_index]
+            ))
+                this->setSectionHidden(static_cast<int>(index), hide);
         }
 
     protected:
@@ -770,30 +758,27 @@ namespace erdo::ui
             pen.setCosmetic(false);
             p.setPen(pen);
 
-            [&]<std::size_t I = 0>(this auto&& self) -> void
+            for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
-                if constexpr (I < std::tuple_size_v<Row>)
+                auto section_name = Row::section_names.at(section_index);
+                if (!section_name.isEmpty())
                 {
-                    if constexpr (std::tuple_element_t<I, Row>::has_header_section_title)
-                    {
-                        constexpr auto first_column = Row::section_index_offsets[I];
-                        constexpr auto last_column = Row::cumulative_section_sizes[I] - 1;
+                    auto first_column = Row::section_index_offsets[section_index];
+                    auto last_column = Row::cumulative_section_sizes[section_index] - 1;
 
-                        auto left  = this->sectionViewportPosition(first_column);
-                        auto right = this->sectionViewportPosition(last_column) + this->sectionSize(last_column);
+                    auto left  = this->sectionViewportPosition(first_column);
+                    auto right = this->sectionViewportPosition(last_column) + this->sectionSize(last_column);
 
-                        QRect r(
-                            left,
-                            0,
-                            right - left,
-                            height
-                        );
+                    QRect r(
+                        left,
+                        0,
+                        right - left,
+                        height
+                    );
 
-                        p.drawText(r, Qt::AlignCenter, std::tuple_element_t<I, Row>::header_section_title);
-                    }
-                    return self.template operator()<I + 1>();
+                    p.drawText(r, Qt::AlignCenter, section_name);
                 }
-            }();
+            }
 
             draw_column_group_separators(this->viewport(), this);
 
@@ -1035,28 +1020,40 @@ namespace erdo::ui
         {
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
-
-            this->setHorizontalHeader(this->header);
+            connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
+            connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
 
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
             this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
 
-            this->hide_section<sections::BaseNameSection>();
+            this->setHorizontalHeader(this->header);
+            this->header->setContextMenuPolicy(Qt::CustomContextMenu);
+            this->set_section_hidden<sections::BaseNameSection>(true);
+            this->set_section_hidden<sections::BaseGameDLCSection>(true);
+            connect(this->header, &QHeaderView::customContextMenuRequested, this, [this](const QPoint &pos)
+            {
+                QMenu menu;
 
-            connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
+                for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
+                {
+                    auto name = Row::section_names.at(section_index);
+                    if (name.isEmpty())
+                        name = Row::column_name(Row::section_index_offsets[section_index]);
 
-            auto lambda = [this](){
-                if (settings.hide_base_game_dlc_column)
-                    this->hide_section<sections::BaseGameDLCSection>();
-                else
-                    this->show_section<sections::BaseGameDLCSection>();
-                this->resize_columns_to_contents();
-            };
-            lambda();
-            connect(&settings.hide_base_game_dlc_column, settings.hide_base_game_dlc_column.changed_member_pointer, lambda);
+                    QAction *action = menu.addAction(name);
+                    action->setCheckable(true);
+                    action->setChecked(!this->header->is_section_hidden(section_index));
+
+                    connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                        this->header->set_section_hidden(section_index, !visible);
+                        this->resize_columns_to_contents();
+                    });
+                }
+
+                menu.exec(this->mapToGlobal(pos));
+            });
         }
 
         void resize_columns_to_contents()
@@ -1079,24 +1076,9 @@ namespace erdo::ui
         }
 
         template<typename ColumnType>
-        void hide_section()
+        void set_section_hidden(bool hide)
         {
-            static constexpr auto I = tuple_index_v<ColumnType, Row>;
-            for (auto && index : std::views::iota(
-                Row::section_index_offsets[I],
-                Row::cumulative_section_sizes[I]
-            ))
-                this->header->hideSection(static_cast<int>(index));
-        }
-        template<typename ColumnType>
-        void show_section()
-        {
-            static constexpr auto I = tuple_index_v<ColumnType, Row>;
-            for (auto && index : std::views::iota(
-                Row::section_index_offsets[I],
-                Row::cumulative_section_sizes[I]
-            ))
-                this->header->showSection(static_cast<int>(index));
+            this->header->set_section_hidden(tuple_index_v<ColumnType, Row>, hide);
         }
 
     protected:
