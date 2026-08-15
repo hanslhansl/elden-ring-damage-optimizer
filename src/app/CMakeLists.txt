@@ -31,11 +31,11 @@ add_executable(erdo
 target_link_libraries(erdo PRIVATE
     erdo_ui
 )
-copy_xml_data(erdo)
 
 install(TARGETS erdo
     RUNTIME DESTINATION .
 )
+copy_xml_data(erdo)
 
 if(NOT QT_FEATURE_static)
     qt_generate_deploy_app_script(
@@ -85,6 +85,7 @@ if(NOT QT_FEATURE_static)
         endif()
     ]])
 endif()
+
 
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "elden-ring-damage-optimizer")
