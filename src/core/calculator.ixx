@@ -283,7 +283,7 @@ export namespace erdo::calculator
         // base attack power at each upgrade level for each attack power type
         BaseAttackPowersAtUpgradeLevels base_attack_powers_at_upgrade_levels;
         // each attack power type's scaling with each character attribute
-        AttackElementCorrects attack_power_attribute_scaling;
+        AttackElementCorrects attack_power_types_attribute_scalings;
         // each attack power type's scaling curve
         ScalingCurves attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
@@ -308,7 +308,7 @@ export namespace erdo::calculator
             for (auto attribute : enumerator_integrals_of<calculator::RelevantAttribute>())
             {
                 result[attribute] = std::ranges::all_of(enumerator_integrals_of<calculator::AttackPowerType>(), [&](int apt){
-                    auto&& attribute_correct = this->attack_power_attribute_scaling[apt][attribute];
+                    auto&& attribute_correct = this->attack_power_types_attribute_scalings[apt][attribute];
 
                     // If attribute_correct is 0, this attribute is ignored for both scaling and penalty for this apt
                     if (attribute_correct == 0.)
@@ -435,6 +435,11 @@ export namespace erdo::calculator
         {
             return this->weapon.get().base_attack_powers_at_upgrade_levels[this->upgrade_level()];
         }
+    
+        const AttributeScalings& attack_power_type_attribute_scalings(AttackPowerType apt) const
+        {
+            return this->weapon.get().attack_power_types_attribute_scalings[std::to_underlying(apt)];
+        }
     };
 
     struct AttackRating
@@ -467,7 +472,6 @@ export namespace erdo::calculator
             const ScalingCurve& scaling_curve
         ) const
         {
-
             auto&& weapon = this->weapon.get();
 
             if (is_ineffective_attack_power_type)
@@ -499,7 +503,7 @@ export namespace erdo::calculator
             }
         }
 
-        void calculate_attack_power(
+        void calculate_attack_power_inplace_impl(
             const AttackPowerType attack_power_type,
             const RelevantAttributeLevels& relevant_stats,
             const RelevantAttributeLevels& adjusted_relevant_stats,
@@ -512,7 +516,7 @@ export namespace erdo::calculator
             const auto is_damage_type = attack_power_type <= AttackPowerType::HOLY;
             
             auto&& weapon = this->weapon.get();
-            auto&& scaling_attributes = weapon.attack_power_attribute_scaling[attack_power_type_integral];
+            auto&& scaling_attributes = this->attack_power_type_attribute_scalings(attack_power_type);
             auto&& scaling_curve = weapon.attack_power_scaling_curves[attack_power_type_integral];
             auto&& base_attack_power = base_attack_powers[attack_power_type_integral];
 
@@ -551,7 +555,7 @@ export namespace erdo::calculator
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
 
-            this->calculate_attack_power(
+            this->calculate_attack_power_inplace_impl(
                 attack_power_type,
                 relevant_stats,
                 adjusted_relevant_stats,
@@ -584,7 +588,7 @@ export namespace erdo::calculator
             auto&& base_attack_powers = this->base_attack_powers();
 
             for (auto attack_power_type : enumerators_of<AttackPowerType>())
-                this->calculate_attack_power(
+                this->calculate_attack_power_inplace_impl(
                     attack_power_type,
                     relevant_stats,
                     adjusted_relevant_stats,

@@ -58,7 +58,7 @@ namespace erdo::ui
             static constexpr bool draw_section_header_labels_rotated = false;
             static constexpr bool draw_section_seperators = false;
             static constexpr bool expand_section = false;
-            static constexpr std::string_view section_name = "";
+            static inline const QString section_name = "";
 
             explicit SectionBase(const calculator::Attack& attack) { }
 
@@ -266,7 +266,7 @@ namespace erdo::ui
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
-            static constexpr std::string_view section_name = "attack power";
+            static inline const QString section_name = "attack power";
             inline const static std::vector<QString> column_names = [](){
                 auto result = enumerator_strings_of<calculator::DamageType>()
                     | std::views::transform(string_to_display)
@@ -313,7 +313,7 @@ namespace erdo::ui
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
-            static constexpr std::string_view section_name = "status effects";
+            static inline const QString section_name = "status effects";
 
             using EnumDataSection::EnumDataSection;
             explicit StatusEffects(const calculator::Attack& attack)
@@ -336,7 +336,7 @@ namespace erdo::ui
         };
         export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr std::string_view section_name = "attribute scaling";
+            static inline const QString section_name = "attribute scaling at upgrade level";
 
             using EnumDataSection::EnumDataSection;
             explicit AttributeScalings(const calculator::Attack& attack)
@@ -365,7 +365,7 @@ namespace erdo::ui
         };
         export struct Requirements : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr std::string_view section_name = "attribute requirements";
+            static inline const QString section_name = "attribute requirements";
 
             using EnumDataSection::EnumDataSection;
             explicit Requirements(const calculator::Attack& attack)
@@ -390,7 +390,7 @@ namespace erdo::ui
         };
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
-            static constexpr std::string_view section_name = "character attributes";
+            static inline const QString section_name = "character attributes";
 
             using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::Attack& attack)
@@ -408,6 +408,27 @@ namespace erdo::ui
                     arr[0] = stat;
                     arr[1] = stat;
                     arr[2] = foreground_color(is_ineffective);
+                }
+            }
+        };
+
+        export template<calculator::AttackPowerType apt>
+        struct AttackPowerTypeAttributeScalings : EnumDataSection<calculator::RelevantAttribute>
+        {
+            static constexpr auto attack_power_type = apt;
+            static inline const auto section_name = string_to_display(enum_to_string(attack_power_type) + std::string(" scaling"));
+
+            using EnumDataSection::EnumDataSection;
+            explicit AttackPowerTypeAttributeScalings(const calculator::Attack& attack)
+            {
+                auto&& weapon = attack.weapon.get();
+
+                for (auto&& [attack_power_type_attribute_scalings, arr] : std::views::zip(
+                    attack.attack_power_type_attribute_scalings(attack_power_type),
+                    *this))
+                {
+                    arr[0] = format_number(attack_power_type_attribute_scalings);
+                    arr[1] = attack_power_type_attribute_scalings;
                 }
             }
         };
@@ -460,8 +481,11 @@ namespace erdo::ui
             return result;
         }();
 
-        inline static const std::array section_names = { QString::fromStdString(std::string(Args::section_name))... };
-
+        static const QString& section_name(int column)
+        {
+            const static std::vector<QString> section_names{ Args::section_name... };
+            return section_names.at(column);
+        }
         static const QString& column_name(int column)
         {
             const static std::vector<QString> column_names = [](){
@@ -518,7 +542,21 @@ namespace erdo::ui
         sections::Requirements,
         sections::Stats,
         sections::CharacterLevelSection,
-        sections::BaseGameDLCSection
+        sections::BaseGameDLCSection,
+
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::PHYSICAL>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::MAGIC>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::FIRE>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::LIGHTNING>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::HOLY>,
+        
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::POISON>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::SCARLET_ROT>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::BLEED>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::FROST>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::SLEEP>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::MADNESS>,
+        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::DEATH_BLIGHT>
     >;
 
     export struct RowModel : QAbstractTableModel
@@ -760,7 +798,7 @@ namespace erdo::ui
 
             for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
-                auto section_name = Row::section_names.at(section_index);
+                auto section_name = Row::section_name(section_index);
                 if (!section_name.isEmpty())
                 {
                     auto first_column = Row::section_index_offsets[section_index];
@@ -1018,27 +1056,32 @@ namespace erdo::ui
 
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
         {
+            this->setFrameStyle(QFrame::Box);
+            this->setSortingEnabled(true);
+            this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+            this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
+            this->setSelectionBehavior(QAbstractItemView::SelectRows);
+
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
             connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
             connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
 
-            this->setFrameStyle(QFrame::Box);
-            this->setSortingEnabled(true);
-            this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-            this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
-
             this->setHorizontalHeader(this->header);
             this->header->setContextMenuPolicy(Qt::CustomContextMenu);
             this->set_section_hidden<sections::BaseNameSection>(true);
             this->set_section_hidden<sections::BaseGameDLCSection>(true);
+            [&](auto){
+                static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
+                (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
+            }(1);
             connect(this->header, &QHeaderView::customContextMenuRequested, this, [this](const QPoint &pos)
             {
                 QMenu menu;
 
                 for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
                 {
-                    auto name = Row::section_names.at(section_index);
+                    auto name = Row::section_name(section_index);
                     if (name.isEmpty())
                         name = Row::column_name(Row::section_index_offsets[section_index]);
 
@@ -1065,13 +1108,10 @@ namespace erdo::ui
             {
                 this->doItemsLayout();
 
-                QTimer::singleShot(0, this, [this]()
-                {
-                    if (!this->isVisible())
-                        return;
+                if (!this->isVisible())
+                    return;
 
-                    this->resize_columns_to_contents_impl();
-                });
+                this->resize_columns_to_contents_impl();
             });
         }
 
