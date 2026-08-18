@@ -7,7 +7,10 @@ module;
 #include <QFormLayout>
 #include <QDialog>
 #include <QLabel>
-#include <qtabwidget.h>
+#include <QApplication>
+#include <QPushButton>
+#include <QTabWidget>
+#include <DialogButtonBox>
 export module erdo.ui.settings;
 
 import std;
@@ -156,6 +159,19 @@ namespace erdo::ui
 
             auto layout = new QVBoxLayout{};
             layout->addWidget(tab_widget);
+
+            QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Reset, this->dialog);
+            QObject::connect(buttons, &QDialogButtonBox::accepted, this->dialog, &QDialog::accept);
+            QObject::connect(buttons, &QDialogButtonBox::clicked, [this, buttons](QAbstractButton* button) {
+                if (buttons->buttonRole(button) == QDialogButtonBox::ResetRole)
+                {
+                    this->dialog->reject();
+                    this->qsettings->clear();
+                    QApplication::quit();
+                }
+            });
+            layout->addWidget(buttons);
+
             this->dialog->setLayout(layout);
             this->dialog->setWindowTitle("settings");
         }
