@@ -10,7 +10,7 @@ module;
 #include <QApplication>
 #include <QPushButton>
 #include <QTabWidget>
-#include <DialogButtonBox>
+#include <QDialogButtonBox>
 export module erdo.ui.settings;
 
 import std;
