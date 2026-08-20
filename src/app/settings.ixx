@@ -95,16 +95,6 @@ namespace erdo::ui
             checkbox->setChecked(value);
         }
     };
-    struct LinkToFextralifeInsteadOfFandom : CheckBoxSetting
-    {
-        using typename CheckBoxSetting::value_type;
-
-        constexpr static std::string_view section_name = "weapon table";
-        constexpr static std::string_view name = "link_to_fextralife_instead_of_fandom";
-        constexpr static std::string_view display_name = "link to Fextralife instead of Fandom";
-
-        constexpr static value_type default_value = false;
-    };
 
     class Settings
     {
@@ -121,7 +111,6 @@ namespace erdo::ui
         SettingBuilder<AttributeLevelLimit> attribute_level_limit{ *this };
 
         SettingBuilder<DecimalPlaces> decimal_places{ *this };
-        SettingBuilder<LinkToFextralifeInsteadOfFandom> link_to_fextralife_instead_of_fandom{ *this };
 
         Settings(int) {};
         Settings() : is_initialized{ true }, dialog{ new QDialog{} }, qsettings{ std::make_unique<QSettings>() }

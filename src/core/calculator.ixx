@@ -355,13 +355,13 @@ export namespace erdo::calculator
         }();
 
 
-        std::string fandom_link() const
+        std::string fandom_url() const
         {
             auto url_part = this->base_name;
             std::ranges::replace(url_part, ' ', '_');
             return "https://eldenring.fandom.com/wiki/" + url_part;
         }
-        std::string fextralife_link() const
+        std::string fextralife_url() const
         {
             auto url_part = this->base_name;
             std::ranges::replace(url_part, ' ', '+');
@@ -373,12 +373,6 @@ export namespace erdo::calculator
             if (upgrade_level == 0)
                 return this->full_name;
             return std::format("{} +{}", this->full_name, upgrade_level);
-        }
-        std::string qualified_base_name(int upgrade_level) const
-        {
-            if (upgrade_level == 0)
-                return this->base_name;
-            return std::format("{} +{}", this->base_name, upgrade_level);
         }
 
         static const Weapon dummy;

@@ -41,10 +41,6 @@ namespace erdo::ui
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
  
-    enum QtDataRole
-    {
-        LinkRole = Qt::UserRole + 1
-    };
 
     namespace sections
     {
@@ -65,44 +61,6 @@ namespace erdo::ui
             void update(const calculator::Attack& attack) { }
         };
 
-        export struct NameSection : SectionBase<std::array<std::array<QVariant, 3>, 1>>
-        {
-            static constexpr std::array column_names { "name" };
-
-            using SectionBase::SectionBase;
-            explicit NameSection(const calculator::Attack& attack)
-            {
-                this->update(attack);
-            }
-
-            void update(const calculator::Attack& attack)
-            {
-                auto&& weapon = attack.weapon.get();
-
-                (*this)[0][0] = string_to_display(weapon.qualified_name(attack.upgrade_level()));
-                (*this)[0][1] = string_to_display(weapon.full_name);
-
-                if (settings.link_to_fextralife_instead_of_fandom)
-                    (*this)[0][2] = QUrl(QString::fromStdString(weapon.fextralife_link()));
-                else
-                    (*this)[0][2] = QUrl(QString::fromStdString(weapon.fandom_link()));
-            }
-
-            QVariant data(int column, int role) const
-            {
-                if (role == Qt::DisplayRole)
-                    return (*this)[column][0];
-
-                if (role == Qt::UserRole)
-                    return (*this)[column][1];
-                
-                if (role == QtDataRole::LinkRole)
-                    return (*this)[column][2];
-                
-                return {};
-            }
-        };
-
         export struct BinaryTextSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
             QVariant data(int column, int role) const
@@ -114,6 +72,24 @@ namespace erdo::ui
                     return (*this)[column][1];
                 
                 return {};
+            }
+        };
+        export struct NameSection : BinaryTextSection
+        {
+            static constexpr std::array column_names { "name" };
+
+            using BinaryTextSection::BinaryTextSection;
+            explicit NameSection(const calculator::Attack& attack)
+            {
+                this->update(attack);
+            }
+
+            void update(const calculator::Attack& attack)
+            {
+                auto&& weapon = attack.weapon.get();
+
+                (*this)[0][0] = QString::fromStdString(weapon.qualified_name(attack.upgrade_level()));
+                (*this)[0][1] = QString::fromStdString(weapon.full_name);
             }
         };
         export struct AffinitySection : BinaryTextSection
@@ -549,7 +525,6 @@ namespace erdo::ui
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::FIRE>,
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::LIGHTNING>,
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::HOLY>,
-        
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::POISON>,
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::SCARLET_ROT>,
         sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::BLEED>,
@@ -571,17 +546,6 @@ namespace erdo::ui
                 for (auto&& row : this->rows)
                     row.update();
                 emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
-            });
-
-            static constexpr auto name_section_index = tuple_index_v<sections::NameSection, Row>;
-            connect(&settings.link_to_fextralife_instead_of_fandom, settings.link_to_fextralife_instead_of_fandom.changed_member_pointer, [this](){
-                for (auto&& row : this->rows)
-                    std::get<sections::NameSection>(row).update(row.attack);
-                emit dataChanged(
-                    this->index(0, Row::section_index_offsets[name_section_index]),
-                    this->index(this->rowCount() - 1, Row::cumulative_section_sizes[name_section_index]-1),
-                    {  QtDataRole::LinkRole }
-                );
             });
         }
 
@@ -904,37 +868,6 @@ namespace erdo::ui
         QSet<int> affinities;
     };
 
-    class LinkDelegate : public QStyledItemDelegate
-    {
-    public:
-        using QStyledItemDelegate::QStyledItemDelegate;
-
-        void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
-        {
-            QStyleOptionViewItem opt(option);
-            initStyleOption(&opt, index);
-
-            opt.palette.setColor(QPalette::Text, Qt::blue);
-            opt.font.setUnderline(true);
-
-            QStyledItemDelegate::paint(painter, opt, index);
-        }
-
-        bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &, const QModelIndex &index) override
-        {
-            if (event->type() == QEvent::MouseButtonRelease)
-            {
-                const QString url = index.data(QtDataRole::LinkRole).toString();
-                if (!url.isEmpty())
-                {
-                    QDesktopServices::openUrl(QUrl(url));
-                    return true;
-                }
-            }
-            return false;
-        }
-    };
-
     export class WeaponTable : public QTableView
     {
         void resize_columns_to_contents_impl()
@@ -1049,6 +982,34 @@ namespace erdo::ui
             }
         }
 
+        void show_table_context_menu(const QPoint &pos)
+        {
+            auto row_indices = this->selectionModel()->selectedRows()
+                | std::views::transform([this](const QModelIndex& index){
+                    return this->proxy_model->mapToSource(index).row();
+                })
+                | std::ranges::to<std::vector>();
+
+            auto selection_name = row_indices.size() == 1
+                ? this->model->rows[row_indices[0]].attack.weapon.get().full_name
+                : std::format("Selection ({})", row_indices.size());
+
+
+            QMenu menu(this);
+
+            auto action_fandom = menu.addAction(QString::fromStdString(std::format("Show {} on Fandom", selection_name)));
+            auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
+
+            auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));
+
+            if (selected_action == action_fandom)
+                for (auto row_index : row_indices)
+                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows[row_index].attack.weapon.get().fandom_url())));
+            else if (selected_action == action_fextralife)
+                for (auto row_index : row_indices)
+                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows[row_index].attack.weapon.get().fextralife_url())));
+        }
+
     public:
         RowModel* model = new RowModel(this);
         RowSortFilterModel* proxy_model = new RowSortFilterModel(this);
@@ -1056,17 +1017,21 @@ namespace erdo::ui
 
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
         {
+            // view
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
             this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-            this->setItemDelegateForColumn(Row::section_index_offsets[tuple_index_v<sections::NameSection, Row>], new LinkDelegate(this));
             this->setSelectionBehavior(QAbstractItemView::SelectRows);
+            this->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(this, &QTableView::customContextMenuRequested, this, &WeaponTable::show_table_context_menu);
 
+            // model
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
             connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
             connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
 
+            // header
             this->setHorizontalHeader(this->header);
             this->header->setContextMenuPolicy(Qt::CustomContextMenu);
             this->set_section_hidden<sections::BaseNameSection>(true);
