@@ -37,54 +37,51 @@ install(TARGETS erdo
 )
 copy_xml_data(erdo)
 
-if(NOT QT_FEATURE_static)
-    qt_generate_deploy_app_script(
-        TARGET erdo
-        OUTPUT_SCRIPT deploy_script
-        NO_COMPILER_RUNTIME
-    )
-    install(SCRIPT ${deploy_script})
+qt_generate_deploy_app_script(
+    TARGET erdo
+    OUTPUT_SCRIPT deploy_script
+)
+install(SCRIPT ${deploy_script})
 
-    install(CODE [[
-        set(_root "${CMAKE_INSTALL_PREFIX}")
-        set(bin_dir "${_root}/bin")
+install(CODE [[
+    set(_root "${CMAKE_INSTALL_PREFIX}")
+    set(bin_dir "${_root}/bin")
 
-        if(EXISTS "${bin_dir}")
-            file(GLOB bin_files "${bin_dir}/*")
+    if(EXISTS "${bin_dir}")
+        file(GLOB bin_files "${bin_dir}/*")
 
-            foreach(file IN LISTS bin_files)
-                get_filename_component(name "${file}" NAME)
-                file(RENAME
-                    "${file}"
-                    "${_root}/${name}"
-                )
-            endforeach()
-
-            file(REMOVE_RECURSE "${bin_dir}")
-        endif()
-
-        file(REMOVE_RECURSE "${_bin}")
-
-        # Fix qt.conf for the new location.
-        set(_qt_conf "${_root}/qt.conf")
-
-        if(EXISTS "${_qt_conf}")
-            file(READ "${_qt_conf}" _qt_conf_content)
-
-            string(REPLACE
-                "Prefix = .."
-                "Prefix = ."
-                _qt_conf_content
-                "${_qt_conf_content}"
+        foreach(file IN LISTS bin_files)
+            get_filename_component(name "${file}" NAME)
+            file(RENAME
+                "${file}"
+                "${_root}/${name}"
             )
+        endforeach()
 
-            file(WRITE
-                "${_qt_conf}"
-                "${_qt_conf_content}"
-            )
-        endif()
-    ]])
-endif()
+        file(REMOVE_RECURSE "${bin_dir}")
+    endif()
+
+    file(REMOVE_RECURSE "${_bin}")
+
+    # Fix qt.conf for the new location.
+    set(_qt_conf "${_root}/qt.conf")
+
+    if(EXISTS "${_qt_conf}")
+        file(READ "${_qt_conf}" _qt_conf_content)
+
+        string(REPLACE
+            "Prefix = .."
+            "Prefix = ."
+            _qt_conf_content
+            "${_qt_conf_content}"
+        )
+
+        file(WRITE
+            "${_qt_conf}"
+            "${_qt_conf_content}"
+        )
+    endif()
+]])
 
 
 set(CPACK_GENERATOR "ZIP")
