@@ -14,7 +14,7 @@ module;
 export module erdo.ui.settings;
 
 import std;
-
+import erdo;
 
 namespace erdo::ui
 {
@@ -190,28 +190,20 @@ namespace erdo::ui
     }
 
     export struct {
-        static QString operator()(const QString& str)
+        template<typename E> requires std::is_enum_v<E>
+        static QString operator()(E e)
         {
-            QStringList words = str.split(QRegularExpression("[_ ]+"), Qt::SkipEmptyParts);
+            QStringList words = QString::fromStdString(std::string(enum_to_string(e))).split(QRegularExpression("[_ ]+"), Qt::SkipEmptyParts);
 
             for (QString &word : words)
+            {
                 word = word.toLower();
+                word[0] = word[0].toUpper();
+            }
 
             return words.join(' ');
         }
-        static QString operator()(const char* str)
-        {
-            return operator()(QString(str));
-        }
-        static QString operator()(const std::string& str)
-        {
-            return operator()(QString::fromStdString(str));
-        }
-        static QString operator()(std::string_view str)
-        {
-            return operator()(std::string(str));
-        }
-    } string_to_display;
+    } enum_to_display;
 
     export template<typename T>
     auto format_number(T x)

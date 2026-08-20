@@ -250,7 +250,7 @@ namespace erdo::ui
             });
 
             // character stats spinboxes
-            for (auto& attribute : enumerator_strings_of<calculator::Attribute>())
+            for (auto& attribute : enumerators_of<calculator::Attribute>())
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(0);
@@ -261,7 +261,7 @@ namespace erdo::ui
 
                 this->character_stats_layout->insertRow(
                     this->character_stats_layout->rowCount() - 1,
-                    string_to_display(attribute) + ":", attribute_spinbox
+                    enum_to_display(attribute) + ":", attribute_spinbox
                 );
 
                 connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
@@ -289,26 +289,24 @@ namespace erdo::ui
             });
 
             // base game / dlc
-            for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"base game", "dlc"}))
+            for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"Base Game", "DLC"}))
             {
                 auto item = new QListWidgetItem(str, this->base_game_dlc_list);
                 item->setData(Qt::UserRole, val);
             }
 
             // weapon type list widget
-            for (auto&& [type, str]
-                : std::views::zip(enumerator_integrals_of<calculator::Weapon::Type>(), enumerator_strings_of<calculator::Weapon::Type>()))
+            for (auto&& type : enumerators_of<calculator::Weapon::Type>())
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->type_list);
-                item->setData(Qt::UserRole, type);
+                auto item = new QListWidgetItem(enum_to_display(type), this->type_list);
+                item->setData(Qt::UserRole, std::to_underlying(type));
             }
 
             // weapon affinity list widget
-            for (auto&& [affinity, str]
-                : std::views::zip(enumerator_integrals_of<calculator::Weapon::Affinity>(), enumerator_strings_of<calculator::Weapon::Affinity>()))
+            for (auto&& affinity : enumerators_of<calculator::Weapon::Affinity>())
             {
-                auto item = new QListWidgetItem(string_to_display(str), this->affinity_list);
-                item->setData(Qt::UserRole, affinity);
+                auto item = new QListWidgetItem(enum_to_display(affinity), this->affinity_list);
+                item->setData(Qt::UserRole, std::to_underlying(affinity));
             }
             
             // weapon table view
@@ -354,7 +352,7 @@ namespace erdo::ui
             this->base_name_list->clear();
             for (auto&& base_name : new_base_names)
             {
-                auto item = new QListWidgetItem(string_to_display(base_name), this->base_name_list);
+                auto item = new QListWidgetItem(QString::fromStdString(base_name), this->base_name_list);
                 item->setData(Qt::UserRole, QString::fromStdString(base_name));
             }
 
@@ -638,16 +636,16 @@ namespace erdo::ui
     public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
-            this->character_stats_box->setTitle("min character attributes");
+            this->character_stats_box->setTitle("Min Character Attributes");
 
-            auto max_character_stats_box = new QGroupBox("max character stats");
+            auto max_character_stats_box = new QGroupBox("Max Character Attributes");
             this->second_vertical_layout->insertWidget(1, max_character_stats_box);
 
             auto max_character_stats_layout = new QFormLayout();
             max_character_stats_box->setLayout(max_character_stats_layout);
 
             // max character level label
-            max_character_stats_layout->addRow("max character level:", this->max_character_level_spinbox = new QSpinBox());
+            max_character_stats_layout->addRow("Max Character Level:", this->max_character_level_spinbox = new QSpinBox());
             this->max_character_level_spinbox->setMinimum(1);
             calculator::AttributeLevels max_stats{};
             max_stats.fill(99);
@@ -655,8 +653,8 @@ namespace erdo::ui
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, this, &OptimizeTab::prepare_optimization);
 
             // attribute points label
-            max_character_stats_layout->addRow("max attribute points:", this->max_attribute_points_label = new QLabel());
-            max_character_stats_layout->addRow("max free attribute points:", this->free_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow("Max Attribute Points:", this->max_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow("Max Free Attribute Points:", this->free_attribute_points_label = new QLabel());
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);
@@ -682,8 +680,8 @@ namespace erdo::ui
             this->Ui::OptimizeWidget::setupUi(opt_group);
 
             // optimize target combobox
-            for (const auto& target : enumerator_strings_of<optimizer::Target>())
-                this->target_combobox->addItem(string_to_display(target));
+            for (const auto& target : enumerators_of<optimizer::Target>())
+                this->target_combobox->addItem(enum_to_display(target));
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
@@ -721,7 +719,7 @@ namespace erdo::ui
         void set_active_weapon_data(const std::filesystem::path& dir)
         {
             auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
-            execute_future_with_blocking_progress_bar<false>(future, this, "loading weapon data...");
+            execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
             this->active_weapon_data = future.takeResult();
 
             this->stats->set_active_weapon_data(this->active_weapon_data);
@@ -733,7 +731,7 @@ namespace erdo::ui
             dir = std::filesystem::canonical(dir).make_preferred();
             if (!std::filesystem::is_directory(dir))
             {
-                QMessageBox::critical(this, "invalid directory", std::format("not a directory: {}", dir).c_str());
+                QMessageBox::critical(this, "Invalid Directory", std::format("Not a Directory: {}", dir).c_str());
                 return nullptr;
             }
 
@@ -769,7 +767,7 @@ namespace erdo::ui
         {
             QString directory = QFileDialog::getExistingDirectory(
                 this,
-                "select weapon data directory",
+                "Select Weapon Data Directory",
                 QDir::homePath(),
                 QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
             );
@@ -784,9 +782,9 @@ namespace erdo::ui
         {
             QString file_name = QFileDialog::getOpenFileName(
                 this,
-                "select eldenring.exe",
+                "Select eldenring.exe",
                 QDir::homePath(),
-                "elden ring executable (eldenring.exe);;all executables (*.exe);;all files (*)"
+                "Elden Ring Executable (eldenring.exe);;All Executables (*.exe);;All Files (*)"
             );
             if (file_name.isEmpty())
                 return;
@@ -794,9 +792,9 @@ namespace erdo::ui
 
             file_name = QFileDialog::getOpenFileName(
                 this,
-                "select WitchyBND.exe",
+                "Select WitchyBND.exe",
                 QDir::homePath(),
-                "WitchyBND executable (WitchyBND.exe);;all executables (*.exe);;all files (*)"
+                "WitchyBND executable (WitchyBND.exe);;All Executables (*.exe);;All Files (*)"
             );
             if (file_name.isEmpty())
                 return;
@@ -805,7 +803,7 @@ namespace erdo::ui
             auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
             QString directory = QFileDialog::getExistingDirectory(
                 this,
-                "select a save directory",
+                "Select a Save Directory",
                 xml_data_directory.string().c_str(),
                 QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
             );
@@ -814,7 +812,7 @@ namespace erdo::ui
             auto save_directory = std::filesystem::path(directory.toStdString());
             if (!std::filesystem::is_directory(save_directory))
             {
-                QMessageBox::critical(this, "invalid directory", std::format("not a directory: {}", save_directory).c_str());
+                QMessageBox::critical(this, "Invalid Directory", std::format("Not a Directory: {}", save_directory).c_str());
                 return;
             }
 
@@ -825,12 +823,12 @@ namespace erdo::ui
                     save_directory
                 );
             });
-            execute_future_with_blocking_progress_bar<false>(future, this, "generating weapon data...");
+            execute_future_with_blocking_progress_bar<false>(future, this, "Generating Weapon Data...");
             auto expected = future.takeResult();
             if (expected)
-                QMessageBox::information(this, "success", QString::fromStdString(expected.value()));
+                QMessageBox::information(this, "Success", QString::fromStdString(expected.value()));
             else
-                QMessageBox::critical(this, "error", QString::fromStdString(expected.error()));
+                QMessageBox::critical(this, "Error", QString::fromStdString(expected.error()));
         }
 
         void closeEvent(QCloseEvent *event) override
@@ -863,10 +861,10 @@ namespace erdo::ui
                     })
                 >>();
             if (weapon_data_directories.empty())
-                critical_error(this, "no weapon data directories found in xml_data directory");
+                critical_error(this, "No weapon data directories found in xml_data directory.");
 
             // weapon data menu
-            this->menu_choose_weapon_data = this->ui->menu_file->addMenu("choose weapon data");
+            this->menu_choose_weapon_data = this->ui->menu_file->addMenu("Choose Weapon Data");
             this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
@@ -876,19 +874,19 @@ namespace erdo::ui
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            this->ui->menu_file->addAction("load weapon data from directory", this, &MainWindow::load_weapon_data_from_directory);
-            this->ui->menu_file->addAction("generate weapon data from game data", this, &MainWindow::generate_weapon_data_from_game_data);
+            this->ui->menu_file->addAction("Load Weapon Data from Directory", this, &MainWindow::load_weapon_data_from_directory);
+            this->ui->menu_file->addAction("Generate Weapon Data from Game Data", this, &MainWindow::generate_weapon_data_from_game_data);
             this->ui->menu_file->addSeparator();
-            this->ui->menu_file->addAction("settings", [](){ settings.show(); });
+            this->ui->menu_file->addAction("Settings", [](){ settings.show(); });
 
-            this->ui->menu_help->addAction("about erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
-            this->ui->menu_help->addAction("about qt", QApplication::aboutQt);
+            this->ui->menu_help->addAction("About erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
+            this->ui->menu_help->addAction("About Qt", QApplication::aboutQt);
 
 
             // add tabs
-            this->ui->tab_widget->addTab(stats, "stats");
-            this->ui->tab_widget->addTab(optimize, "optimize");
-            this->ui->tab_widget->addTab(plot, "plot");
+            this->ui->tab_widget->addTab(stats, "Stats");
+            this->ui->tab_widget->addTab(optimize, "Optimize");
+            this->ui->tab_widget->addTab(plot, "Plot");
 
             // restore geometry and state
             QSettings settings{};

@@ -14,7 +14,7 @@
    <string>Form</string>
   </property>
   <property name="title">
-   <string>optimize</string>
+   <string>Optimize</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -22,7 +22,7 @@
      <item row="0" column="0">
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>target:</string>
+        <string>Target:</string>
        </property>
       </widget>
      </item>
@@ -32,7 +32,7 @@
      <item row="1" column="0">
       <widget class="QLabel" name="label_5">
        <property name="text">
-        <string>weapons:</string>
+        <string>Weapons:</string>
        </property>
       </widget>
      </item>
@@ -46,14 +46,14 @@
      <item row="3" column="0" colspan="2">
       <widget class="QPushButton" name="start_brute_force_button">
        <property name="text">
-        <string>start brute force</string>
+        <string>Start Brute Force</string>
        </property>
       </widget>
      </item>
      <item row="4" column="0">
       <widget class="QLabel" name="label_9">
        <property name="text">
-        <string>attribute variations:</string>
+        <string>Attribute Variations:</string>
        </property>
       </widget>
      </item>
@@ -67,7 +67,7 @@
      <item row="5" column="0">
       <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>iterations:</string>
+        <string>Iterations:</string>
        </property>
       </widget>
      </item>
@@ -81,14 +81,14 @@
      <item row="7" column="0" colspan="2">
       <widget class="QPushButton" name="start_v2_button">
        <property name="text">
-        <string>start v2</string>
+        <string>Start V2</string>
        </property>
       </widget>
      </item>
      <item row="8" column="0">
       <widget class="QLabel" name="label_11">
        <property name="text">
-        <string>avg. attribute variations:</string>
+        <string>Avg. Attribute Variations:</string>
        </property>
       </widget>
      </item>
@@ -102,7 +102,7 @@
      <item row="9" column="0">
       <widget class="QLabel" name="label_7">
        <property name="text">
-        <string>iterations:</string>
+        <string>Iterations:</string>
        </property>
       </widget>
      </item>

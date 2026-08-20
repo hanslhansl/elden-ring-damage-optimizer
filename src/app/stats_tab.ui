@@ -22,7 +22,7 @@
         <locale language="English" country="AmericanSamoa"/>
        </property>
        <property name="title">
-        <string>character attributes</string>
+        <string>Character Attributes</string>
        </property>
        <layout class="QFormLayout" name="character_stats_layout">
         <item row="0" column="0">
@@ -31,7 +31,7 @@
            <locale language="English" country="AmericanSamoa"/>
           </property>
           <property name="text">
-           <string>starting class:</string>
+           <string>Starting Class:</string>
           </property>
          </widget>
         </item>
@@ -45,7 +45,7 @@
         <item row="1" column="0">
          <widget class="QLabel" name="label_5">
           <property name="text">
-           <string>character level:</string>
+           <string>Character Level:</string>
           </property>
          </widget>
         </item>
@@ -83,7 +83,7 @@
           <locale language="English" country="AmericanSamoa"/>
          </property>
          <property name="title">
-          <string>attack options</string>
+          <string>Attack Options</string>
          </property>
          <layout class="QFormLayout" name="formLayout_2">
           <item row="0" column="0">
@@ -92,7 +92,7 @@
              <locale language="English" country="AmericanSamoa"/>
             </property>
             <property name="text">
-             <string>normal upgrade level:</string>
+             <string>Normal Upgrade Level:</string>
             </property>
            </widget>
           </item>
@@ -102,7 +102,7 @@
              <locale language="English" country="AmericanSamoa"/>
             </property>
             <property name="text">
-             <string>somber upgrade level:</string>
+             <string>Somber Upgrade Level:</string>
             </property>
            </widget>
           </item>
@@ -132,7 +132,7 @@
              <locale language="English" country="AmericanSamoa"/>
             </property>
             <property name="text">
-             <string>two-handing</string>
+             <string>Two-handing</string>
             </property>
            </widget>
           </item>
@@ -155,7 +155,7 @@
           <locale language="English" country="AmericanSamoa"/>
          </property>
          <property name="title">
-          <string>base game / dlc filter</string>
+          <string>Base Game / DLC Filter</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7">
           <item>
@@ -182,7 +182,7 @@
         <locale language="English" country="AmericanSamoa"/>
        </property>
        <property name="title">
-        <string>weapon type filter</string>
+        <string>Weapon Type Filter</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
@@ -207,7 +207,7 @@
         <locale language="English" country="AmericanSamoa"/>
        </property>
        <property name="title">
-        <string>weapon base name filter</string>
+        <string>Weapon Base Name Filter</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
@@ -229,7 +229,7 @@
         <locale language="English" country="AmericanSamoa"/>
        </property>
        <property name="title">
-        <string>weapon affinity filter</string>
+        <string>Weapon Affinity Filter</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_5">
         <item>

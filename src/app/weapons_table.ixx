@@ -76,7 +76,7 @@ namespace erdo::ui
         };
         export struct NameSection : BinaryTextSection
         {
-            static constexpr std::array column_names { "name" };
+            static constexpr std::array column_names { "Name" };
 
             using BinaryTextSection::BinaryTextSection;
             explicit NameSection(const calculator::Attack& attack)
@@ -94,41 +94,41 @@ namespace erdo::ui
         };
         export struct AffinitySection : BinaryTextSection
         {
-            static constexpr std::array column_names { "affinity" };
+            static constexpr std::array column_names { "Affinity" };
 
             using BinaryTextSection::BinaryTextSection;
             explicit AffinitySection(const calculator::Attack& attack)
             {
                 auto&& weapon = attack.weapon.get();
 
-                (*this)[0][0] = string_to_display(enum_to_string(weapon.affinity));
+                (*this)[0][0] = enum_to_display(weapon.affinity);
                 (*this)[0][1] = std::to_underlying(weapon.affinity);
             }
         };
         export struct TypeSection : BinaryTextSection
         {
-            static constexpr std::array column_names { "type" };
+            static constexpr std::array column_names { "Type" };
 
             using BinaryTextSection::BinaryTextSection;
             explicit TypeSection(const calculator::Attack& attack)
             {
                 auto&& weapon = attack.weapon.get();
 
-                (*this)[0][0] = string_to_display(enum_to_string(weapon.type));
+                (*this)[0][0] = enum_to_display(weapon.type);
                 (*this)[0][1] = std::to_underlying(weapon.type);
             }
         };
         
         export struct BaseGameDLCSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
-            static constexpr std::array column_names { "base game\ndlc" };
+            static constexpr std::array column_names { "Base Game\nDLC" };
 
             using SectionBase::SectionBase;
             explicit BaseGameDLCSection(const calculator::Attack& attack)
             {
                 auto&& weapon = attack.weapon.get();
 
-                (*this)[0][0] = weapon.dlc ? "dlc" : "base game";
+                (*this)[0][0] = weapon.dlc ? "DLC" : "Base Game";
                 (*this)[0][1] = weapon.dlc;
             }
 
@@ -149,12 +149,12 @@ namespace erdo::ui
 
         export struct BaseNameSection : SectionBase<std::array<QVariant, 1>>
         {
-            static constexpr std::array column_names { "base name" };
+            static constexpr std::array column_names { "Base Name" };
 
             using SectionBase::SectionBase;
             explicit BaseNameSection(const calculator::Attack& attack)
             {
-                (*this)[0] = string_to_display(attack.weapon.get().base_name);
+                (*this)[0] = QString::fromStdString(attack.weapon.get().base_name);
             }
 
             QVariant data(int column, int role) const
@@ -172,7 +172,7 @@ namespace erdo::ui
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
-            static constexpr std::array column_names { "character level" };
+            static constexpr std::array column_names { "Character Level" };
 
             using SectionBase::SectionBase;
             explicit CharacterLevelSection(const calculator::Attack& attack)
@@ -223,7 +223,7 @@ namespace erdo::ui
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
-            static constexpr std::array column_names = { "spell scaling" };
+            static constexpr std::array column_names = { "Spell Scaling" };
 
             using DataSection::DataSection;
             explicit SpellScaling(const calculator::Attack& attack)
@@ -242,12 +242,12 @@ namespace erdo::ui
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
-            static inline const QString section_name = "attack power";
+            static inline const QString section_name = "Attack Power";
             inline const static std::vector<QString> column_names = [](){
-                auto result = enumerator_strings_of<calculator::DamageType>()
-                    | std::views::transform(string_to_display)
+                auto result = enumerators_of<calculator::DamageType>()
+                    | std::views::transform(enum_to_display)
                     | std::ranges::to<std::vector>();
-                result.emplace_back("total");
+                result.emplace_back("Total");
                 return result;
             }();
 
@@ -283,13 +283,13 @@ namespace erdo::ui
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
             
-            inline const static std::vector<QString> column_names = enumerator_strings_of<enum_type>()
-                | std::views::transform(string_to_display)
+            inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
+                | std::views::transform(enum_to_display)
                 | std::ranges::to<std::vector>();
         };
         export struct StatusEffects : EnumDataSection<calculator::StatusEffectType>
         {
-            static inline const QString section_name = "status effects";
+            static inline const QString section_name = "Status Effects";
 
             using EnumDataSection::EnumDataSection;
             explicit StatusEffects(const calculator::Attack& attack)
@@ -312,7 +312,7 @@ namespace erdo::ui
         };
         export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
-            static inline const QString section_name = "attribute scaling at upgrade level";
+            static inline const QString section_name = "Attribute Scaling at Upgrade Level";
 
             using EnumDataSection::EnumDataSection;
             explicit AttributeScalings(const calculator::Attack& attack)
@@ -341,7 +341,7 @@ namespace erdo::ui
         };
         export struct Requirements : EnumDataSection<calculator::RelevantAttribute>
         {
-            static inline const QString section_name = "attribute requirements";
+            static inline const QString section_name = "Attribute Requirements";
 
             using EnumDataSection::EnumDataSection;
             explicit Requirements(const calculator::Attack& attack)
@@ -366,7 +366,7 @@ namespace erdo::ui
         };
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
-            static inline const QString section_name = "character attributes";
+            static inline const QString section_name = "Character Attributes";
 
             using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::Attack& attack)
@@ -392,7 +392,7 @@ namespace erdo::ui
         struct AttackPowerTypeAttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
             static constexpr auto attack_power_type = apt;
-            static inline const auto section_name = string_to_display(enum_to_string(attack_power_type) + std::string(" scaling"));
+            static inline const auto section_name = enum_to_display(attack_power_type) + " Scaling";
 
             using EnumDataSection::EnumDataSection;
             explicit AttackPowerTypeAttributeScalings(const calculator::Attack& attack)
