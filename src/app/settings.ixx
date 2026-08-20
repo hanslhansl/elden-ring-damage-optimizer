@@ -50,7 +50,7 @@ namespace erdo::ui
         using value_type = int;
         using widget_type = QSpinBox;
         inline static const auto signal = &QSpinBox::valueChanged;
-        constexpr static std::string_view section_name = "general";
+        constexpr static std::string_view section_name = "General";
 
         static void initialize(widget_type* spinbox, value_type value)
         {
@@ -64,7 +64,7 @@ namespace erdo::ui
         using typename SpinBoxSetting<AttributeLevelLimit>::value_type;
 
         constexpr static std::string_view name = "attribute_level_limit";
-        constexpr static std::string_view display_name = "attribute level limit (ingame: 99)";
+        constexpr static std::string_view display_name = "Attribute Level Limit (Ingame: 99)";
 
         constexpr static value_type default_value = 99;
         constexpr static value_type minimum_value = 0;
@@ -74,9 +74,9 @@ namespace erdo::ui
     {
         using typename SpinBoxSetting<DecimalPlaces>::value_type;
 
-        constexpr static std::string_view section_name = "weapon table";
+        constexpr static std::string_view section_name = "Weapon Table";
         constexpr static std::string_view name = "decimal_places";
-        constexpr static std::string_view display_name = "decimal places";
+        constexpr static std::string_view display_name = "Decimal Places";
 
         constexpr static value_type default_value = 3;
         constexpr static value_type minimum_value = 0;
@@ -88,7 +88,7 @@ namespace erdo::ui
         using value_type = bool;
         using widget_type = QCheckBox;
         inline static const auto signal = &QCheckBox::toggled;
-        constexpr static std::string_view section_name = "general";
+        constexpr static std::string_view section_name = "General";
 
         static void initialize(widget_type* checkbox, value_type value)
         {
@@ -162,7 +162,7 @@ namespace erdo::ui
             layout->addWidget(buttons);
 
             this->dialog->setLayout(layout);
-            this->dialog->setWindowTitle("settings");
+            this->dialog->setWindowTitle("Settings");
         }
 
         void show()
