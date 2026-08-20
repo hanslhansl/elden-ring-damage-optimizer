@@ -247,7 +247,7 @@ namespace erdo::optimizer
                 | std::ranges::to<std::vector>();
         }
    
-        std::size_t total_stat_variation_count = 0;
+        std::size_t iteration_count = 0;
     };
 
     export template<Target target>
@@ -264,7 +264,7 @@ namespace erdo::optimizer
                 min_stats,
                 make_filled_array<RelevantAttributeLevels>(max_stat)
             );
-            this->total_stat_variation_count = this->stat_variations.size() * weapons.size();
+            this->iteration_count = this->stat_variations.size() * weapons.size();
         }
 
         Attack operator()(const Weapon& weapon) const
@@ -326,7 +326,7 @@ namespace erdo::optimizer
                     auto&& optimized_stat_variations = it->second;
                     if (inserted)
                         optimized_stat_variations = V2::get_optimized_stat_variations(free_attribute_points, min_stats, max_relevant_stats, nonscaling_attributes);
-                    this->total_stat_variation_count += optimized_stat_variations.size();
+                    this->iteration_count += optimized_stat_variations.size();
                 }
             }
         }

@@ -137,16 +137,14 @@ export namespace erdo
 
 
     template<typename E, std::size_t I = 0, typename F>
-        requires (std::is_enum_v<E> /*&& std::meta::is_enumerable_type(^^E)*/)
+        requires (std::is_enum_v<E> && I < enumerators_of<E>().size() /*&& std::meta::is_enumerable_type(^^E)*/)
     constexpr decltype(auto) visit_enum(E e, F&& f)
     {
-        if constexpr (I < enumerators_of<E>().size())
-        {
-            if (e == enumerators_of<E>()[I])
-                return std::forward<F>(f)(std::integral_constant<E, enumerators_of<E>()[I]>{});
-            else
-                return visit_enum<E, I + 1>(e, std::forward<F>(f));
-        }
+        if (e == enumerators_of<E>()[I])
+            return std::forward<F>(f)(std::integral_constant<E, enumerators_of<E>()[I]>{});
+
+        if constexpr (I + 1 < enumerators_of<E>().size())
+            return visit_enum<E, I + 1>(e, std::forward<F>(f));
 
         throw std::invalid_argument(std::format("integral {} is not a valid enumerator", std::to_underlying(e)));
     }

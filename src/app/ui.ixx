@@ -221,7 +221,7 @@ namespace erdo::ui
         Q_OBJECT
 
     protected:
-        std::span<const calculator::Weapon> active_weapon_data{};
+        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
         WeaponTable* weapon_table{};
 
@@ -232,7 +232,7 @@ namespace erdo::ui
 
         void adjust_base_game_dlc_filter()
         {
-            auto visible_base_game_dlc = this->active_weapon_data
+            auto visible_base_game_dlc = *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::dlc)
                 | std::ranges::to<QSet>();
 
@@ -250,7 +250,7 @@ namespace erdo::ui
         }
         void adjust_type_filter()
         {
-            auto visible_types = this->active_weapon_data
+            auto visible_types = *this->active_weapon_data
                 | std::views::filter([&](const calculator::Weapon& w){
                     return this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc);
                 })
@@ -272,7 +272,7 @@ namespace erdo::ui
         }
         void adjust_base_name_filter()
         {
-            auto visible_base_names = this->active_weapon_data
+            auto visible_base_names = *this->active_weapon_data
                 | std::views::filter([&](const calculator::Weapon& w){
                     return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
                             (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type)));
@@ -295,7 +295,7 @@ namespace erdo::ui
         }
         void adjust_affinity_list_filter()
         {
-            auto visible_affinities = this->active_weapon_data
+            auto visible_affinities = *this->active_weapon_data
                 | std::views::filter([&](const calculator::Weapon& w){
                     return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
                             (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type))) &&
@@ -408,14 +408,14 @@ namespace erdo::ui
             };
         }
 
-        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
         {
-            this->active_weapon_data = active_weapon_data;
+            this->active_weapon_data = std::move(active_weapon_data);
 
             // base game / dlc
             this->base_game_dlc_filter.clear();
             this->base_game_dlc_list->clear();
-            for (auto&& dlc : this->active_weapon_data
+            for (auto&& dlc : *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::dlc)
                 | std::ranges::to<std::set>()
             )
@@ -427,7 +427,7 @@ namespace erdo::ui
             // type list widget
             this->type_filter.clear();
             this->type_list->clear();
-            for (auto&& type : this->active_weapon_data
+            for (auto&& type : *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::type)
                 | std::ranges::to<std::set>()
             )
@@ -439,7 +439,7 @@ namespace erdo::ui
             // base name list widget
             this->base_name_filter.clear();
             this->base_name_list->clear();
-            for (auto&& base_name : this->active_weapon_data
+            for (auto&& base_name : *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::base_name)
                 | std::ranges::to<std::set>()
             )
@@ -451,7 +451,7 @@ namespace erdo::ui
             // affinity list widget
             this->affinity_filter.clear();
             this->affinity_list->clear();
-            for (auto&& affinity : this->active_weapon_data
+            for (auto&& affinity : *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::affinity)
                 | std::ranges::to<std::set>()
             )
@@ -507,8 +507,10 @@ namespace erdo::ui
             this->weapon_table->set_section_hidden<sections::CharacterLevelSection>(true);
         }
 
-        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
         {
+            this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
+
             // get character stats
             auto stats = this->get_character_stats();
 
@@ -519,15 +521,14 @@ namespace erdo::ui
             calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
             std::vector<Row> rows{};
-            rows.reserve(active_weapon_data.size());
-            rows.append_range(active_weapon_data
+            rows.reserve(this->active_weapon_data->size());
+            rows.append_range(*this->active_weapon_data
                 | std::views::transform([&](const calculator::Weapon& w) {
                     attack.weapon = w;
                     attack.calculate_inplace();
                     return Row(std::move(attack));
                 })
             );
-            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
             this->weapon_table->model->set_rows(std::move(rows));
         }
         
@@ -543,7 +544,7 @@ namespace erdo::ui
             calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
             this->weapon_table->model->update_rows(
-                this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::Attack&& {
+                *this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::Attack&& {
                     attack.weapon = w;
                     attack.calculate_inplace();
                     return std::move(attack);
@@ -556,15 +557,6 @@ namespace erdo::ui
     {
         std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_weapon_data{};
 
-        decltype([](auto){
-            static constexpr auto [...targets] = enumerators_of<optimizer::Target>();
-            return std::type_identity<std::variant<std::monostate, optimizer::BruteForce<targets>...>>{};
-        }(1))::type brute_force_optimizer;
-        decltype([](auto){
-            static constexpr auto [...targets] = enumerators_of<optimizer::Target>();
-            return std::type_identity<std::variant<std::monostate, optimizer::V2<targets>...>>{};
-        }(1))::type v2_optimizer;
-
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
@@ -572,8 +564,8 @@ namespace erdo::ui
         void prepare_optimization()
         {
             this->filtered_active_weapon_data.clear();
-            this->filtered_active_weapon_data.reserve(this->active_weapon_data.size());
-            this->filtered_active_weapon_data.append_range(this->active_weapon_data
+            this->filtered_active_weapon_data.reserve(this->active_weapon_data->size());
+            this->filtered_active_weapon_data.append_range(*this->active_weapon_data
                 | std::views::filter([&](const calculator::Weapon& w) {
                     return (this->base_game_dlc_filter.empty() || this->base_game_dlc_filter.contains(w.dlc))
                         && (this->type_filter.empty() || this->type_filter.contains(std::to_underlying(w.type)))
@@ -581,87 +573,93 @@ namespace erdo::ui
                         && (this->affinity_filter.empty() || this->affinity_filter.contains(std::to_underlying(w.affinity)));
                 })
             );
+            this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
 
-            auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
-            auto stat_variations = optimizer::get_stat_variation_count(
+            this->max_attribute_points_label->setText(QString::number(max_attribute_points));
+            this->free_attribute_points_label->setText(QString::number(free_attribute_points));
+
+
+            auto stat_variation_count = optimizer::get_stat_variation_count(
                 free_attribute_points,
                 min_stats.relevant_stats(),
                 make_filled_array<calculator::RelevantAttributeLevels>(settings.attribute_level_limit)
             );
-
-            this->max_attribute_points_label->setText(QString::number(max_attribute_points));
-            this->free_attribute_points_label->setText(QString::number(free_attribute_points));
-
-            this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
-
-            visit_enum(
-                (optimizer::Target)this->target_combobox->currentIndex(),
-                [&](auto integral_constant) {
-                    this->brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
-                        this->filtered_active_weapon_data,
-                        attack_options,
-                        free_attribute_points,
-                        min_stats,
-                        settings.attribute_level_limit
-                    };
-                    auto brute_force_total_stat_variation_count = std::get<optimizer::BruteForce<integral_constant.value>>(this->brute_force_optimizer).total_stat_variation_count;
-                    this->brute_force_variations_label->setText(QString::number(brute_force_total_stat_variation_count / this->filtered_active_weapon_data.size()));
-                    this->brute_force_iterations_label->setText(QString::number(brute_force_total_stat_variation_count));
-
-                    this->v2_optimizer = optimizer::V2<integral_constant.value>{
-                        this->filtered_active_weapon_data,
-                        attack_options,
-                        free_attribute_points,
-                        min_stats,
-                        settings.attribute_level_limit
-                    };
-                    auto v2_total_stat_variation_count = std::get<optimizer::V2<integral_constant.value>>(this->v2_optimizer).total_stat_variation_count;
-                    this->v2_variations_label->setText(QString::number(v2_total_stat_variation_count / this->filtered_active_weapon_data.size()));
-                    this->v2_iterations_label->setText(QString::number(v2_total_stat_variation_count));
-                }
-            );
+            this->brute_force_variations_label->setText(QString::number(stat_variation_count));
+            this->brute_force_iterations_label->setText(QString::number(stat_variation_count * this->filtered_active_weapon_data.size()));
         }
 
-        void optimize(const auto& optimizer)
+        void optimize(bool use_v2)
         {
             auto attack_options = this->get_attack_options();
             auto min_stats = this->get_character_stats();
             auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value())
                 - min_stats.attribute_points();
 
-            optimizer.visit([&](const auto& optimizer) {
-                if constexpr (!std::same_as<std::decay_t<decltype(optimizer)>, std::monostate>)
+            auto target = static_cast<optimizer::Target>(this->target_combobox->currentIndex());
+
+            auto optimizer_visitor = [&](const auto& optimizer) {
+                if(optimizer.iteration_count == 0)
                 {
-                    if(optimizer.total_stat_variation_count == 0)
-                    {
-                        QMessageBox::warning(
-                            this,
-                            "No Valid Stat Variations",
-                            "There are no valid stat variations for the given min character attributes and max character level."
-                        );
-                        return;
-                    }
-
-                    auto future = QtConcurrent::mapped(
-                        this->filtered_active_weapon_data,
-                        [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
+                    QMessageBox::warning(
+                        this,
+                        "No Valid Stat Variations",
+                        "There are no valid stat variations for the given min character attributes and max character level."
                     );
-
-                    std::vector<Row> rows{};
-                    if (execute_future_with_blocking_progress_bar<true>(future, this, "Optimizing..."))
-                    {
-                        rows.reserve(this->filtered_active_weapon_data.size());
-                        rows.append_range(
-                            future
-                            | std::views::as_rvalue
-                        );
-                    }
-                    this->weapon_table->model->set_rows(std::move(rows));
+                    return;
                 }
-            });
+
+                auto future = QtConcurrent::mapped(
+                    this->filtered_active_weapon_data,
+                    [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
+                );
+
+                std::vector<Row> rows{};
+                if (execute_future_with_blocking_progress_bar<true>(future, this, "Optimizing..."))
+                {
+                    rows.reserve(this->filtered_active_weapon_data.size());
+                    rows.append_range(
+                        future
+                        | std::views::as_rvalue
+                    );
+                }
+                this->weapon_table->model->set_rows(std::move(rows));
+            };
+
+            if (use_v2)
+            {
+                visit_enum(target, [&](auto integral_constant) {
+                    auto v2_optimizer = optimizer::V2<integral_constant.value>{
+                        filtered_active_weapon_data,
+                        attack_options,
+                        free_attribute_points,
+                        min_stats,
+                        settings.attribute_level_limit.value
+                    };
+                    this->v2_variations_label->setText(
+                        QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
+                    );
+                    this->v2_iterations_label->setText(QString::number(v2_optimizer.iteration_count));
+
+                    optimizer_visitor(v2_optimizer);
+                });
+            }
+            else
+            {
+                visit_enum(target, [&](auto integral_constant) {
+                    auto brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
+                        filtered_active_weapon_data,
+                        attack_options,
+                        free_attribute_points,
+                        min_stats,
+                        settings.attribute_level_limit.value
+                    };
+
+                    optimizer_visitor(brute_force_optimizer);
+                });
+            }
         }
 
     public:
@@ -716,13 +714,13 @@ namespace erdo::ui
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
-            connect(this->start_brute_force_button, &QPushButton::clicked, [this](){ this->optimize(this->brute_force_optimizer); });
-            connect(this->start_v2_button, &QPushButton::clicked, [this](){ this->optimize(this->v2_optimizer); });
+            connect(this->start_brute_force_button, &QPushButton::clicked, [this](){ this->optimize(false); });
+            connect(this->start_v2_button, &QPushButton::clicked, [this](){ this->optimize(true); });
         }
     
-        void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
+        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
         {
-            this->StatsTabBase::set_active_weapon_data(active_weapon_data);
+            this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
             this->prepare_optimization();
             this->weapon_table->model->set_rows({});
         }
@@ -736,22 +734,21 @@ namespace erdo::ui
         };
     };
 
-    class MainWindow : public QMainWindow
+    class MainWindow : public QMainWindow, public Ui::MainWindow
     {
-        std::unique_ptr<Ui::MainWindow> ui = std::make_unique<Ui::MainWindow>();
         QActionGroup* menu_weapon_data_group = new QActionGroup(this);
         QMenu *menu_choose_weapon_data;
         StatsTab* stats = new StatsTab();
         OptimizeTab* optimize = new OptimizeTab();
         PlotTab* plot = new PlotTab();
 
-        std::vector<calculator::Weapon> active_weapon_data{};
+        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
 
         void set_active_weapon_data(const std::filesystem::path& dir)
         {
             auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
             execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
-            this->active_weapon_data = future.takeResult();
+            this->active_weapon_data = std::make_shared<const std::vector<calculator::Weapon>>(future.takeResult());
 
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
@@ -878,7 +875,7 @@ namespace erdo::ui
         explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
         {
             // setup
-            this->ui->setupUi(this);
+            this->setupUi(this);
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()).make_preferred();
@@ -895,7 +892,7 @@ namespace erdo::ui
                 critical_error(this, "No weapon data directories found in xml_data directory.");
 
             // weapon data menu
-            this->menu_choose_weapon_data = this->ui->menu_file->addMenu("Choose Weapon Data");
+            this->menu_choose_weapon_data = this->menu_file->addMenu("Choose Weapon Data");
             this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
             {
@@ -905,19 +902,19 @@ namespace erdo::ui
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            this->ui->menu_file->addAction("Load Weapon Data from Directory", this, &MainWindow::load_weapon_data_from_directory);
-            this->ui->menu_file->addAction("Generate Weapon Data from Game Data", this, &MainWindow::generate_weapon_data_from_game_data);
-            this->ui->menu_file->addSeparator();
-            this->ui->menu_file->addAction("Settings", [](){ settings.show(); });
+            this->menu_file->addAction("Load Weapon Data from Directory", this, &MainWindow::load_weapon_data_from_directory);
+            this->menu_file->addAction("Generate Weapon Data from Game Data", this, &MainWindow::generate_weapon_data_from_game_data);
+            this->menu_file->addSeparator();
+            this->menu_file->addAction("Settings", [](){ settings.show(); });
 
-            this->ui->menu_help->addAction("About erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
-            this->ui->menu_help->addAction("About Qt", QApplication::aboutQt);
+            this->menu_help->addAction("About erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
+            this->menu_help->addAction("About Qt", QApplication::aboutQt);
 
 
             // add tabs
-            this->ui->tab_widget->addTab(stats, "Stats");
-            this->ui->tab_widget->addTab(optimize, "Optimize");
-            this->ui->tab_widget->addTab(plot, "Plot");
+            this->tab_widget->addTab(stats, "Stats");
+            this->tab_widget->addTab(optimize, "Optimize");
+            this->tab_widget->addTab(plot, "Plot");
 
             // restore geometry and state
             QSettings settings{};
