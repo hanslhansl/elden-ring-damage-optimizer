@@ -7,11 +7,13 @@ Download the latest release [here](https://github.com/hanslhansl/elden-ring-dama
 ## notes on the optimization algorithm
 The *brute force* algorithm is pretty simple: It tries every attribute variation (satisfying the provided minimum attributes and maximum character level) with every weapon (according to the weapon filter options) and returns the best result.
 
-The *v2* takes only the scaling attributes of each weapon into account. This potentially reduces the number of attribute variations and therefor computing time by orders of magnitude.
+The *v2* algorithm takes only the scaling attributes of each weapon into account. This reduces the number of attribute variations and therefor computing time by orders of magnitude.
 
 The *attribute variations* fields show how many attack ratings per weapon the algorithm has to calculate.
 
 The *iterations* fields are a good indicator for how computationally expensive the optimization will be. It displays the total number of attack ratings the algorithm has to calculate
+
+Note: For *brute force* a *max character level* of $168$ and all *min character attributes* equal to zero cause the highest possible attribute variations of $59,896,875$ and $192,628,350,000$ iterations. For *v2* the same setup results in only $~354168$ attribute variations and $1139007301$ iterations.
 
 ## updating the weapon data
 The included [weapon data](xml_data) contains the necessary raw data. If, however, it becomes outdated (e.g. because of an Elden Ring update) or if you are playing on an old/modded version of the game you might want to generate your own regulation data file. To do this you'll need
