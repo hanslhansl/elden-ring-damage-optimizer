@@ -46,7 +46,7 @@ namespace erdo::ui
         QFutureWatcher<T> watcher;
         watcher.setFuture(future);
 
-        const QString cancelButtonText = cancelable ? "cancel" : QString{};
+        const QString cancelButtonText = cancelable ? "Cancel" : QString{};
 
         QProgressDialog progress(
             labelText,
@@ -201,7 +201,7 @@ namespace erdo::ui
             {
                 // future.cancel();
                 progress.setCancelButton(nullptr);
-                progress.setLabelText("canceling…");
+                progress.setLabelText("Canceling…");
                 progress.setRange(0, 0);
                 future.cancel();
             });
@@ -608,8 +608,8 @@ namespace erdo::ui
                     {
                         QMessageBox::warning(
                             this,
-                            "no valid stat variations",
-                            "there are no valid stat variations for the given min character attributes and max character level."
+                            "No Valid Stat Variations",
+                            "There are no valid stat variations for the given min character attributes and max character level."
                         );
                         return;
                     }
@@ -620,7 +620,7 @@ namespace erdo::ui
                     );
 
                     std::vector<Row> rows{};
-                    if (execute_future_with_blocking_progress_bar<true>(future, this, "optimizing..."))
+                    if (execute_future_with_blocking_progress_bar<true>(future, this, "Optimizing..."))
                     {
                         rows.reserve(this->filtered_active_weapon_data.size());
                         rows.append_range(
