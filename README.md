@@ -13,7 +13,7 @@ The *attribute variations* fields show how many attack ratings per weapon the al
 
 The *iterations* fields are a good indicator for how computationally expensive the optimization will be. It displays the total number of attack ratings the algorithm has to calculate
 
-Note: For *brute force* a *max character level* of $168$ and all *min character attributes* equal to zero cause the highest possible attribute variations of $59,896,875$ and $192,628,350,000$ iterations. For *v2* the same setup results in only $~354168$ attribute variations and $1139007301$ iterations.
+Note: For *brute force* a *max character level* of $168$ and all *min character attributes* equal to zero cause the highest possible attribute variations of $59.896.875$ and $192.628.350.000$ iterations. For *v2* the same setup results in only $~354.168$ attribute variations and $1.139.007.301$ iterations.
 
 ## updating the weapon data
 The included [weapon data](xml_data) contains the necessary raw data. If, however, it becomes outdated (e.g. because of an Elden Ring update) or if you are playing on an old/modded version of the game you might want to generate your own regulation data file. To do this you'll need
