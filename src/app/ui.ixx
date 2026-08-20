@@ -221,10 +221,100 @@ namespace erdo::ui
         Q_OBJECT
 
     protected:
-    public:
         std::span<const calculator::Weapon> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
         WeaponTable* weapon_table{};
+
+        QSet<bool> base_game_dlc_filter{};
+        QSet<int> type_filter{};
+        QSet<QString> base_name_filter{};
+        QSet<int> affinity_filter{};
+
+        void adjust_base_game_dlc_filter()
+        {
+            auto visible_base_game_dlc = this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::dlc)
+                | std::ranges::to<QSet>();
+
+            this->base_game_dlc_filter.clear();
+            for (int i = 0; i < this->base_game_dlc_list->count(); ++i)
+            {
+                auto item = this->base_game_dlc_list->item(i);
+                const auto dlc_value = item->data(Qt::UserRole).toBool();
+                auto visible = true;
+                item->setHidden(!visible);
+                if (visible && item->isSelected())
+                    this->base_game_dlc_filter.insert(dlc_value);
+            }
+            this->adjust_type_filter();
+        }
+        void adjust_type_filter()
+        {
+            auto visible_types = this->active_weapon_data
+                | std::views::filter([&](const calculator::Weapon& w){
+                    return this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc);
+                })
+                | std::views::transform(&calculator::Weapon::type)
+                | std::ranges::to<QSet>();
+
+            this->type_filter.clear();
+            for (int i = 0; i < this->type_list->count(); ++i)
+            {
+                auto item = this->type_list->item(i);
+                const int type_value = item->data(Qt::UserRole).toInt();
+                auto visible = visible_types.isEmpty() || visible_types.contains(static_cast<calculator::Weapon::Type>(type_value));
+                item->setHidden(!visible);
+                if (visible && item->isSelected())
+                    this->type_filter.insert(type_value);
+            }
+
+            this->adjust_base_name_filter();
+        }
+        void adjust_base_name_filter()
+        {
+            auto visible_base_names = this->active_weapon_data
+                | std::views::filter([&](const calculator::Weapon& w){
+                    return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
+                            (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type)));
+                })
+                | std::views::transform(&calculator::Weapon::base_name)
+                | std::ranges::to<QSet>();
+
+            this->base_name_filter.clear();
+            for (int i = 0; i < this->base_name_list->count(); ++i)
+            {
+                auto item = this->base_name_list->item(i);
+                const QString base_name = item->data(Qt::UserRole).toString();
+                auto visible = visible_base_names.isEmpty() || visible_base_names.contains(base_name.toStdString());
+                item->setHidden(!visible);
+                if (visible && item->isSelected())
+                    this->base_name_filter.insert(base_name);
+            }
+
+            this->adjust_affinity_list_filter();
+        }
+        void adjust_affinity_list_filter()
+        {
+            auto visible_affinities = this->active_weapon_data
+                | std::views::filter([&](const calculator::Weapon& w){
+                    return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
+                            (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type))) &&
+                            (this->base_name_filter.isEmpty() || this->base_name_filter.contains(QString::fromStdString(w.base_name)));
+                })
+                | std::views::transform(&calculator::Weapon::affinity)
+                | std::ranges::to<QSet>();
+
+            this->affinity_filter.clear();
+            for (int i = 0; i < this->affinity_list->count(); ++i)
+            {
+                auto item = this->affinity_list->item(i);
+                const int affinity_value = item->data(Qt::UserRole).toInt();
+                auto visible = visible_affinities.isEmpty() || visible_affinities.contains(static_cast<calculator::Weapon::Affinity>(affinity_value));
+                item->setHidden(!visible);
+                if (visible && item->isSelected())
+                    this->affinity_filter.insert(affinity_value);
+            }
+        }
 
     public:
         explicit StatsTabBase(QWidget *parent = nullptr) : QWidget(parent)
@@ -288,27 +378,12 @@ namespace erdo::ui
                 this->character_level_label->setText(QString::number(stats.character_level()));
             });
 
-            // base game / dlc
-            for (auto&& [val, str] : std::views::zip(std::array{false, true}, std::array{"Base Game", "DLC"}))
-            {
-                auto item = new QListWidgetItem(str, this->base_game_dlc_list);
-                item->setData(Qt::UserRole, val);
-            }
+            // filters
+            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_base_game_dlc_filter);
+            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_type_filter);
+            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_base_name_filter);
+            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_affinity_list_filter);
 
-            // weapon type list widget
-            for (auto&& type : enumerators_of<calculator::Weapon::Type>())
-            {
-                auto item = new QListWidgetItem(enum_to_display(type), this->type_list);
-                item->setData(Qt::UserRole, std::to_underlying(type));
-            }
-
-            // weapon affinity list widget
-            for (auto&& affinity : enumerators_of<calculator::Weapon::Affinity>())
-            {
-                auto item = new QListWidgetItem(enum_to_display(affinity), this->affinity_list);
-                item->setData(Qt::UserRole, std::to_underlying(affinity));
-            }
-            
             // weapon table view
             this->weapon_table = new WeaponTable(this);
             this->main_layout->addWidget(this->weapon_table, 1);
@@ -321,42 +396,71 @@ namespace erdo::ui
                 stat = spinbox->value();
             return stats;
         }
-        
-        calculator::UpgradeLevels get_upgrade_levels()
-        {
-            calculator::UpgradeLevels upgrade_levels{};
-            upgrade_levels.at(1) = this->normal_upgrade_level_spinbox->value();
-            upgrade_levels.at(2) = this->somber_upgrade_level_spinbox->value();
-            return upgrade_levels;
-        }
-        
-        bool get_two_handing()
-        {
-            return this->two_handing_checkbox->isChecked();
-        }
-    
         calculator::AttackOptions get_attack_options()
         {
             return calculator::AttackOptions{
-                this->get_upgrade_levels(),
-                this->get_two_handing()
+                {
+                    0,
+                    (unsigned int)this->normal_upgrade_level_spinbox->value(),
+                    (unsigned int)this->somber_upgrade_level_spinbox->value()
+                },
+                this->two_handing_checkbox->isChecked()
             };
         }
 
         void set_active_weapon_data(std::span<const calculator::Weapon> active_weapon_data)
         {
-            auto new_base_names = active_weapon_data
-                | std::views::transform(&calculator::Weapon::base_name)
-                | std::ranges::to<std::set>();
+            this->active_weapon_data = active_weapon_data;
 
+            // base game / dlc
+            this->base_game_dlc_filter.clear();
+            this->base_game_dlc_list->clear();
+            for (auto&& dlc : this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::dlc)
+                | std::ranges::to<std::set>()
+            )
+            {
+                auto item = new QListWidgetItem(dlc ? "DLC" : "Base Game", this->base_game_dlc_list);
+                item->setData(Qt::UserRole, dlc);
+            }
+
+            // type list widget
+            this->type_filter.clear();
+            this->type_list->clear();
+            for (auto&& type : this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::type)
+                | std::ranges::to<std::set>()
+            )
+            {
+                auto item = new QListWidgetItem(enum_to_display(type), this->type_list);
+                item->setData(Qt::UserRole, std::to_underlying(type));
+            }
+
+            // base name list widget
+            this->base_name_filter.clear();
             this->base_name_list->clear();
-            for (auto&& base_name : new_base_names)
+            for (auto&& base_name : this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::base_name)
+                | std::ranges::to<std::set>()
+            )
             {
                 auto item = new QListWidgetItem(QString::fromStdString(base_name), this->base_name_list);
                 item->setData(Qt::UserRole, QString::fromStdString(base_name));
             }
 
-            this->active_weapon_data = active_weapon_data;
+            // affinity list widget
+            this->affinity_filter.clear();
+            this->affinity_list->clear();
+            for (auto&& affinity : this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::affinity)
+                | std::ranges::to<std::set>()
+            )
+            {
+                auto item = new QListWidgetItem(enum_to_display(affinity), this->affinity_list);
+                item->setData(Qt::UserRole, std::to_underlying(affinity));
+            }
+            
+            this->adjust_base_game_dlc_filter();
         }
     
     signals:
@@ -379,63 +483,23 @@ namespace erdo::ui
             connect(this->two_handing_checkbox, &QCheckBox::checkStateChanged, this, &StatsTab::calculate_weapon_stats);
 
             // base game / dlc filter
-            connect(
-                this->base_game_dlc_list,
-                &QListWidget::itemSelectionChanged,
-                this,
-                [this]() {
-                    QSet<bool> selected;
-
-                    for (QListWidgetItem *item : this->base_game_dlc_list->selectedItems())
-                        selected.insert(item->data(Qt::UserRole).toBool());
-
-                    this->weapon_table->proxy_model->set_selected_base_game_dlc(std::move(selected));
-                }
+            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged,
+                [this]() { this->weapon_table->proxy_model->set_selected_base_game_dlc(this->base_game_dlc_filter); }
             );
 
             // weapon type filter
-            connect(
-                this->type_list,
-                &QListWidget::itemSelectionChanged,
-                this,
-                [this]() {
-                    QSet<int> selected;
-
-                    for (QListWidgetItem *item : this->type_list->selectedItems())
-                        selected.insert(item->data(Qt::UserRole).toInt());
-
-                    this->weapon_table->proxy_model->set_selected_types(std::move(selected));
-                }
+            connect(this->type_list, &QListWidget::itemSelectionChanged,
+                [this]() { this->weapon_table->proxy_model->set_selected_types(this->type_filter); }
             );
 
             // weapon base name filter
-            connect(
-                this->base_name_list,
-                &QListWidget::itemSelectionChanged,
-                this,
-                [this]() {
-                    QSet<QString> selected;
-
-                    for (QListWidgetItem *item : this->base_name_list->selectedItems())
-                        selected.insert(item->text());
-
-                    this->weapon_table->proxy_model->set_selected_base_names(std::move(selected));
-                }
+            connect(this->base_name_list, &QListWidget::itemSelectionChanged,
+                [this]() { this->weapon_table->proxy_model->set_selected_base_names(this->base_name_filter); }
             );
 
             // weapon affinity filter
-            connect(
-                this->affinity_list,
-                &QListWidget::itemSelectionChanged,
-                this,
-                [this]() {
-                    QSet<int> selected;
-
-                    for (QListWidgetItem *item : this->affinity_list->selectedItems())
-                        selected.insert(item->data(Qt::UserRole).toInt());
-
-                    this->weapon_table->proxy_model->set_selected_affinities(std::move(selected));
-                }
+            connect(this->affinity_list, &QListWidget::itemSelectionChanged,
+                [this]() { this->weapon_table->proxy_model->set_selected_affinities(this->affinity_filter); }
             );
 
             // weapon table view
@@ -507,47 +571,14 @@ namespace erdo::ui
 
         void prepare_optimization()
         {
-            // base game / dlc filter
-            auto selected_base_game_dlc = this->base_game_dlc_list->selectedItems();
-            std::unordered_set<bool> base_game_dlc_set;
-            base_game_dlc_set.reserve(selected_base_game_dlc.size());
-            for (QListWidgetItem *item : selected_base_game_dlc)
-                base_game_dlc_set.insert(item->data(Qt::UserRole).toBool());
-
-            // weapon type filter
-            auto selected_types = this->type_list->selectedItems();
-            std::unordered_set<int> type_set;
-            type_set.reserve(selected_types.size());
-            for (QListWidgetItem *item : selected_types)
-                type_set.insert(item->data(Qt::UserRole).toInt());
-
-            // weapon base name filter
-            auto selected_base_names = this->base_name_list->selectedItems();
-            std::unordered_set<std::string> base_name_set;
-            base_name_set.reserve(selected_base_names.size());
-            for (QListWidgetItem *item : selected_base_names)
-                base_name_set.insert(item->data(Qt::UserRole).toString().toStdString());
-
-            // weapon affinity filter
-            auto selected_affinity = this->affinity_list->selectedItems();
-            std::unordered_set<int> affinity_set;
-            affinity_set.reserve(selected_affinity.size());
-            for (QListWidgetItem *item : selected_affinity)
-                affinity_set.insert(item->data(Qt::UserRole).toInt());
-
             this->filtered_active_weapon_data.clear();
             this->filtered_active_weapon_data.reserve(this->active_weapon_data.size());
             this->filtered_active_weapon_data.append_range(this->active_weapon_data
                 | std::views::filter([&](const calculator::Weapon& w) {
-                    if (!base_game_dlc_set.empty() && !base_game_dlc_set.contains(w.dlc))
-                        return false;
-                    if (!type_set.empty() && !type_set.contains(std::to_underlying(w.type)))
-                        return false;
-                    if (!base_name_set.empty() && !base_name_set.contains(w.base_name))
-                        return false;
-                    if (!affinity_set.empty() && !affinity_set.contains(std::to_underlying(w.affinity)))
-                        return false;
-                    return true;
+                    return (this->base_game_dlc_filter.empty() || this->base_game_dlc_filter.contains(w.dlc))
+                        && (this->type_filter.empty() || this->type_filter.contains(std::to_underlying(w.type)))
+                        && (this->base_name_filter.empty() || this->base_name_filter.contains(QString::fromStdString(w.base_name)))
+                        && (this->affinity_filter.empty() || this->affinity_filter.contains(std::to_underlying(w.affinity)));
                 })
             );
 

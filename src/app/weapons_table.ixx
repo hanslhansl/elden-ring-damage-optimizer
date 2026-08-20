@@ -804,25 +804,25 @@ namespace erdo::ui
             this->setSortRole(Qt::UserRole);
         }
 
-        void set_selected_base_game_dlc(QSet<bool>&& base_game_dlc)
+        void set_selected_base_game_dlc(QSet<bool> base_game_dlc)
         {
             this->beginFilterChange();
             this->base_game_dlc = std::move(base_game_dlc);
             this->endFilterChange();
         }
-        void set_selected_types(QSet<int>&& types)
+        void set_selected_types(QSet<int> types)
         {
             this->beginFilterChange();
             this->types = std::move(types);
             this->endFilterChange();
         }
-        void set_selected_base_names(QSet<QString>&& base_names)
+        void set_selected_base_names(QSet<QString> base_names)
         {
             this->beginFilterChange();
             this->base_names = std::move(base_names);
             this->endFilterChange();
         }
-        void set_selected_affinities(QSet<int>&& affinities)
+        void set_selected_affinities(QSet<int> affinities)
         {
             this->beginFilterChange();
             this->affinities = std::move(affinities);
