@@ -86,6 +86,6 @@ install(CODE [[
 
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "elden-ring-damage-optimizer")
-set(CPACK_PACKAGE_VERSION "3.0.0")
+set(CPACK_PACKAGE_VERSION "3.1.0")
 
 include(CPack)
