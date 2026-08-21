@@ -31,18 +31,18 @@ add_executable(erdo
 target_link_libraries(erdo PRIVATE
     erdo_ui
 )
-
-install(TARGETS erdo
-    RUNTIME DESTINATION .
-)
 copy_xml_data(erdo)
 
+install(TARGETS erdo)
+
+# use qt deploy script to copy dependencies (e.g. DLLs) to the install directory
 qt_generate_deploy_app_script(
     TARGET erdo
     OUTPUT_SCRIPT deploy_script
 )
 install(SCRIPT ${deploy_script})
 
+# copy binaries to root of install directory
 install(CODE [[
     set(_root "${CMAKE_INSTALL_PREFIX}")
     set(bin_dir "${_root}/bin")
@@ -52,9 +52,17 @@ install(CODE [[
 
         foreach(file IN LISTS bin_files)
             get_filename_component(name "${file}" NAME)
+            set(dst "${_root}/${name}")
+
+            # file(RENAME) does not reliably replace an existing
+            # destination on Windows.
+            if(EXISTS "${dst}")
+                file(REMOVE_RECURSE "${dst}")
+            endif()
+
             file(RENAME
                 "${file}"
-                "${_root}/${name}"
+                "${dst}"
             )
         endforeach()
 
@@ -83,9 +91,8 @@ install(CODE [[
     endif()
 ]])
 
-
+# set up packaging
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "elden-ring-damage-optimizer")
 set(CPACK_PACKAGE_VERSION "3.1.0")
-
 include(CPack)

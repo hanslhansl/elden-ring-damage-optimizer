@@ -57,5 +57,5 @@ function(copy_xml_data target)
 endfunction()
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/xml_data
-    DESTINATION .
+    TYPE BIN
 )
