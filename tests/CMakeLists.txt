@@ -20,7 +20,11 @@ function(configure_test_executable target erdo_core_library test_prefix)
     copy_xml_data(${target})
 
     # discover tests
-    catch_discover_tests(${target} TEST_PREFIX "${test_prefix}.")
+    catch_discover_tests(
+        ${target}
+        TEST_PREFIX "${test_prefix}."
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target}>"
+    )
 endfunction()
 
 # normal tests

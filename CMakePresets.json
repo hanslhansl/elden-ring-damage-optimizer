@@ -10,6 +10,23 @@
         },
 
         {
+            "name": "Qt-6.12.0-llvm-mingw_64",
+            "hidden": true,
+            "inherits": "Base",
+            "toolchainFile": "C:/Qt/6.12.0/llvm-mingw_64/lib/cmake/Qt6/qt.toolchain.cmake",
+            "environment": {
+                "PATH": "C:/Qt/6.12.0/llvm-mingw_64/bin;$penv{PATH}"
+            }
+        },
+        {
+            "name": "Qt-6.12.0-llvm-mingw_64-Release",
+            "inherits": "Qt-6.12.0-llvm-mingw_64",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+
+        {
             "name": "Qt-6.11.1-LLVM24",
             "hidden": true,
             "inherits": "Base",
@@ -42,6 +59,11 @@
     ],
     
     "buildPresets": [
+        {
+            "name": "Qt-6.12.0-llvm-mingw_64-Release",
+            "configurePreset": "Qt-6.12.0-llvm-mingw_64-Release"
+        },
+
         {
             "name": "Qt-6.11.1-LLVM24-Debug",
             "configurePreset": "Qt-6.11.1-LLVM24-Debug"
