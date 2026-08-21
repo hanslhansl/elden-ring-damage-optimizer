@@ -872,114 +872,152 @@ namespace erdo::ui
     {
         void resize_columns_to_contents_impl()
         {
+            using Clock = std::chrono::steady_clock;
+
+            // const auto start = Clock::now();
+
+            const int rows = this->model->rowCount();
             const int columns = this->model->columnCount();
 
-            this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
-            this->resizeColumnsToContents();
+            if (rows <= 0 || columns <= 0)
+                return;
 
-            QVector<int> widths(columns);
+            auto* header = this->horizontalHeader();
+
+            QVector<int> widths(columns, header->minimumSectionSize());
             QVector<int> visibleColumns;
             QVector<int> expandableColumns;
 
-            int total = 0;
+            visibleColumns.reserve(columns);
+            expandableColumns.reserve(columns);
+
+            // Calculate content widths here...
+            //
+            // widths[c] = required content width
+            //
+            // For now assuming this part already exists.
 
             for (int c = 0; c < columns; ++c)
             {
-                if (this->header->isSectionHidden(c))
+                if (header->isSectionHidden(c))
                     continue;
 
-                widths[c] = std::max({
-                    this->header->sectionSize(c),
-                    this->header->sectionSizeHint(c),
-                    this->header->minimumSectionSize()
-                });
-                total += widths[c];
                 visibleColumns.append(c);
+
+                widths[c] = std::max({
+                    widths[c],
+                    header->sectionSizeHint(c),
+                    header->minimumSectionSize()
+                });
 
                 if (Row::expand_column[c])
                     expandableColumns.append(c);
             }
 
-            this->header->setSectionResizeMode(QHeaderView::Interactive);
-
-            if (total <= 0 || visibleColumns.isEmpty())
+            if (visibleColumns.isEmpty())
                 return;
+
+            int total = 0;
+
+            for (const int c : visibleColumns)
+                total += widths[c];
 
             const int available = this->viewport()->width();
 
-            // First restore the content-based widths.
-            for (int c : visibleColumns)
-                this->header->resizeSection(c, widths[c]);
-
-            if (total >= available || expandableColumns.isEmpty())
-                return;
-
-            int extra = available - total;
-
-            // Sort expandable columns from narrowest to widest.
-            std::sort(
-                expandableColumns.begin(),
-                expandableColumns.end(),
-                [&](int a, int b)
-                {
-                    return widths[a] < widths[b];
-                });
-
-            // Raise the narrowest columns until they reach the next width level.
-            int level = widths[expandableColumns[0]];
-
-            for (int i = 1; i < expandableColumns.size() && extra > 0; ++i)
+            if (total < available && !expandableColumns.isEmpty())
             {
-                const int nextLevel = widths[expandableColumns[i]];
-                const int count = i;
+                int extra = available - total;
 
-                const int required = (nextLevel - level) * count;
+                // Narrowest first.
+                std::sort(
+                    expandableColumns.begin(),
+                    expandableColumns.end(),
+                    [&](int a, int b)
+                    {
+                        return widths[a] < widths[b];
+                    });
 
-                if (required > extra)
+                const int count = expandableColumns.size();
+
+                // --------------------------------------------------------
+                // Water-fill.
+                //
+                // Raise the lowest columns until either:
+                //
+                //   1. they reach the next level, or
+                //   2. there isn't enough space to reach it.
+                //
+                // No resizeSection() happens here.
+                // --------------------------------------------------------
+
+                int level = widths[expandableColumns[0]];
+                int first = 0;
+
+                while (first < count - 1 && extra > 0)
                 {
-                    // Can't reach the next level.
+                    int next = first + 1;
+
+                    while (next < count &&
+                        widths[expandableColumns[next]] == level)
+                    {
+                        ++next;
+                    }
+
+                    if (next == count)
+                        break;
+
+                    const int nextLevel =
+                        widths[expandableColumns[next]];
+
+                    const int numAtLevel = next;
+
+                    const int required =
+                        (nextLevel - level) * numAtLevel;
+
+                    if (required > extra)
+                    {
+                        // Can't reach the next level.
+                        break;
+                    }
+
+                    for (int i = 0; i < numAtLevel; ++i)
+                        widths[expandableColumns[i]] = nextLevel;
+
+                    extra -= required;
+                    level = nextLevel;
+                    first = next - 1;
+                }
+
+                // --------------------------------------------------------
+                // Whatever remains is distributed equally among ALL
+                // expandable columns.
+                // --------------------------------------------------------
+
+                if (extra > 0)
+                {
                     const int increase = extra / count;
                     const int remainder = extra % count;
 
-                    for (int j = 0; j < count; ++j)
+                    for (int i = 0; i < count; ++i)
                     {
-                        const int c = expandableColumns[j];
-                        const int delta = increase + (j < remainder ? 1 : 0);
+                        const int c = expandableColumns[i];
 
-                        this->header->resizeSection(c, widths[c] + delta);
+                        widths[c] +=
+                            increase + (i < remainder ? 1 : 0);
                     }
-
-                    return;
-                }
-
-                // Raise the first `count` columns to the next level.
-                for (int j = 0; j < count; ++j)
-                {
-                    const int c = expandableColumns[j];
-                    widths[c] = nextLevel;
-                    this->header->resizeSection(c, widths[c]);
-                }
-
-                extra -= required;
-                level = nextLevel;
-            }
-
-            // All expandable columns have reached the same width.
-            // Distribute any remaining space evenly.
-            if (extra > 0)
-            {
-                const int count = expandableColumns.size();
-                const int increase = extra / count;
-                const int remainder = extra % count;
-
-                for (int i = 0; i < count; ++i)
-                {
-                    const int c = expandableColumns[i];
-                    const int delta = increase + (i < remainder ? 1 : 0);
-
-                    this->header->resizeSection(c, widths[c] + delta);
                 }
             }
+
+            // Only touch Qt once per column.
+            header->setUpdatesEnabled(false);
+
+            for (const int c : visibleColumns)
+                header->resizeSection(c, widths[c]);
+
+            header->setUpdatesEnabled(true);
+
+            // const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start);
+            // std::println("Resized weapon table columns in {:.2f} ms", elapsed.count() / 1000.0);
         }
 
         void show_table_context_menu(const QPoint &pos)

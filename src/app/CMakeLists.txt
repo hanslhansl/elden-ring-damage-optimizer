@@ -33,7 +33,9 @@ target_link_libraries(erdo PRIVATE
 )
 copy_xml_data(erdo)
 
-install(TARGETS erdo)
+install(TARGETS erdo
+    RUNTIME DESTINATION .
+)
 
 # use qt deploy script to copy dependencies (e.g. DLLs) to the install directory
 qt_generate_deploy_app_script(
