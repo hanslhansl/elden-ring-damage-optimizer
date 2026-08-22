@@ -970,6 +970,7 @@ namespace erdo::ui
 
             auto action_fandom = menu.addAction(QString::fromStdString(std::format("Show {} on Fandom", selection_name)));
             auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
+            menu.addSeparator();
             auto action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
 
             auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));

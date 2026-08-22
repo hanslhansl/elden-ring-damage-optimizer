@@ -14,7 +14,6 @@
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
-#include "ui_plot_tab.h"
 export module erdo.ui;
 
 import std;
@@ -23,6 +22,7 @@ import erdo;
 
 import erdo.ui.settings;
 import erdo.ui.weapons_table;
+import erdo.ui.plot_tab;
 
 
 export namespace erdo::ui
@@ -724,14 +724,6 @@ namespace erdo::ui
             this->prepare_optimization();
             this->weapon_table->model->set_rows({});
         }
-    };
-
-    struct PlotTab : QWidget, Ui::PlotTab
-    {
-        explicit PlotTab(QWidget *parent = nullptr) : QWidget(parent)
-        {
-            this->setupUi(this);
-        };
     };
 
     class MainWindow : public QMainWindow, public Ui::MainWindow
