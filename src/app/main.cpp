@@ -2,7 +2,7 @@
 
 import erdo;
 import erdo.ui;
-int main(int argc, char *argv[])
+int main2(int argc, char *argv[])
 {
 	return erdo::ui::run_ui(argc, argv);
 
@@ -20,3 +20,5 @@ int main(int argc, char *argv[])
 	// std::println("{}", attacks.back().weapon.get().full_name);
 	// return 0;
 }
+
+

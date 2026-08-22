@@ -10,28 +10,28 @@
         },
 
         {
-            "name": "Qt-6.11.1-LLVM24",
+            "name": "Qt-6.12.0-LLVM24",
             "hidden": true,
             "inherits": "Base",
-            "toolchainFile": "F:/Qt/Qt-6.11.1-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake"
+            "toolchainFile": "F:/Qt/Qt-6.12.0-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake"
         },
         {
-            "name": "Qt-6.11.1-LLVM24-Debug",
-            "inherits": "Qt-6.11.1-LLVM24",
+            "name": "Debug",
+            "inherits": "Qt-6.12.0-LLVM24",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
-            "name": "Qt-6.11.1-LLVM24-Release",
-            "inherits": "Qt-6.11.1-LLVM24",
+            "name": "Release",
+            "inherits": "Qt-6.12.0-LLVM24",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
-            "name": "Qt-6.11.1-LLVM24-RelWithDebInfo",
-            "inherits": "Qt-6.11.1-LLVM24",
+            "name": "RelWithDebInfo",
+            "inherits": "Qt-6.12.0-LLVM24",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
@@ -40,16 +40,16 @@
     
     "buildPresets": [
         {
-            "name": "Qt-6.11.1-LLVM24-Debug",
-            "configurePreset": "Qt-6.11.1-LLVM24-Debug"
+            "name": "Debug",
+            "configurePreset": "Debug"
         },
         {
-            "name": "Qt-6.11.1-LLVM24-Release",
-            "configurePreset": "Qt-6.11.1-LLVM24-Release"
+            "name": "Release",
+            "configurePreset": "Release"
         },
         {
-            "name": "Qt-6.11.1-LLVM24-RelWithDebInfo",
-            "configurePreset": "Qt-6.11.1-LLVM24-RelWithDebInfo"
+            "name": "RelWithDebInfo",
+            "configurePreset": "RelWithDebInfo"
         }
     ]
 }

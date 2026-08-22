@@ -41,11 +41,11 @@ The dependencies are:
 - [CPM.cmake](https://github.com/cpm-cmake/cpm.cmake) (package manager)
 - [pugixml](https://github.com/zeux/pugixml)
 - [Catch2](https://github.com/catchorg/Catch2) (if building tests)
-- [Qt](https://www.qt.io/)
+- [Qt](https://www.qt.io/), licensed under LGPL
 
 The cmake build script automatically downloads *CPM.cmake* which it then uses to download *pugixml* and *Catch2*.
 
-*Qt* needs to be provided seperately. Official downloads are available but might not support the newest compiler versions necessary for c++26. [build_qt.py](build_qt.py) may be used to build *Qt* from source with any compiler.
+*Qt* needs to be provided seperately. Binaries and source are available on the official website. You may use [build_qt.py](build_qt.py) to build *Qt* with all required submodules from source.
 
 #### supported compilers
-The project is tested and built with [LLVM/Clang 24](https://github.com/mstorsjo/llvm-mingw).
+The project is tested and built with [this](https://github.com/mstorsjo/llvm-mingw) llvm 24 mingw-w64 toolchain.

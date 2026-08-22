@@ -1,8 +1,22 @@
 ﻿# add Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent Graphs)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent PrintSupport)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+
+# add KDChart
+CPMAddPackage(
+    NAME KDChart
+    GITHUB_REPOSITORY KDAB/KDChart
+    GIT_TAG kdchart-3.0.0
+    OPTIONS
+        "KDChart_QT6 ON"
+        "KDChart_EXAMPLES OFF"
+        "KDChart_TESTS OFF"
+        "KDChart_DOCS OFF"
+)
+add_library(KDChart::kdchart ALIAS kdchart)
+
 
 add_library(erdo_ui STATIC)
 target_sources(erdo_ui PUBLIC FILE_SET CXX_MODULES FILES
@@ -17,13 +31,14 @@ qt_add_ui(erdo_ui SOURCES
     optimize_widget.ui
     plot_tab.ui
 )
-target_link_libraries(erdo_ui PRIVATE
+target_link_libraries(erdo_ui PUBLIC#PRIVATE
     erdo_core
     Qt6::Core
     Qt6::Widgets
     Qt6::Gui
     Qt6::Concurrent
-    Qt6::Graphs
+    Qt6::PrintSupport
+    KDChart::kdchart
 )
 
 # set up main executable

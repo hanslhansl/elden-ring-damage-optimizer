@@ -24,8 +24,8 @@ CMAKE_BIN = None    # None: get from PATH
 NINJA_BIN = None    # None: get from PATH
 
 # Qt configure options
-QT_SUBMODULES = "qtbase,qtsvg,qttools,qtgraphs,qtcharts"
-QT_USE_ORIGINAL_COMPILER = True # if true, the generated qt.toolchain.cmake file will set the C/CXX to the compiler used to build Qt itself
+QT_SUBMODULES = "qtbase,qttools"
+QT_USE_ORIGINAL_COMPILER = True # if true, the generated qt.toolchain.cmake file will set C/CXX to the compiler used to build Qt itself
 
 SYSTEM_PATHS = [
     os.path.join(os.environ["SystemRoot"], "System32"),
