@@ -10,10 +10,9 @@ from pathlib import Path
 # Global configuration
 # ============================================================
 
-COMPILER_BIN = r".../bin"
-QT_SOURCE = r".../Qt/6.11.1/Src"
+COMPILER_BIN = r"...\bin"
+QT_SOURCE = r"...\6.12.0\Src"
 INSTALL_PREFIX = r"..."
-BUILD_STATIC = False
 
 
 BUILD_DIR = f"{INSTALL_PREFIX}-build"
@@ -25,7 +24,7 @@ CMAKE_BIN = None    # None: get from PATH
 NINJA_BIN = None    # None: get from PATH
 
 # Qt configure options
-QT_SUBMODULES = "qtbase,qtsvg,qttools,qtgraphs"
+QT_SUBMODULES = "qtbase,qtsvg,qttools,qtgraphs,qtcharts"
 QT_USE_ORIGINAL_COMPILER = True # if true, the generated qt.toolchain.cmake file will set the C/CXX to the compiler used to build Qt itself
 
 SYSTEM_PATHS = [
@@ -109,19 +108,16 @@ def main():
         configure_cmd = [
             os.path.join(QT_SOURCE, "configure.bat"),
 
-            "-prefix",
-            INSTALL_PREFIX,
+            "-prefix", INSTALL_PREFIX,
 
             "-release",
-            *(("-static",) if BUILD_STATIC else ("-shared", "-force-debug-info", "-separate-debug-info")),
+            "-shared", "-force-debug-info", "-separate-debug-info", # shared build
             "-opensource",
             "-confirm-license",
 
-            "-cmake-generator",
-            "Ninja",
+            "-cmake-generator", "Ninja",
 
-            "-submodules",
-            QT_SUBMODULES,
+            "-submodules", QT_SUBMODULES,
 
             "--",
 
