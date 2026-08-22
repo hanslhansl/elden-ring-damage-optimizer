@@ -2,7 +2,7 @@
 
 import erdo;
 import erdo.ui;
-int main2(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	return erdo::ui::run_ui(argc, argv);
 

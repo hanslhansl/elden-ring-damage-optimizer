@@ -29,7 +29,6 @@ qt_add_ui(erdo_ui SOURCES
     main_window.ui
     stats_tab.ui
     optimize_widget.ui
-    plot_tab.ui
 )
 target_link_libraries(erdo_ui PUBLIC#PRIVATE
     erdo_core

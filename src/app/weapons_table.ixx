@@ -877,6 +877,8 @@ namespace erdo::ui
         {
             auto start = std::chrono::high_resolution_clock::now();
 
+            this->resize_timer->stop();
+
             const int columns = this->model->columnCount();
 
             this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -970,8 +972,15 @@ namespace erdo::ui
 
             auto action_fandom = menu.addAction(QString::fromStdString(std::format("Show {} on Fandom", selection_name)));
             auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
-            menu.addSeparator();
-            auto action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
+
+            QAction* action_add_to_plot;
+            auto add_to_plot_has_receivers = this->receivers(SIGNAL(add_to_plot(const std::vector<std::reference_wrapper<const calculator::Attack>>&))) != 0;
+            if (add_to_plot_has_receivers)
+            {
+                menu.addSeparator();
+                action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
+            }
+
 
             auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));
 
@@ -981,7 +990,7 @@ namespace erdo::ui
             else if (selected_action == action_fextralife)
                 for (auto row_index : row_indices)
                     QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
-            else if (selected_action == action_add_to_plot)
+            else if (add_to_plot_has_receivers && selected_action == action_add_to_plot)
                 emit add_to_plot(row_indices
                     | std::views::transform([this](auto row_index){
                         return std::cref(this->model->rows.at(row_index).attack);
@@ -1002,7 +1011,7 @@ namespace erdo::ui
         {
             QTableView::showEvent(event);
 
-            this->resize_columns_to_contents();
+            this->resize_columns_to_contents_impl();
         }
     
     public:

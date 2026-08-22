@@ -223,7 +223,6 @@ namespace erdo::ui
     protected:
         std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
-        WeaponTable* weapon_table{};
 
         QSet<bool> base_game_dlc_filter{};
         QSet<int> type_filter{};
@@ -317,6 +316,8 @@ namespace erdo::ui
         }
 
     public:
+        WeaponTable* weapon_table{};
+
         explicit StatsTabBase(QWidget *parent = nullptr) : QWidget(parent)
         {
             this->setupUi(this);
@@ -904,9 +905,13 @@ namespace erdo::ui
 
 
             // add tabs
-            this->tab_widget->addTab(stats, "Stats");
-            this->tab_widget->addTab(optimize, "Optimize");
-            this->tab_widget->addTab(plot, "Plot");
+            this->tab_widget->addTab(this->stats, "Stats");
+            connect(this->stats->weapon_table, &WeaponTable::add_to_plot, this->plot, &PlotTab::add_datasets);
+
+            this->tab_widget->addTab(this->optimize, "Optimize");
+            connect(this->optimize->weapon_table, &WeaponTable::add_to_plot, this->plot, &PlotTab::add_datasets);
+
+            this->tab_widget->addTab(this->plot, "Plot");
 
             // restore geometry and state
             QSettings settings{};
