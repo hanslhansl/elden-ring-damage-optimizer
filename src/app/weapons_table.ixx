@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <qabstractitemmodel.h>
 #include <qmenu.h>
+#include <qobject.h>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -41,7 +42,6 @@ namespace erdo::ui
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
  
-
     namespace sections
     {
         static const auto alignment_center = QVariant::fromValue(Qt::AlignCenter);
@@ -870,154 +870,87 @@ namespace erdo::ui
 
     export class WeaponTable : public QTableView
     {
+        Q_OBJECT
+
+        QTimer *resize_timer = new QTimer(this);
         void resize_columns_to_contents_impl()
         {
-            using Clock = std::chrono::steady_clock;
+            auto start = std::chrono::high_resolution_clock::now();
 
-            // const auto start = Clock::now();
-
-            const int rows = this->model->rowCount();
             const int columns = this->model->columnCount();
 
-            if (rows <= 0 || columns <= 0)
-                return;
+            this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
+            this->resizeColumnsToContents();
 
-            auto* header = this->horizontalHeader();
-
-            QVector<int> widths(columns, header->minimumSectionSize());
-            QVector<int> visibleColumns;
-            QVector<int> expandableColumns;
-
-            visibleColumns.reserve(columns);
-            expandableColumns.reserve(columns);
-
-            // Calculate content widths here...
-            //
-            // widths[c] = required content width
-            //
-            // For now assuming this part already exists.
-
-            for (int c = 0; c < columns; ++c)
-            {
-                if (header->isSectionHidden(c))
-                    continue;
-
-                visibleColumns.append(c);
-
-                widths[c] = std::max({
-                    widths[c],
-                    header->sectionSizeHint(c),
-                    header->minimumSectionSize()
-                });
-
-                if (Row::expand_column[c])
-                    expandableColumns.append(c);
-            }
-
-            if (visibleColumns.isEmpty())
-                return;
+            std::vector<int> widths(columns);
+            std::vector<int> visibleColumns;
+            std::vector<int> expandableColumns;
 
             int total = 0;
 
-            for (const int c : visibleColumns)
+            for (int c = 0; c < columns; ++c)
+            {
+                if (this->header->isSectionHidden(c))
+                    continue;
+
+                widths[c] = std::max({
+                    this->header->sectionSize(c),
+                    this->header->sectionSizeHint(c),
+                    this->header->minimumSectionSize()
+                });
                 total += widths[c];
+                visibleColumns.push_back(c);
+
+                if (Row::expand_column[c])
+                    expandableColumns.push_back(c);
+            }
+
+            this->header->setSectionResizeMode(QHeaderView::Interactive);
+
+            if (total <= 0 || visibleColumns.empty())
+                return;
 
             const int available = this->viewport()->width();
 
-            if (total < available && !expandableColumns.isEmpty())
+            if (total >= available || expandableColumns.empty())
+                return;
+
+            int extra = available - total;
+
+            // Sort expandable columns from narrowest to widest.
+            std::ranges::sort(expandableColumns, [&](int a, int b) { return widths[a] < widths[b]; });
+
+            int total_expandable = extra;
+            int cols_to_expand = 0;
+            int current_width = widths[expandableColumns[0]];
+
+            for (auto c : expandableColumns)
             {
-                int extra = available - total;
-
-                // Narrowest first.
-                std::sort(
-                    expandableColumns.begin(),
-                    expandableColumns.end(),
-                    [&](int a, int b)
-                    {
-                        return widths[a] < widths[b];
-                    });
-
-                const int count = expandableColumns.size();
-
-                // --------------------------------------------------------
-                // Water-fill.
-                //
-                // Raise the lowest columns until either:
-                //
-                //   1. they reach the next level, or
-                //   2. there isn't enough space to reach it.
-                //
-                // No resizeSection() happens here.
-                // --------------------------------------------------------
-
-                int level = widths[expandableColumns[0]];
-                int first = 0;
-
-                while (first < count - 1 && extra > 0)
+                if (widths[c] > current_width)
                 {
-                    int next = first + 1;
-
-                    while (next < count &&
-                        widths[expandableColumns[next]] == level)
-                    {
-                        ++next;
-                    }
-
-                    if (next == count)
+                    if (total_expandable < widths[c] * cols_to_expand)
                         break;
 
-                    const int nextLevel =
-                        widths[expandableColumns[next]];
-
-                    const int numAtLevel = next;
-
-                    const int required =
-                        (nextLevel - level) * numAtLevel;
-
-                    if (required > extra)
-                    {
-                        // Can't reach the next level.
-                        break;
-                    }
-
-                    for (int i = 0; i < numAtLevel; ++i)
-                        widths[expandableColumns[i]] = nextLevel;
-
-                    extra -= required;
-                    level = nextLevel;
-                    first = next - 1;
+                    current_width = widths[c];
                 }
 
-                // --------------------------------------------------------
-                // Whatever remains is distributed equally among ALL
-                // expandable columns.
-                // --------------------------------------------------------
-
-                if (extra > 0)
-                {
-                    const int increase = extra / count;
-                    const int remainder = extra % count;
-
-                    for (int i = 0; i < count; ++i)
-                    {
-                        const int c = expandableColumns[i];
-
-                        widths[c] +=
-                            increase + (i < remainder ? 1 : 0);
-                    }
-                }
+                total_expandable += widths[c];
+                ++cols_to_expand;
             }
 
-            // Only touch Qt once per column.
-            header->setUpdatesEnabled(false);
+            int each = total_expandable / cols_to_expand;
+            int remainder = total_expandable % cols_to_expand;
+            for (int i = 0; i < cols_to_expand; ++i)
+            {
+                auto c = expandableColumns[i];
+                auto new_width = each + (i < remainder ? 1 : 0);
+                if (new_width != widths[c])
+                    this->header->resizeSection(c, new_width);
+            }
 
-            for (const int c : visibleColumns)
-                header->resizeSection(c, widths[c]);
-
-            header->setUpdatesEnabled(true);
-
-            // const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start);
-            // std::println("Resized weapon table columns in {:.2f} ms", elapsed.count() / 1000.0);
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::println("Resize columns to contents took {}", duration);
         }
 
         void show_table_context_menu(const QPoint &pos)
@@ -1029,7 +962,7 @@ namespace erdo::ui
                 | std::ranges::to<std::vector>();
 
             auto selection_name = row_indices.size() == 1
-                ? this->model->rows[row_indices[0]].attack.weapon.get().full_name
+                ? this->model->rows.at(row_indices.front()).attack.weapon.get().full_name
                 : std::format("Selection ({})", row_indices.size());
 
 
@@ -1037,17 +970,40 @@ namespace erdo::ui
 
             auto action_fandom = menu.addAction(QString::fromStdString(std::format("Show {} on Fandom", selection_name)));
             auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
+            auto action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
 
             auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));
 
             if (selected_action == action_fandom)
                 for (auto row_index : row_indices)
-                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows[row_index].attack.weapon.get().fandom_url())));
+                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fandom_url())));
             else if (selected_action == action_fextralife)
                 for (auto row_index : row_indices)
-                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows[row_index].attack.weapon.get().fextralife_url())));
+                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
+            else if (selected_action == action_add_to_plot)
+                emit add_to_plot(row_indices
+                    | std::views::transform([this](auto row_index){
+                        return std::cref(this->model->rows.at(row_index).attack);
+                    })
+                    | std::ranges::to<std::vector>()
+                );
         }
 
+    protected:
+        void paintEvent(QPaintEvent *event) override
+        {
+            QTableView::paintEvent(event);
+
+            draw_column_group_separators(this->viewport(), this->horizontalHeader());
+        }
+    
+        void showEvent(QShowEvent *event) override
+        {
+            QTableView::showEvent(event);
+
+            this->resize_columns_to_contents();
+        }
+    
     public:
         RowModel* model = new RowModel(this);
         RowSortFilterModel* proxy_model = new RowSortFilterModel(this);
@@ -1055,6 +1011,10 @@ namespace erdo::ui
 
         explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
         {
+            // table resize timer
+            this->resize_timer->setSingleShot(true);
+            connect(this->resize_timer, &QTimer::timeout, this, &WeaponTable::resize_columns_to_contents_impl);
+
             // view
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
@@ -1107,15 +1067,7 @@ namespace erdo::ui
             if (!this->isVisible())
                 return;
 
-            QTimer::singleShot(0, this, [this]()
-            {
-                this->doItemsLayout();
-
-                if (!this->isVisible())
-                    return;
-
-                this->resize_columns_to_contents_impl();
-            });
+            this->resize_timer->start(500);
         }
 
         template<typename ColumnType>
@@ -1124,19 +1076,9 @@ namespace erdo::ui
             this->header->set_section_hidden(tuple_index_v<ColumnType, Row>, hide);
         }
 
-    protected:
-        void paintEvent(QPaintEvent *event) override
-        {
-            QTableView::paintEvent(event);
-
-            draw_column_group_separators(this->viewport(), this->horizontalHeader());
-        }
-    
-        void showEvent(QShowEvent *event) override
-        {
-            QTableView::showEvent(event);
-
-            this->resize_columns_to_contents();
-        }
+    signals:
+        void add_to_plot(const std::vector<std::reference_wrapper<const calculator::Attack>>&);
     };
 }
+
+#include "weapons_table.moc"
