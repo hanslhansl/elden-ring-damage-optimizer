@@ -50,7 +50,6 @@ namespace erdo::ui
         using value_type = int;
         using widget_type = QSpinBox;
         inline static const auto signal = &QSpinBox::valueChanged;
-        constexpr static std::string_view section_name = "General";
 
         static void initialize(widget_type* spinbox, value_type value)
         {
@@ -59,10 +58,23 @@ namespace erdo::ui
             spinbox->setValue(value);
         }
     };
+    struct CalculationDelay : SpinBoxSetting<CalculationDelay>
+    {
+        using typename SpinBoxSetting<CalculationDelay>::value_type;
+
+        constexpr static std::string_view section_name = "General";
+        constexpr static std::string_view name = "calculation_delay";
+        constexpr static std::string_view display_name = "Calculation Delay (ms)";
+
+        constexpr static value_type default_value = 500;
+        constexpr static value_type minimum_value = 0;
+        constexpr static value_type maximum_value = 5000;
+    };
     struct AttributeLevelLimit : SpinBoxSetting<AttributeLevelLimit>
     {
         using typename SpinBoxSetting<AttributeLevelLimit>::value_type;
 
+        constexpr static std::string_view section_name = "Elden Ring";
         constexpr static std::string_view name = "attribute_level_limit";
         constexpr static std::string_view display_name = "Attribute Level Limit (Ingame: 99)";
 
@@ -88,7 +100,6 @@ namespace erdo::ui
         using value_type = bool;
         using widget_type = QCheckBox;
         inline static const auto signal = &QCheckBox::toggled;
-        constexpr static std::string_view section_name = "General";
 
         static void initialize(widget_type* checkbox, value_type value)
         {
@@ -102,18 +113,20 @@ namespace erdo::ui
 
         std::vector<std::pair<std::array<std::string_view, 2>, QWidget*>> widgets{};
         std::unique_ptr<QSettings> qsettings{};
-        QDialog* dialog{};
+        std::unique_ptr<QDialog> dialog{};
 
         template<typename T>
         friend class SettingBuilder;
 
     public:
+        SettingBuilder<CalculationDelay> calculation_delay{ *this };
+        
         SettingBuilder<AttributeLevelLimit> attribute_level_limit{ *this };
 
         SettingBuilder<DecimalPlaces> decimal_places{ *this };
 
         Settings(int) {};
-        Settings() : is_initialized{ true }, dialog{ new QDialog{} }, qsettings{ std::make_unique<QSettings>() }
+        Settings() : is_initialized{ true }, dialog{ std::make_unique<QDialog>() }, qsettings{ std::make_unique<QSettings>() }
         {
             auto tab_widget = new QTabWidget{};
 
@@ -149,8 +162,8 @@ namespace erdo::ui
             auto layout = new QVBoxLayout{};
             layout->addWidget(tab_widget);
 
-            QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Reset, this->dialog);
-            QObject::connect(buttons, &QDialogButtonBox::accepted, this->dialog, &QDialog::accept);
+            QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Reset, this->dialog.get());
+            QObject::connect(buttons, &QDialogButtonBox::accepted, this->dialog.get(), &QDialog::accept);
             QObject::connect(buttons, &QDialogButtonBox::clicked, [this, buttons](QAbstractButton* button) {
                 if (buttons->buttonRole(button) == QDialogButtonBox::ResetRole)
                 {

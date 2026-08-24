@@ -15,7 +15,6 @@ const auto& get_weapons()
     static std::vector<std::reference_wrapper<const calculator::Weapon>> data_reference;
 
     std::call_once(flag, [] {
-        std::println("std::filesystem::current_path(): {}", std::filesystem::current_path().string());
         auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
         data = parser::load_weapons(xml_data_directory);
         std::ranges::sort(data, {}, &calculator::Weapon::full_name);

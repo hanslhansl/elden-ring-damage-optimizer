@@ -58,7 +58,7 @@ namespace erdo::ui
 
             explicit SectionBase(const calculator::Attack& attack) { }
 
-            void update(const calculator::Attack& attack) { }
+            void update(const calculator::FullAttackOptions& attack_options) { }
         };
 
         export struct BinaryTextSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
@@ -79,16 +79,16 @@ namespace erdo::ui
             static constexpr std::array column_names { "Name" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit NameSection(const calculator::Attack& attack)
+            explicit NameSection(const calculator::FullAttackOptions& attack_options)
             {
-                this->update(attack);
+                this->update(attack_options);
             }
 
-            void update(const calculator::Attack& attack)
+            void update(const calculator::FullAttackOptions& attack_options)
             {
-                auto&& weapon = attack.weapon.get();
+                auto&& weapon = attack_options.weapon.get();
 
-                (*this)[0][0] = QString::fromStdString(weapon.qualified_name(attack.upgrade_level()));
+                (*this)[0][0] = QString::fromStdString(weapon.qualified_name(attack_options.upgrade_level()));
                 (*this)[0][1] = QString::fromStdString(weapon.full_name);
             }
         };
@@ -97,9 +97,9 @@ namespace erdo::ui
             static constexpr std::array column_names { "Affinity" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit AffinitySection(const calculator::Attack& attack)
+            explicit AffinitySection(const calculator::FullAttackOptions& attack_options)
             {
-                auto&& weapon = attack.weapon.get();
+                auto&& weapon = attack_options.weapon.get();
 
                 (*this)[0][0] = enum_to_display(weapon.affinity);
                 (*this)[0][1] = std::to_underlying(weapon.affinity);
@@ -110,9 +110,9 @@ namespace erdo::ui
             static constexpr std::array column_names { "Type" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit TypeSection(const calculator::Attack& attack)
+            explicit TypeSection(const calculator::FullAttackOptions& attack_options)
             {
-                auto&& weapon = attack.weapon.get();
+                auto&& weapon = attack_options.weapon.get();
 
                 (*this)[0][0] = enum_to_display(weapon.type);
                 (*this)[0][1] = std::to_underlying(weapon.type);
@@ -124,9 +124,9 @@ namespace erdo::ui
             static constexpr std::array column_names { "Base Game\nDLC" };
 
             using SectionBase::SectionBase;
-            explicit BaseGameDLCSection(const calculator::Attack& attack)
+            explicit BaseGameDLCSection(const calculator::FullAttackOptions& attack_options)
             {
-                auto&& weapon = attack.weapon.get();
+                auto&& weapon = attack_options.weapon.get();
 
                 (*this)[0][0] = weapon.dlc ? "DLC" : "Base Game";
                 (*this)[0][1] = weapon.dlc;
@@ -152,9 +152,9 @@ namespace erdo::ui
             static constexpr std::array column_names { "Base Name" };
 
             using SectionBase::SectionBase;
-            explicit BaseNameSection(const calculator::Attack& attack)
+            explicit BaseNameSection(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0] = QString::fromStdString(attack.weapon.get().base_name);
+                (*this)[0] = QString::fromStdString(attack_options.weapon.get().base_name);
             }
 
             QVariant data(int column, int role) const
@@ -175,14 +175,14 @@ namespace erdo::ui
             static constexpr std::array column_names { "Character Level" };
 
             using SectionBase::SectionBase;
-            explicit CharacterLevelSection(const calculator::Attack& attack)
+            explicit CharacterLevelSection(const calculator::FullAttackOptions& attack_options)
             {
-                this->update(attack);
+                this->update(attack_options);
             }
 
-            void update(const calculator::Attack& attack)
+            void update(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0] = attack.stats.character_level();
+                (*this)[0] = attack_options.stats.character_level();
             }
 
             QVariant data(int column, int role) const
@@ -348,6 +348,10 @@ namespace erdo::ui
             {
                 this->update(attack);
             }
+            explicit Requirements(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
+            }
 
             void update(const calculator::Attack& attack)
             {
@@ -363,6 +367,18 @@ namespace erdo::ui
                     arr[2] = foreground_color(is_ineffective);
                 }
             }
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                auto&& weapon = attack_options.weapon.get();
+
+                for (auto&& [requirement, arr] : std::views::zip(
+                    weapon.requirements,
+                    *this))
+                {
+                    arr[0] = format_number(requirement);
+                    arr[1] = requirement;
+                }
+            }
         };
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
@@ -372,6 +388,10 @@ namespace erdo::ui
             explicit Stats(const calculator::Attack& attack)
             {
                 this->update(attack);
+            }
+            explicit Stats(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
             }
 
             void update(const calculator::Attack& attack)
@@ -386,6 +406,16 @@ namespace erdo::ui
                     arr[2] = foreground_color(is_ineffective);
                 }
             }
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                for (auto&& [stat, arr] : std::views::zip(
+                    attack_options.stats.relevant_stats(),
+                    *this))
+                {
+                    arr[0] = stat;
+                    arr[1] = stat;
+                }
+            }
         };
 
         export template<calculator::AttackPowerType apt>
@@ -395,12 +425,12 @@ namespace erdo::ui
             static inline const auto section_name = enum_to_display(attack_power_type) + " Scaling";
 
             using EnumDataSection::EnumDataSection;
-            explicit AttackPowerTypeAttributeScalings(const calculator::Attack& attack)
+            explicit AttackPowerTypeAttributeScalings(const calculator::FullAttackOptions& attack_options)
             {
-                auto&& weapon = attack.weapon.get();
+                auto&& weapon = attack_options.weapon.get();
 
                 for (auto&& [attack_power_type_attribute_scalings, arr] : std::views::zip(
-                    attack.attack_power_type_attribute_scalings(attack_power_type),
+                    attack_options.attack_power_type_attribute_scalings(attack_power_type),
                     *this))
                 {
                     arr[0] = format_number(attack_power_type_attribute_scalings);
@@ -410,13 +440,15 @@ namespace erdo::ui
         };
     }
 
-    export template<std::default_initializable...Args>
+    export template<bool _sparse, std::default_initializable...Args>
+        requires (!_sparse) || (std::constructible_from<Args, const calculator::FullAttackOptions&> && ...)
     struct BasicRow : _tuple_base<std::tuple<Args...>>
     {
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
         using _tuple_base::_tuple_base;
+        static constexpr auto sparse = _sparse;
 
-        calculator::Attack attack { calculator::Weapon::dummy, {}, {} };
+        std::conditional_t<sparse, calculator::FullAttackOptions, calculator::Attack> attack { calculator::Weapon::dummy, {}, {} };
 
         static constexpr std::array section_sizes = { std::tuple_size_v<Args>... };
         static constexpr std::array cumulative_section_sizes = []() {
@@ -474,11 +506,11 @@ namespace erdo::ui
         }
 
         BasicRow() = default;
-        explicit BasicRow(calculator::Attack&& attack) : _tuple_base(Args(attack)...), attack{ std::move(attack) } { }
+        explicit BasicRow(const decltype(attack)& attack) : _tuple_base(Args(attack)...), attack{ attack } { }
 
-        void update(calculator::Attack&& attack)
+        void update(const decltype(attack)& attack)
         {
-            this->attack = std::move(attack);
+            this->attack = attack;
             this->update();
         }
         void update()
@@ -506,35 +538,8 @@ namespace erdo::ui
         }
     };
 
-    export using Row = BasicRow<
-        sections::NameSection,
-        sections::BaseNameSection,
-        sections::AffinitySection,
-        sections::TypeSection,
-        sections::SpellScaling,
-        sections::AttackPowers,
-        sections::StatusEffects,
-        sections::AttributeScalings,
-        sections::Requirements,
-        sections::Stats,
-        sections::CharacterLevelSection,
-        sections::BaseGameDLCSection,
-
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::PHYSICAL>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::MAGIC>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::FIRE>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::LIGHTNING>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::HOLY>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::POISON>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::SCARLET_ROT>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::BLEED>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::FROST>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::SLEEP>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::MADNESS>,
-        sections::AttackPowerTypeAttributeScalings<calculator::AttackPowerType::DEATH_BLIGHT>
-    >;
-
-    export struct RowModel : QAbstractTableModel
+    export template<typename Row>
+    struct RowModel : QAbstractTableModel
     {
         friend class WeaponsTable;
 
@@ -583,17 +588,45 @@ namespace erdo::ui
             this->rows = std::move(rows);
             this->endResetModel();
         }
-
-        void update_rows(std::ranges::range auto&& attacks)
+        void add_rows(std::ranges::sized_range auto&& rows)
         {
+            this->beginInsertRows({}, this->rowCount(), this->rowCount() + std::ranges::size(rows) - 1);
+            this->rows.append_range(std::forward<decltype(rows)>(rows));
+            this->endInsertRows();
+        }
+        void update_rows(std::ranges::sized_range auto&& attacks)
+        {
+            if (this->rows.size() != std::ranges::size(attacks))
+                throw std::invalid_argument("attacks size must match rows size");
+
             for (auto&& [attack, row] : std::views::zip(attacks, this->rows))
                 row.update(std::move(attack));
             emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
         }
+        void remove_rows(std::vector<int> row_indices)
+        {
+            std::ranges::sort(row_indices);
+
+            std::vector<Row> new_rows{};
+            new_rows.reserve(this->rows.size() - row_indices.size());
+            auto j = 0;
+            for (auto [i, row] : this->rows | std::views::enumerate)
+            {
+                if (j < row_indices.size() && i == row_indices.at(j))
+                {
+                    ++j;
+                    continue;
+                }
+
+                new_rows.emplace_back(std::move(row));
+            }
+
+            this->set_rows(std::move(new_rows));
+        }
     };
 
-    template <typename PaintDevice>
-    static void draw_column_group_separators(PaintDevice *device, const QHeaderView *header)
+    template <typename Row>
+    void draw_column_group_separators(auto *device, const QHeaderView *header)
     {
         QPainter painter(device);
 
@@ -630,6 +663,7 @@ namespace erdo::ui
         painter.restore();
     }
 
+    template<typename Row>
     class RotatedHeaderView : public QHeaderView
     {
     public:
@@ -782,7 +816,7 @@ namespace erdo::ui
                 }
             }
 
-            draw_column_group_separators(this->viewport(), this);
+            draw_column_group_separators<Row>(this->viewport(), this);
 
             p.restore();
         }
@@ -796,6 +830,7 @@ namespace erdo::ui
         Rotation rotation;
     };
 
+    template<typename Row>
     class RowSortFilterModel : public QSortFilterProxyModel
     {
     public:
@@ -868,10 +903,21 @@ namespace erdo::ui
         QSet<int> affinities;
     };
 
-    export class WeaponTable : public QTableView
+    class WeaponTableBase : public QTableView
     {
         Q_OBJECT
 
+    public:
+        using QTableView::QTableView;
+
+    signals:
+        void add_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&);
+        void remove_from_plot(const std::vector<int>&);
+    };
+
+    export template<typename Row>
+    class WeaponTable : public WeaponTableBase
+    {
         QTimer *resize_timer = new QTimer(this);
         void resize_columns_to_contents_impl()
         {
@@ -955,6 +1001,28 @@ namespace erdo::ui
             std::println("Resize columns to contents took {}", duration);
         }
 
+        void show_header_context_menu(const QPoint &pos)
+        {
+            QMenu menu;
+
+            for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
+            {
+                auto name = Row::section_name(section_index);
+                if (name.isEmpty())
+                    name = Row::column_name(Row::section_index_offsets[section_index]);
+
+                QAction *action = menu.addAction(name);
+                action->setCheckable(true);
+                action->setChecked(!this->header->is_section_hidden(section_index));
+
+                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                    this->header->set_section_hidden(section_index, !visible);
+                    this->resize_columns_to_contents_impl();
+                });
+            }
+
+            menu.exec(this->mapToGlobal(pos));
+        }
         void show_table_context_menu(const QPoint &pos)
         {
             auto row_indices = this->selectionModel()->selectedRows()
@@ -962,6 +1030,9 @@ namespace erdo::ui
                     return this->proxy_model->mapToSource(index).row();
                 })
                 | std::ranges::to<std::vector>();
+
+            if (row_indices.empty())
+                return;
 
             auto selection_name = row_indices.size() == 1
                 ? this->model->rows.at(row_indices.front()).attack.weapon.get().full_name
@@ -974,13 +1045,22 @@ namespace erdo::ui
             auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
 
             QAction* action_add_to_plot;
-            auto add_to_plot_has_receivers = this->receivers(SIGNAL(add_to_plot(const std::vector<std::reference_wrapper<const calculator::Attack>>&))) != 0;
+            auto add_to_plot_has_receivers = this->receivers(
+                SIGNAL(add_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&))
+            ) != 0;
             if (add_to_plot_has_receivers)
             {
                 menu.addSeparator();
                 action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
             }
 
+            QAction* action_remove_from_plot;
+            auto remove_from_plot_has_receivers = this->receivers(SIGNAL(remove_from_plot(const std::vector<int>&))) != 0;
+            if (remove_from_plot_has_receivers)
+            {
+                menu.addSeparator();
+                action_remove_from_plot = menu.addAction(QString::fromStdString(std::format("Remove {} from Plot", selection_name)));
+            }
 
             auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));
 
@@ -993,10 +1073,12 @@ namespace erdo::ui
             else if (add_to_plot_has_receivers && selected_action == action_add_to_plot)
                 emit add_to_plot(row_indices
                     | std::views::transform([this](auto row_index){
-                        return std::cref(this->model->rows.at(row_index).attack);
+                        return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
                     })
                     | std::ranges::to<std::vector>()
                 );
+            else if (remove_from_plot_has_receivers && selected_action == action_remove_from_plot)
+                emit remove_from_plot(row_indices);
         }
 
     protected:
@@ -1004,7 +1086,7 @@ namespace erdo::ui
         {
             QTableView::paintEvent(event);
 
-            draw_column_group_separators(this->viewport(), this->horizontalHeader());
+            draw_column_group_separators<Row>(this->viewport(), this->horizontalHeader());
         }
     
         void showEvent(QShowEvent *event) override
@@ -1015,11 +1097,11 @@ namespace erdo::ui
         }
     
     public:
-        RowModel* model = new RowModel(this);
-        RowSortFilterModel* proxy_model = new RowSortFilterModel(this);
-        RotatedHeaderView* header = new RotatedHeaderView(Qt::Horizontal, RotatedHeaderView::Rotation::Clockwise, this);
+        RowModel<Row>* model = new RowModel<Row>(this);
+        RowSortFilterModel<Row>* proxy_model = new RowSortFilterModel<Row>(this);
+        RotatedHeaderView<Row>* header = new RotatedHeaderView<Row>(Qt::Horizontal, RotatedHeaderView<Row>::Rotation::Clockwise, this);
 
-        explicit WeaponTable(QWidget *parent = nullptr) : QTableView(parent)
+        explicit WeaponTable(QWidget *parent = nullptr) : WeaponTableBase(parent)
         {
             // table resize timer
             this->resize_timer->setSingleShot(true);
@@ -1036,8 +1118,8 @@ namespace erdo::ui
             // model
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
-            connect(this->model, &RowModel::dataChanged, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel::modelReset, this, &WeaponTable::resize_columns_to_contents);
+            connect(this->model, &RowModel<Row>::dataChanged, this, &WeaponTable::resize_columns_to_contents);
+            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents_impl);
 
             // header
             this->setHorizontalHeader(this->header);
@@ -1048,28 +1130,7 @@ namespace erdo::ui
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
             }(1);
-            connect(this->header, &QHeaderView::customContextMenuRequested, this, [this](const QPoint &pos)
-            {
-                QMenu menu;
-
-                for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
-                {
-                    auto name = Row::section_name(section_index);
-                    if (name.isEmpty())
-                        name = Row::column_name(Row::section_index_offsets[section_index]);
-
-                    QAction *action = menu.addAction(name);
-                    action->setCheckable(true);
-                    action->setChecked(!this->header->is_section_hidden(section_index));
-
-                    connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
-                        this->header->set_section_hidden(section_index, !visible);
-                        this->resize_columns_to_contents();
-                    });
-                }
-
-                menu.exec(this->mapToGlobal(pos));
-            });
+            connect(this->header, &QHeaderView::customContextMenuRequested, this, &WeaponTable::show_header_context_menu);
         }
 
         void resize_columns_to_contents()
@@ -1077,17 +1138,15 @@ namespace erdo::ui
             if (!this->isVisible())
                 return;
 
-            this->resize_timer->start(500);
+            this->resize_timer->start(settings.calculation_delay);
         }
 
         template<typename ColumnType>
         void set_section_hidden(bool hide)
         {
+            if constexpr (requires { tuple_index_v<ColumnType, Row>; })
             this->header->set_section_hidden(tuple_index_v<ColumnType, Row>, hide);
         }
-
-    signals:
-        void add_to_plot(const std::vector<std::reference_wrapper<const calculator::Attack>>&);
     };
 }
 

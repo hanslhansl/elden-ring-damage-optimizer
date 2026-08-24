@@ -316,7 +316,29 @@ namespace erdo::ui
         }
 
     public:
-        WeaponTable* weapon_table{};
+        using Row = decltype([](auto){
+            static constexpr auto [...apts] = enumerators_of<calculator::AttackPowerType>();
+
+            return BasicRow<false,
+                sections::NameSection,
+                sections::BaseNameSection,
+                sections::AffinitySection,
+                sections::TypeSection,
+                sections::AttackPowers,
+                sections::StatusEffects,
+                sections::SpellScaling,
+                sections::AttributeScalings,
+                sections::Stats,
+                sections::Requirements,
+                sections::CharacterLevelSection,
+
+                sections::AttackPowerTypeAttributeScalings<apts>...,
+
+                sections::BaseGameDLCSection
+            >{};
+        }(1));
+
+        WeaponTable<Row>* weapon_table{};
 
         explicit StatsTabBase(QWidget *parent = nullptr) : QWidget(parent)
         {
@@ -386,7 +408,7 @@ namespace erdo::ui
             connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_affinity_list_filter);
 
             // weapon table view
-            this->weapon_table = new WeaponTable(this);
+            this->weapon_table = new WeaponTable<Row>(this);
             this->main_layout->addWidget(this->weapon_table, 1);
         };
 
@@ -527,7 +549,7 @@ namespace erdo::ui
                 | std::views::transform([&](const calculator::Weapon& w) {
                     attack.weapon = w;
                     attack.calculate_inplace();
-                    return Row(std::move(attack));
+                    return Row(attack);
                 })
             );
             this->weapon_table->model->set_rows(std::move(rows));
@@ -632,33 +654,43 @@ namespace erdo::ui
             if (use_v2)
             {
                 visit_enum(target, [&](auto integral_constant) {
-                    auto v2_optimizer = optimizer::V2<integral_constant.value>{
-                        filtered_active_weapon_data,
-                        attack_options,
-                        free_attribute_points,
-                        min_stats,
-                        settings.attribute_level_limit.value
-                    };
-                    this->v2_variations_label->setText(
-                        QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
-                    );
-                    this->v2_iterations_label->setText(QString::number(v2_optimizer.iteration_count));
+                    if constexpr (optimizer::valid_optimizer_target<integral_constant.value>)
+                    {
+                        auto v2_optimizer = optimizer::V2<integral_constant.value>{
+                            filtered_active_weapon_data,
+                            attack_options,
+                            free_attribute_points,
+                            min_stats,
+                            settings.attribute_level_limit.value
+                        };
+                        this->v2_variations_label->setText(
+                            QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
+                        );
+                        this->v2_iterations_label->setText(QString::number(v2_optimizer.iteration_count));
 
-                    optimizer_visitor(v2_optimizer);
+                        optimizer_visitor(v2_optimizer);
+                    }
+                    else
+                        throw std::runtime_error("V2 optimizer not implemented for this target.");
                 });
             }
             else
             {
                 visit_enum(target, [&](auto integral_constant) {
-                    auto brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
-                        filtered_active_weapon_data,
-                        attack_options,
-                        free_attribute_points,
-                        min_stats,
-                        settings.attribute_level_limit.value
-                    };
+                    if constexpr (optimizer::valid_optimizer_target<integral_constant.value>)
+                    {   
+                        auto brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
+                            filtered_active_weapon_data,
+                            attack_options,
+                            free_attribute_points,
+                            min_stats,
+                            settings.attribute_level_limit.value
+                        };
 
-                    optimizer_visitor(brute_force_optimizer);
+                        optimizer_visitor(brute_force_optimizer);
+                    }
+                    else
+                        throw std::runtime_error("V2 optimizer not implemented for this target.");
                 });
             }
         }
@@ -710,8 +742,13 @@ namespace erdo::ui
             this->Ui::OptimizeWidget::setupUi(opt_group);
 
             // optimize target combobox
-            for (const auto& target : enumerators_of<optimizer::Target>())
-                this->target_combobox->addItem(enum_to_display(target));
+            [&](auto){
+                static constexpr auto [...targets] = enumerators_of<optimizer::Target>();
+                ([&]{
+                    if constexpr (optimizer::valid_optimizer_target<targets>)
+                        this->target_combobox->addItem(enum_to_display(targets));
+                }(), ...);
+            }(1);
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
@@ -900,16 +937,18 @@ namespace erdo::ui
             this->menu_file->addSeparator();
             this->menu_file->addAction("Settings", [](){ settings.show(); });
 
-            this->menu_help->addAction("About erdo", [](){ QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer")); });
+            this->menu_help->addAction("About erdo", [](){
+                QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer"));
+            });
             this->menu_help->addAction("About Qt", QApplication::aboutQt);
 
 
             // add tabs
             this->tab_widget->addTab(this->stats, "Stats");
-            connect(this->stats->weapon_table, &WeaponTable::add_to_plot, this->plot, &PlotTab::add_datasets);
+            connect(this->stats->weapon_table, &WeaponTable<StatsTabBase::Row>::add_to_plot, this->plot, &PlotTab::add_datasets);
 
             this->tab_widget->addTab(this->optimize, "Optimize");
-            connect(this->optimize->weapon_table, &WeaponTable::add_to_plot, this->plot, &PlotTab::add_datasets);
+            connect(this->optimize->weapon_table, &WeaponTable<StatsTabBase::Row>::add_to_plot, this->plot, &PlotTab::add_datasets);
 
             this->tab_widget->addTab(this->plot, "Plot");
 

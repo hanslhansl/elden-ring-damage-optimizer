@@ -393,6 +393,9 @@ export namespace erdo::calculator
         std::reference_wrapper<const Weapon> weapon;
         AttributeLevels stats;
 
+        FullAttackOptions(const Weapon& weapon, const AttributeLevels& stats, const AttackOptions& attack_options)
+            : AttackOptions{attack_options}, weapon{ weapon }, stats{ stats } { }
+
         RelevantAttributeLevelsArray adjust_stats_for_two_handing() const
         {
             RelevantAttributeLevelsArray adjusted_relevant_stats{};
@@ -635,7 +638,7 @@ export namespace erdo::calculator
             return attack_power_type != AttackPowerType::PHYSICAL && this->ineffective_attack_power_types[std::to_underlying(attack_power_type)];
         }
 
-        Attack(const Weapon& weapon, const AttributeLevels& stats, const AttackOptions& attack_options) : FullAttackOptions{ attack_options, weapon, stats } { }
+        using FullAttackOptions::FullAttackOptions;
 
         static Attack calculate(const Weapon& weapon, const AttributeLevels& stats, const AttackOptions& attack_options)
         {

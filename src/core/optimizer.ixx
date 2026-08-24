@@ -8,6 +8,60 @@ using namespace erdo::calculator;
 
 namespace erdo::optimizer
 {
+    export enum class Target
+    {
+        TOTAL_ATTACK_POWER,
+
+        PHYSICAL_ATTACK_POWER,
+        MAGIC_ATTACK_POWER,
+        FIRE_ATTACK_POWER,
+        LIGHTNING_ATTACK_POWER,
+        HOLY_ATTACK_POWER,
+
+        POISON_STATUS_EFFECT,
+        SCARLET_ROT_STATUS_EFFECT,
+        BLEED_STATUS_EFFECT,
+        FROST_STATUS_EFFECT,
+        SLEEP_STATUS_EFFECT,
+        MADNESS_STATUS_EFFECT,
+        DEATH_BLIGHT_STATUS_EFFECT,
+
+        SPELL_SCALING,
+
+        STRENGTH_SCALING,
+        DEXTERITY_SCALING,
+        INTELLIGENCE_SCALING,
+        FAITH_SCALING,
+        ARCAINE_SCALING,
+    };
+}
+
+using namespace erdo;
+template<>
+constexpr std::array<std::pair<optimizer::Target, std::string_view>, 19> enum_string_mapping<optimizer::Target> = {
+    std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
+    std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
+    std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
+    std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
+    std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
+    std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
+    std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
+    std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
+    std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
+    std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
+    std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
+    std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
+    std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
+    std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
+    std::pair{optimizer::Target::STRENGTH_SCALING, "STRENGTH_SCALING"},
+    std::pair{optimizer::Target::DEXTERITY_SCALING, "DEXTERITY_SCALING"},
+    std::pair{optimizer::Target::INTELLIGENCE_SCALING, "INTELLIGENCE_SCALING"},
+    std::pair{optimizer::Target::FAITH_SCALING, "FAITH_SCALING"},
+    std::pair{optimizer::Target::ARCAINE_SCALING, "ARCAINE_SCALING"}
+};
+
+namespace erdo::optimizer
+{
     export std::size_t get_stat_variation_count(const int free_attribute_points, const RelevantAttributeLevels& min_relevant_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
         const auto A = free_attribute_points;
@@ -110,87 +164,69 @@ namespace erdo::optimizer
         return stat_variations;
     }
 
-    export enum class Target
+    export template<Target target>
+    struct Projection;
+    template<>
+    struct Projection<Target::TOTAL_ATTACK_POWER>
     {
-        PHYSICAL_ATTACK_POWER = std::to_underlying(AttackPowerType::PHYSICAL),
-        MAGIC_ATTACK_POWER = std::to_underlying(AttackPowerType::MAGIC),
-        FIRE_ATTACK_POWER = std::to_underlying(AttackPowerType::FIRE),
-        LIGHTNING_ATTACK_POWER = std::to_underlying(AttackPowerType::LIGHTNING),
-        HOLY_ATTACK_POWER = std::to_underlying(AttackPowerType::HOLY),
-
-        POISON_STATUS_EFFECT = std::to_underlying(AttackPowerType::POISON),
-        SCARLET_ROT_STATUS_EFFECT = std::to_underlying(AttackPowerType::SCARLET_ROT),
-        BLEED_STATUS_EFFECT = std::to_underlying(AttackPowerType::BLEED),
-        FROST_STATUS_EFFECT = std::to_underlying(AttackPowerType::FROST),
-        SLEEP_STATUS_EFFECT = std::to_underlying(AttackPowerType::SLEEP),
-        MADNESS_STATUS_EFFECT = std::to_underlying(AttackPowerType::MADNESS),
-        DEATH_BLIGHT_STATUS_EFFECT = std::to_underlying(AttackPowerType::DEATH_BLIGHT),
-
-        TOTAL_ATTACK_POWER,
-        SPELL_SCALING,
+        static const double& operator()(const AttackRating& attack_rating)
+        {
+            return attack_rating.total_attack_power[1];
+        }
     };
-
-    template<Target target>
-    struct ProjectionImpl;
-    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target)))
-    struct ProjectionImpl<target>
+    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER)))
+    struct Projection<target>
     {
-        static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(std::to_underlying(target));
-        static constexpr auto attack_power_type_integral = std::to_underlying(attack_power_type);
+        static constexpr auto attack_power_type_integral = std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER);
+        static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(attack_power_type_integral);
 
-        static double& operator()(AttackRating& attack_rating)
+        static const double& operator()(const AttackRating& attack_rating)
         {
             return attack_rating.attack_powers[attack_power_type_integral][1];
         }
     };
     template<>
-    struct ProjectionImpl<Target::SPELL_SCALING>
+    struct Projection<Target::SPELL_SCALING>
     {
-        static double& operator()(AttackRating& attack_rating)
+        static const double& operator()(const AttackRating& attack_rating)
         {
             return attack_rating.spell_scaling;
         }
     };
-    template<>
-    struct ProjectionImpl<Target::TOTAL_ATTACK_POWER>
+    template<Target target> requires (is_valid_enum_integral<RelevantAttribute>(std::to_underlying(target) - std::to_underlying(Target::STRENGTH_SCALING)))
+    struct Projection<target>
     {
-        static double& operator()(AttackRating& attack_rating)
-        {
-            return attack_rating.total_attack_power[1];
-        }
-    };
-    template<Target target>
-    struct Projection
-    {
-        using value_type = std::remove_reference_t<std::invoke_result_t<decltype(ProjectionImpl<target>::operator()), AttackRating&>>;
+        static constexpr auto attribute_integral = std::to_underlying(target) - std::to_underlying(Target::STRENGTH_SCALING);
+        static constexpr auto attribute = integral_to_enum<calculator::RelevantAttribute>(attribute_integral);
 
-        static value_type& operator()(AttackRating& attack_rating)
+        static const double& operator()(const calculator::FullAttackOptions& attack_options)
         {
-            return ProjectionImpl<target>::operator()(attack_rating);
-        }
-
-        static const value_type& operator()(const AttackRating& attack_rating)
-        {
-            return ProjectionImpl<target>::operator()(const_cast<AttackRating&>(attack_rating));
+            return attack_options.attribute_scalings_at_upgrade_level()[attribute_integral];
         }
     };
     export template<Target target>
     constexpr Projection<target> projection{};
+    // constexpr auto projections = [](auto){
+    //     static constexpr auto [...targets] = enumerators_of<Target>();
+    //     return std::array{ Projection<targets>::operator()... };
+    // }(1);
 
     template<Target target>
-    struct EfficientCalculateAttack
+    struct EfficientCalculateAttack;
+    template<>
+    struct EfficientCalculateAttack<Target::TOTAL_ATTACK_POWER>
     {
         static void operator()(Attack& attack)
         {
             attack.calculate_inplace();
         }
     };
-    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target)))
+    template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER)))
     struct EfficientCalculateAttack<target>
     {
         static void operator()(Attack& attack)
         {
-            attack.calculate_attack_power_inplace(ProjectionImpl<target>::attack_power_type);
+            attack.calculate_attack_power_inplace(Projection<target>::attack_power_type);
         }
     };
     template<>
@@ -201,16 +237,16 @@ namespace erdo::optimizer
             attack.calculate_spell_scaling_inplace();
         }
     };
-    template<Target target>
-    constexpr EfficientCalculateAttack<target> efficient_calculate_attack{};
 
-    template<template <Target> typename O, Target target_>
+    export template<Target target>
+    concept valid_optimizer_target = requires { sizeof(Projection<target>); sizeof(EfficientCalculateAttack<target>); };
+
+    template<Target target_> requires valid_optimizer_target<target_>
     struct OptimizerBase
     {
         static constexpr auto target = target_;
-        static constexpr auto projection = optimizer::projection<target>;
-        static constexpr auto efficient_calculate_attack = optimizer::efficient_calculate_attack<target>;
-        using Optimizer = O<target>;
+        static constexpr Projection<target> projection{};
+        static constexpr EfficientCalculateAttack<target> efficient_calculate_attack{};
 
         static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<AttributeLevels>& stat_variations)
         {
@@ -219,7 +255,7 @@ namespace erdo::optimizer
 
             Attack attack{ weapon, {}, attack_options };
             AttributeLevels const* best_stats = nullptr;
-            auto best_value = std::numeric_limits<typename Projection<target>::value_type>::lowest();
+            auto best_value = std::numeric_limits<double>::lowest();
 
             for (const auto& stats : stat_variations)
             {
@@ -240,18 +276,18 @@ namespace erdo::optimizer
             return attack;
         }
     
-        std::vector<Attack> run_synchronously(const std::ranges::sized_range auto& weapons) const
+        std::vector<Attack> run_synchronously(this const auto& self, const std::ranges::sized_range auto& weapons)
         {
             return weapons
-                | std::views::transform(*static_cast<const Optimizer*>(this))
+                | std::views::transform(self)
                 | std::ranges::to<std::vector>();
         }
    
         std::size_t iteration_count = 0;
     };
 
-    export template<Target target>
-    struct BruteForce : OptimizerBase<BruteForce, target>
+    export template<Target target> requires valid_optimizer_target<target>
+    struct BruteForce : OptimizerBase<target>
     {
         std::vector<AttributeLevels> stat_variations{};
         AttackOptions attack_options;
@@ -273,8 +309,8 @@ namespace erdo::optimizer
         }
     };
 
-    export template<Target target>
-    struct V2 : OptimizerBase<V2, target>
+    export template<Target target> requires valid_optimizer_target<target>
+    struct V2 : OptimizerBase<target>
     {
         static RelevantAttributeLevelsArray get_optimized_max_relevant_stats(
             const int free_attribute_points,
@@ -339,21 +375,3 @@ namespace erdo::optimizer
     };
 }
 
-using namespace erdo;
-template<>
-constexpr std::array<std::pair<optimizer::Target, std::string_view>, 14> enum_string_mapping<optimizer::Target> = {
-    std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
-    std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
-    std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
-    std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
-    std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
-    std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
-    std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
-    std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
-};

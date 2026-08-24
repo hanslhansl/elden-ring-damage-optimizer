@@ -151,7 +151,7 @@ export namespace erdo
 
 
     template<typename T, typename Tuple, std::size_t... Is>
-    constexpr std::size_t tuple_index_impl(std::index_sequence<Is...>)
+    consteval std::size_t tuple_index_impl(std::index_sequence<Is...>)
     {
         constexpr bool matches[] = { std::same_as<T, std::tuple_element_t<Is, Tuple>>... };
 
@@ -159,9 +159,10 @@ export namespace erdo
             if (matches[i])
                 return i;
 
-        throw std::out_of_range("Type not found in tuple");
+        return -1;
     }
     template<typename T, typename Tuple>
+        requires (tuple_index_impl<T, Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}) != -1)
     constexpr std::size_t tuple_index_v = tuple_index_impl<T, Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 
 
