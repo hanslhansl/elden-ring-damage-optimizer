@@ -172,6 +172,7 @@ export namespace erdo::calculator
     };
 
     using UpgradeLevels = std::array<unsigned int, 3>; // free handed, normal, somber
+    constexpr auto max_upgrade_levels = UpgradeLevels{ 0, 25, 10 };
     using ScalingCurve = std::array<double, 149>;
     using ScalingCurves = std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()>;
     using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
@@ -291,14 +292,11 @@ export namespace erdo::calculator
 
         // the index of the upgrade level for this weapon
         int upgrade_level_index = [&]() {
-            if (this->base_attack_powers_at_upgrade_levels.size() == 1)
-                return 0;
-            else if (this->base_attack_powers_at_upgrade_levels.size() == 11)
-                return 2;
-            else if (this->base_attack_powers_at_upgrade_levels.size() == 26)
-                return 1;
-            else
-                throw std::runtime_error("invalid base attack power size");
+            for (auto [i, max_upgrade_level] : max_upgrade_levels | std::views::enumerate)
+                if (this->base_attack_powers_at_upgrade_levels.size() == max_upgrade_level + 1)
+                    return i;
+            
+            throw std::runtime_error("invalid base attack power size");
         }();
         // whether the weapon is a catalyst
         bool is_sorcery_or_incantation_tool = this->sorcery_tool || this->incantation_tool;

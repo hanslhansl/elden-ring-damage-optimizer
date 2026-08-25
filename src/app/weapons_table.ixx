@@ -8,9 +8,10 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QTimer>
-#include <qabstractitemmodel.h>
-#include <qmenu.h>
-#include <qobject.h>
+#include <QAbstractitemModel>
+#include <QMenu>
+#include <QColorDialog>
+#include <QMouseEvent>
 export module erdo.ui.weapons_table;
 
 import std;
@@ -56,7 +57,7 @@ namespace erdo::ui
             static constexpr bool expand_section = false;
             static inline const QString section_name = "";
 
-            explicit SectionBase(const calculator::Attack& attack) { }
+            explicit SectionBase(const calculator::FullAttackOptions& attack_options) { }
 
             void update(const calculator::FullAttackOptions& attack_options) { }
         };
@@ -118,12 +119,11 @@ namespace erdo::ui
                 (*this)[0][1] = std::to_underlying(weapon.type);
             }
         };
-        
-        export struct BaseGameDLCSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
+        export struct BaseGameDLCSection : BinaryTextSection
         {
             static constexpr std::array column_names { "Base Game\nDLC" };
 
-            using SectionBase::SectionBase;
+            using BinaryTextSection::BinaryTextSection;
             explicit BaseGameDLCSection(const calculator::FullAttackOptions& attack_options)
             {
                 auto&& weapon = attack_options.weapon.get();
@@ -134,16 +134,10 @@ namespace erdo::ui
 
             QVariant data(int column, int role) const
             {
-                if (role == Qt::DisplayRole)
-                    return (*this)[column][0];
-
-                if (role == Qt::UserRole)
-                    return (*this)[column][1];
-
                 if (role == Qt::TextAlignmentRole)
                     return alignment_center;
                 
-                return {};
+                return this->BinaryTextSection::data(column, role);
             }
         };
 
@@ -162,6 +156,28 @@ namespace erdo::ui
                 if (role == Qt::DisplayRole || role == Qt::UserRole)
                     return (*this)[column];
                 
+                return {};
+            }
+        };
+
+        export struct ColorSection : SectionBase<std::array<QVariant, 1>>
+        {
+            static constexpr std::array column_names { "Color" };
+
+            using SectionBase::SectionBase;
+            explicit ColorSection(const calculator::FullAttackOptions& attack_options)
+            {
+                (*this)[0] = QColor();
+            }
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DecorationRole || role == Qt::EditRole || role == Qt::UserRole)
+                    return (*this)[column];
+
+                if (role == Qt::TextAlignmentRole)
+                    return alignment_center;
+
                 return {};
             }
         };
@@ -471,11 +487,18 @@ namespace erdo::ui
 
         static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
         static constexpr std::array draw_column_header_label_rotated = [](){
-            std::array draw_section_header_labels_rotated = { Args::draw_section_header_labels_rotated... };
             std::array<bool, total_size> result{};
-            for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(draw_section_header_labels_rotated, section_index_offsets, section_sizes))
-                if (draw_rotated)
-                    std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
+            if constexpr (sparse)
+                result.fill(false);
+            
+            else
+                for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(
+                    std::array{ Args::draw_section_header_labels_rotated... },
+                    section_index_offsets,
+                    section_sizes
+                ))
+                    if (draw_rotated)
+                        std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
             
             return result;
         }();
@@ -569,6 +592,27 @@ namespace erdo::ui
                 return {};
 
             return this->rows[index.row()].data(index.column(), role);
+        }
+        bool setData(const QModelIndex &index, const QVariant &value, int role) override
+        {
+            if constexpr (requires { tuple_index_v<sections::ColorSection, Row>; })
+            {
+                if (index.column() == Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>) && role == Qt::EditRole)
+                {
+                    const QColor color = value.value<QColor>();
+
+                    if (!color.isValid())
+                        return false;
+
+                    std::get<sections::ColorSection>(this->rows[index.row()])[0] = color;
+
+                    emit dataChanged(index, index, { Qt::DecorationRole, Qt::UserRole });
+
+                    return true;
+                }
+            }
+            
+            return false;
         }
 
         QVariant headerData(int section, Qt::Orientation orientation, int role) const override
@@ -695,10 +739,9 @@ namespace erdo::ui
     protected:
         void paintSection(QPainter *painter, const QRect &rect_, int logicalIndex) const override
         {
+            // Move normal section contents down
             QRect rect = rect_;
-
-            // Move your normal section contents down
-            rect.translate(0, this->group_header_height());
+            rect.setTop(rect.top() + this->group_header_height());
 
             painter->save();
 
@@ -715,36 +758,25 @@ namespace erdo::ui
             this->initStyleOption(&option);
             option.rect = rect;
             option.text.clear();   // prevent normal text drawing
-
-            // Keep the sort indicator information
-            if (sortIndicatorSection() == logicalIndex) {
-                option.sortIndicator = sortIndicatorOrder() == Qt::AscendingOrder
-                    ? QStyleOptionHeader::SortDown
-                    : QStyleOptionHeader::SortUp;
-            }
+            option.sortIndicator = QStyleOptionHeader::None;
+            if (this->sortIndicatorSection() == logicalIndex)
+                option.sortIndicator = this->sortIndicatorOrder() == Qt::AscendingOrder ? QStyleOptionHeader::SortUp : QStyleOptionHeader::SortDown;
 
             this->style()->drawControl(QStyle::CE_Header, &option, painter, this);
 
-            QString text = this->model()->headerData(
-                logicalIndex,
-                this->orientation(),
-                Qt::DisplayRole).toString();
+            QString text = this->model()->headerData(logicalIndex, this->orientation(), Qt::DisplayRole).toString();
 
             painter->setPen(option.palette.color(QPalette::Text));
 
             painter->translate(
                 rotation == Rotation::CounterClockwise ? rect.left() : rect.right(),
-                rotation == Rotation::CounterClockwise ? rect.bottom() : rect.top());
+                rotation == Rotation::CounterClockwise ? rect.bottom() : rect.top()
+            );
 
             painter->rotate(rotation == Rotation::CounterClockwise ? -90 : 90);
 
             // Leave room for the indicator
             QRect textRect(0, 0, rect.height(), rect.width());
-
-            int indicatorSize = this->style()->pixelMetric(
-                QStyle::PM_HeaderMarkSize, &option, this);
-
-            textRect.adjust(0, 0, -indicatorSize, 0);
 
             painter->drawText(textRect, Qt::AlignCenter, text);
 
@@ -753,26 +785,20 @@ namespace erdo::ui
 
         QSize sectionSizeFromContents(int logicalIndex) const override
         {
-            QSize size = QHeaderView::sectionSizeFromContents(logicalIndex);
+            QSize size = this->QHeaderView::sectionSizeFromContents(logicalIndex);
 
             // Width becomes height after rotation
             if (Row::draw_column_header_label_rotated[logicalIndex])
-                return QSize(
-                    size.height(),
-                    size.width()
-                );
+            {
+                size.transpose();
+                size.rheight() += 8;
+            }
+            else
+                size.rheight() = this->group_header_height()*2;
+
+            // size.rheight() += this->group_header_height();
 
             return size;
-        }
-
-        QSize sizeHint() const override
-        {
-            QSize s = QHeaderView::sizeHint();
-
-            // Preserve your sectionSizeFromContents() height
-            s.setHeight(s.height() + this->group_header_height());
-
-            return s;
         }
 
         void paintEvent(QPaintEvent *e) override
@@ -788,8 +814,8 @@ namespace erdo::ui
             QPen pen(Qt::black, 1);
             pen.setCosmetic(true);
             p.setPen(pen);
-            p.drawLine(bounds.left(), height, bounds.right(), height);
-            p.drawLine(bounds.left(), this->height() - 1, bounds.right(), this->height() - 1);
+            p.drawLine(bounds.left(), height, bounds.right(), height); // inbetween
+            p.drawLine(bounds.left(), this->height() - 1, bounds.right(), this->height() - 1); // below
 
             pen.setCosmetic(false);
             p.setPen(pen);
@@ -824,6 +850,7 @@ namespace erdo::ui
     private:
         int group_header_height() const
         {
+            return this->fontMetrics().height() * 2;
             return this->fontMetrics().height() + 8;
         }
 
@@ -833,6 +860,11 @@ namespace erdo::ui
     template<typename Row>
     class RowSortFilterModel : public QSortFilterProxyModel
     {
+        QSet<bool> base_game_dlc; // true = dlc, false = base game
+        QSet<int> types;
+        QSet<QString> base_names;
+        QSet<int> affinities;
+
     public:
         explicit RowSortFilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
         {
@@ -895,13 +927,34 @@ namespace erdo::ui
                 && check_filter(tuple_index_v<sections::BaseNameSection, Row>, this->base_names)
                 && check_filter(tuple_index_v<sections::AffinitySection, Row>, this->affinities);
         }
-
-    private:
-        QSet<bool> base_game_dlc; // true = dlc, false = base game
-        QSet<int> types;
-        QSet<QString> base_names;
-        QSet<int> affinities;
     };
+
+    struct ColorDelegate : QStyledItemDelegate
+    {
+        using QStyledItemDelegate::QStyledItemDelegate;
+
+        bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index) override
+        {
+            Q_UNUSED(option);
+
+            if (event->type() != QEvent::MouseButtonRelease)
+                return false;
+
+            auto *mouseEvent = static_cast<QMouseEvent *>(event);
+
+            if (mouseEvent->button() != Qt::LeftButton)
+                return false;
+
+            QColorDialog dialog;
+            dialog.setCurrentColor(index.data(Qt::DecorationRole).value<QColor>());
+
+            if (dialog.exec() == QDialog::Accepted)
+                model->setData(index, dialog.selectedColor(), Qt::EditRole);
+            
+            return true;
+        }
+    };
+    
 
     class WeaponTableBase : public QTableView
     {
@@ -919,6 +972,13 @@ namespace erdo::ui
     class WeaponTable : public WeaponTableBase
     {
         QTimer *resize_timer = new QTimer(this);
+        void resize_columns_to_contents_short_delay()
+        {
+            if (!this->isVisible())
+                return;
+
+            this->resize_timer->start(100);
+        }
         void resize_columns_to_contents_impl()
         {
             auto start = std::chrono::high_resolution_clock::now();
@@ -931,11 +991,12 @@ namespace erdo::ui
             this->resizeColumnsToContents();
 
             std::vector<int> widths(columns);
-            std::vector<int> visibleColumns;
-            std::vector<int> expandableColumns;
+            std::vector<int> visible_columns;
+            std::vector<int> expandable_columns;
 
-            int total = 0;
+            int sum_total_width = 0;
 
+            // calculate expandable columns and the widths of all visible columns
             for (int c = 0; c < columns; ++c)
             {
                 if (this->header->isSectionHidden(c))
@@ -946,55 +1007,94 @@ namespace erdo::ui
                     this->header->sectionSizeHint(c),
                     this->header->minimumSectionSize()
                 });
-                total += widths[c];
-                visibleColumns.push_back(c);
+                sum_total_width += widths[c];
+                visible_columns.push_back(c);
 
                 if (Row::expand_column[c])
-                    expandableColumns.push_back(c);
+                    expandable_columns.push_back(c);
             }
 
             this->header->setSectionResizeMode(QHeaderView::Interactive);
 
-            if (total <= 0 || visibleColumns.empty())
+            if (sum_total_width <= 0 || visible_columns.empty())
                 return;
 
-            const int available = this->viewport()->width();
+            const int total_available_width = this->viewport()->width();
 
-            if (total >= available || expandableColumns.empty())
+            if (sum_total_width >= total_available_width || expandable_columns.empty())
                 return;
 
-            int extra = available - total;
+            int total_extra_width = total_available_width - sum_total_width;
 
-            // Sort expandable columns from narrowest to widest.
-            std::ranges::sort(expandableColumns, [&](int a, int b) { return widths[a] < widths[b]; });
+            // sort expandable columns from narrowest to widest.
+            std::ranges::sort(expandable_columns, [&](int a, int b) { return widths[a] < widths[b]; });
 
-            int total_expandable = extra;
-            int cols_to_expand = 0;
-            int current_width = widths[expandableColumns[0]];
-
-            for (auto c : expandableColumns)
+            // determine how many expandable columns to expand, also determine their expanded sum total width
+            auto sum_total_width_of_expanded_columns = total_extra_width;
+            auto expandable_columns_to_expand = 0;
+            auto current_width = 0;
+            for (auto c : expandable_columns)
             {
-                if (widths[c] > current_width)
+                if (current_width < widths[c])
                 {
-                    if (total_expandable < widths[c] * cols_to_expand)
+                    if (sum_total_width_of_expanded_columns < widths[c] * expandable_columns_to_expand)
                         break;
 
                     current_width = widths[c];
                 }
 
-                total_expandable += widths[c];
-                ++cols_to_expand;
+                sum_total_width_of_expanded_columns += widths[c];
+                ++expandable_columns_to_expand;
             }
 
-            int each = total_expandable / cols_to_expand;
-            int remainder = total_expandable % cols_to_expand;
-            for (int i = 0; i < cols_to_expand; ++i)
+            // if all expandable colums can be expanded to the highest expandable width (or further)
+            if(expandable_columns_to_expand == expandable_columns.size())
             {
-                auto c = expandableColumns[i];
-                auto new_width = each + (i < remainder ? 1 : 0);
-                if (new_width != widths[c])
-                    this->header->resizeSection(c, new_width);
+                // first, expand them to the highest expandable width
+                auto highest_expandable_width = widths[expandable_columns.back()];
+                for (int expandable_column : expandable_columns)
+                    widths[expandable_column] = highest_expandable_width;
+
+                // afterwards, distribute the remaining extra width proportionally among all visible columns
+                auto remaining_extra_width = sum_total_width_of_expanded_columns - (highest_expandable_width * expandable_columns.size());
+                auto current_sum_total_width = std::ranges::fold_left(widths, 0, std::plus{});
+                auto remainder = remaining_extra_width;
+                for (auto& c : visible_columns)
+                {
+                    auto& width = widths[c];
+                    int add = width * remaining_extra_width / current_sum_total_width;
+                    width += add;
+                    remainder -= add;
+                }
+
+                // distribute leftover points (due to integer division), max 1 per width.
+                for (auto& c : visible_columns)
+                {
+                    auto& width = widths[c];
+                    if (remainder != 0)
+                    {
+                        ++width;
+                        --remainder;
+                    }
+
+                    this->header->resizeSection(c, width);
+                }
             }
+            else
+            {
+                // otherwise expand the subset of expandable columns to the sum total width previously calculated
+                auto each = sum_total_width_of_expanded_columns / expandable_columns_to_expand;
+                auto remainder = sum_total_width_of_expanded_columns % expandable_columns_to_expand;
+                for (auto i = 0; i < expandable_columns_to_expand; ++i)
+                {
+                    auto c = expandable_columns[i];
+                    auto new_width = each + (i < remainder ? 1 : 0);
+                    if (new_width != widths[c])
+                        this->header->resizeSection(c, new_width);
+                }
+            }
+
+            
 
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -1115,22 +1215,38 @@ namespace erdo::ui
             this->setContextMenuPolicy(Qt::CustomContextMenu);
             connect(this, &QTableView::customContextMenuRequested, this, &WeaponTable::show_table_context_menu);
 
+            // color delegate
+            if constexpr (requires { tuple_index_v<sections::ColorSection, Row>; })
+            {
+                auto *delegate = new ColorDelegate(this);
+                this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>), delegate);
+            }
+
             // model
             this->proxy_model->setSourceModel(this->model);
             this->setModel(this->proxy_model);
+            this->proxy_model->setFilterCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
+            this->proxy_model->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
             connect(this->model, &RowModel<Row>::dataChanged, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents_impl);
+            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents_short_delay);
 
             // header
             this->setHorizontalHeader(this->header);
             this->header->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(this->header, &QHeaderView::customContextMenuRequested, this, &WeaponTable::show_header_context_menu);
+
+            // sorting
+            auto sort_column = Row::section_index_offsets.at(tuple_index_v<sections::BaseNameSection, Row>);
+            auto sort_order = Qt::SortOrder::AscendingOrder;
+            this->proxy_model->sort(sort_column, sort_order);
+            this->header->setSortIndicator(sort_column, sort_order);
+
             this->set_section_hidden<sections::BaseNameSection>(true);
             this->set_section_hidden<sections::BaseGameDLCSection>(true);
             [&](auto){
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
             }(1);
-            connect(this->header, &QHeaderView::customContextMenuRequested, this, &WeaponTable::show_header_context_menu);
         }
 
         void resize_columns_to_contents()
@@ -1145,7 +1261,7 @@ namespace erdo::ui
         void set_section_hidden(bool hide)
         {
             if constexpr (requires { tuple_index_v<ColumnType, Row>; })
-            this->header->set_section_hidden(tuple_index_v<ColumnType, Row>, hide);
+                this->header->set_section_hidden(tuple_index_v<ColumnType, Row>, hide);
         }
     };
 }

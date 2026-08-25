@@ -67,7 +67,7 @@ namespace erdo::ui
         constexpr static std::string_view display_name = "Calculation Delay (ms)";
 
         constexpr static value_type default_value = 500;
-        constexpr static value_type minimum_value = 0;
+        constexpr static value_type minimum_value = 100;
         constexpr static value_type maximum_value = 5000;
     };
     struct AttributeLevelLimit : SpinBoxSetting<AttributeLevelLimit>
