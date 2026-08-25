@@ -96,6 +96,7 @@ namespace erdo::ui
 
         QStandardItemModel *model;
         KDChart::Chart* chart;
+        KDChart::Plotter* plotter;
         KDChart::CartesianAxis *x_axis;
         KDChart::CartesianAxis *y_axis;
 
@@ -105,6 +106,23 @@ namespace erdo::ui
 
         QTimer *update_plot_timer = new QTimer(this);
         void update_plot_impl();
+
+        static QColor get_distinctive_color()
+        {
+            static const QVector<QColor> colors = {
+                QColor("#0072B2"),
+                QColor("#E69F00"),
+                QColor("#009E73"),
+                QColor("#D55E00"),
+                QColor("#CC79A7"),
+                QColor("#56B4E9"),
+                QColor("#F0E442"),
+                QColor("#000000"),
+            };
+            static auto index = 0;
+
+            return colors[index++ % colors.size()];
+        }
 
     public:
         explicit PlotTab(QWidget *parent = nullptr);
@@ -118,7 +136,9 @@ namespace erdo::ui
         {
             this->weapon_table->model->add_rows(attacks_options
                 | std::views::transform([](const calculator::FullAttackOptions& attacks_option) {
-                    return Row(calculator::FullAttackOptions(attacks_option));
+                    auto row = Row(calculator::FullAttackOptions(attacks_option));
+                    std::get<sections::ColorSection>(row)[0] = get_distinctive_color();
+                    return row;
                 })
             );
 
@@ -173,7 +193,7 @@ void ui::PlotTab::update_plot_impl()
         calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
         this->model->setHeaderData(column, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
-        // this->model->setHeaderData(column + 1, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
+        this->plotter->setPen(i, std::get<sections::ColorSection>(this->weapon_table->model->rows[i])[0].value<QColor>());
 
         for (auto [j, x_j] : x | std::views::enumerate)
         {
@@ -222,23 +242,13 @@ ui::PlotTab::PlotTab(QWidget *parent) : QSplitter(Qt::Orientation::Vertical, par
     this->chart = new KDChart::Chart(this);
     upper_layout->addWidget(this->chart);
 
-    auto plotter = new KDChart::Plotter;
+    this->plotter = new KDChart::Plotter;
     KDChart::LineAttributes attr;
     attr.setDisplayArea(false);
-    plotter->setLineAttributes(0, attr);
-    plotter->setModel(model);
-    this->chart->coordinatePlane()->replaceDiagram(plotter);
+    this->plotter->setLineAttributes(0, attr);
+    this->plotter->setModel(model);
+    this->chart->coordinatePlane()->replaceDiagram(this->plotter);
 
-    // auto legend = new KDChart::Legend(plotter, chart);
-    // legend->setVisible(true);
-    // // legend->setPosition(KDChart::Position::East);
-    // // legend->setAlignment(Qt::AlignTop);
-    // // legend->setOrientation(Qt::Vertical);
-    // legend->setPosition(KDChart::Position::NorthEast);
-    // legend->setAlignment(Qt::AlignTop | Qt::AlignRight);
-    // legend->setOrientation(Qt::Vertical);
-    // this->chart->addLegend(legend);
-    
     this->x_axis = new KDChart::CartesianAxis(plotter);
     this->y_axis = new KDChart::CartesianAxis(plotter);
     this->x_axis->setPosition(KDChart::CartesianAxis::Bottom);
@@ -248,4 +258,7 @@ ui::PlotTab::PlotTab(QWidget *parent) : QSplitter(Qt::Orientation::Vertical, par
 
     this->weapon_table = new WeaponTable<Row>(this);
     connect(this->weapon_table, &WeaponTable<Row>::remove_from_plot, this, &PlotTab::remove_datasets);
+    connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int index, QColor color){
+        this->plotter->setPen(index, color);
+    });
 };

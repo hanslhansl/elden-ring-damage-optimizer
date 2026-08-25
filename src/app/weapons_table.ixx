@@ -929,8 +929,11 @@ namespace erdo::ui
         }
     };
 
-    struct ColorDelegate : QStyledItemDelegate
+    class ColorDelegate : public QStyledItemDelegate
     {
+        Q_OBJECT
+
+    public:
         using QStyledItemDelegate::QStyledItemDelegate;
 
         bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index) override
@@ -949,10 +952,17 @@ namespace erdo::ui
             dialog.setCurrentColor(index.data(Qt::DecorationRole).value<QColor>());
 
             if (dialog.exec() == QDialog::Accepted)
-                model->setData(index, dialog.selectedColor(), Qt::EditRole);
+            {
+                auto selected_color = dialog.selectedColor();
+                model->setData(index, selected_color, Qt::EditRole);
+                emit row_color_changed(index.row(), selected_color);
+            }
             
             return true;
         }
+    
+    signals:
+        void row_color_changed(int, QColor);
     };
     
 
@@ -966,6 +976,7 @@ namespace erdo::ui
     signals:
         void add_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&);
         void remove_from_plot(const std::vector<int>&);
+        void row_color_changed(int, QColor);
     };
 
     export template<typename Row>
@@ -1218,8 +1229,9 @@ namespace erdo::ui
             // color delegate
             if constexpr (requires { tuple_index_v<sections::ColorSection, Row>; })
             {
-                auto *delegate = new ColorDelegate(this);
+                auto delegate = new ColorDelegate(this);
                 this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>), delegate);
+                connect(delegate, &ColorDelegate::row_color_changed, this, &WeaponTable::row_color_changed);
             }
 
             // model
