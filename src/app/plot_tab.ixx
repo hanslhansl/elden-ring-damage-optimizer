@@ -91,7 +91,7 @@ namespace erdo::ui
             >{};
         }(0));
 
-        KDChart::Widget* chart;
+        KDChart::Chart* chart;
         QStandardItemModel *model;
         QComboBox* variable_combobox;
         QSpinBox* min_spinbox;
@@ -105,8 +105,7 @@ namespace erdo::ui
         {
             this->update_plot_timer->stop();
 
-            // this->chart->resetData();
-            this->model->removeRows(0, this->model->rowCount());
+            this->model->clear();
 
             auto variable_index = this->variable_combobox->currentIndex();
             auto variable = static_cast<PlotVariable>(variable_index);
@@ -137,18 +136,9 @@ namespace erdo::ui
                 {
                     variable_projection(attack) = x_j;
                     attack.calculate_inplace();
-                    auto y_ij = metric_projection(attack)/*x*i*//*QPair{ x*2, x*2 }*/;
+                    auto y_ij = metric_projection(attack);
                     this->model->setData(model->index(j, i), y_ij);
                 }
-
-                // auto xy = x
-                //     | std::views::transform([&](unsigned int x){
-                //         variable_projection(attack) = x;
-                //         attack.calculate_inplace();
-                //         return metric_projection(attack)/*x*i*//*QPair{ x*2, x*2 }*/;
-                //     })
-                //     | std::ranges::to<QVector<qreal/*QPair<qreal, qreal>*/>>();
-                // this->chart->setDataset(i, xy, std::get<sections::NameSection>(row)[0][0].toString());
             }
         }
 
@@ -166,15 +156,18 @@ namespace erdo::ui
             auto upper_layout = new QHBoxLayout(upper_widget);
 
             this->model = new QStandardItemModel(this);
-            this->chart = new KDChart::Widget(this);
-            KDChart::CartesianAxis *xAxis = new KDChart::CartesianAxis( this->chart->lineDiagram() );
-            KDChart::CartesianAxis *yAxis = new KDChart::CartesianAxis(this->chart->lineDiagram() );
+            auto *diagram = new KDChart::LineDiagram;
+            diagram->setModel(model);
+            this->chart = new KDChart::Chart(this);
+            this->chart->coordinatePlane()->replaceDiagram(diagram);
+            KDChart::CartesianAxis *xAxis = new KDChart::CartesianAxis(diagram);
+            KDChart::CartesianAxis *yAxis = new KDChart::CartesianAxis(diagram);
             xAxis->setPosition( KDChart::CartesianAxis::Bottom );
             yAxis->setPosition( KDChart::CartesianAxis::Left );
             xAxis->setTitleText( "x" );
             yAxis->setTitleText( "y" );
-            this->chart->lineDiagram()->addAxis( xAxis );
-            this->chart->lineDiagram()->addAxis( yAxis );
+            diagram->addAxis( xAxis );
+            diagram->addAxis( yAxis );
             upper_layout->addWidget(this->chart);
 
             auto upper_right_layout = new QVBoxLayout();
@@ -225,12 +218,11 @@ namespace erdo::ui
             this->update_plot_impl();
         }
 
-        void remove_datasets(const std::vector<int>& attacks)
+        void remove_datasets(const std::vector<int>& indices)
         {
-            // this->weapon_table->model->remove_rows(attacks);
-            for (auto&& attack_index : attacks)
-                this->chart->diagram()->setHidden(attack_index, true);
-            // this->update_plot_impl();
+            this->weapon_table->model->remove_rows(indices);
+            for (auto&& i : indices)
+                this->model->removeColumn(i);
         }
     };
 }
