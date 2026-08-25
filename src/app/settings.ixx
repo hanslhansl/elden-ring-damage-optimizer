@@ -20,79 +20,50 @@ namespace erdo::ui
 {
     class Settings;
 
-    class SettingBuilderBase : public QObject
+    class SettingMemberBase : public QObject
     {
         Q_OBJECT
 
     public:
         Q_SIGNAL void changed();
 
-        static constexpr auto changed_member_pointer = &SettingBuilderBase::changed;
+        static constexpr auto changed_member_pointer = &SettingMemberBase::changed;
     };
 
     template<typename T>
-    struct SettingBuilder : SettingBuilderBase
+    struct SettingMember : SettingMemberBase
     {
+        T value;
 
-        T::value_type value;
+        template<typename U> requires std::same_as<T, typename U::value_type>
+        SettingMember(U&& member_info);
 
-        SettingBuilder(Settings& settings);
-
-        operator const typename T::value_type&() const
+        operator const T&() const
         {
             return this->value;
         }
     };
 
-    template<typename T>
     struct SpinBoxSetting
     {
         using value_type = int;
         using widget_type = QSpinBox;
         inline static const auto signal = &QSpinBox::valueChanged;
 
-        static void initialize(widget_type* spinbox, value_type value)
+        std::string_view section_name;
+        std::string_view name;
+        std::string_view display_name;
+
+        value_type default_value;
+        value_type minimum_value;
+        value_type maximum_value;
+
+        void initialize(widget_type* spinbox, value_type value) const
         {
-            spinbox->setMinimum(T::minimum_value);
-            spinbox->setMaximum(T::maximum_value);
+            spinbox->setMinimum(this->minimum_value);
+            spinbox->setMaximum(this->maximum_value);
             spinbox->setValue(value);
         }
-    };
-    struct CalculationDelay : SpinBoxSetting<CalculationDelay>
-    {
-        using typename SpinBoxSetting<CalculationDelay>::value_type;
-
-        constexpr static std::string_view section_name = "General";
-        constexpr static std::string_view name = "calculation_delay";
-        constexpr static std::string_view display_name = "Calculation Delay (ms)";
-
-        constexpr static value_type default_value = 500;
-        constexpr static value_type minimum_value = 100;
-        constexpr static value_type maximum_value = 5000;
-    };
-    struct AttributeLevelLimit : SpinBoxSetting<AttributeLevelLimit>
-    {
-        using typename SpinBoxSetting<AttributeLevelLimit>::value_type;
-
-        constexpr static std::string_view section_name = "Elden Ring";
-        constexpr static std::string_view name = "attribute_level_limit";
-        constexpr static std::string_view display_name = "Attribute Level Limit (Ingame: 99)";
-
-        constexpr static value_type default_value = 99;
-        constexpr static value_type minimum_value = 0;
-        constexpr static value_type maximum_value = 148;
-    };
-    struct DecimalPlaces : SpinBoxSetting<DecimalPlaces>
-    {
-        using typename SpinBoxSetting<DecimalPlaces>::value_type;
-
-        constexpr static std::string_view section_name = "Weapon Table";
-        constexpr static std::string_view name = "decimal_places";
-        constexpr static std::string_view display_name = "Decimal Places";
-
-        constexpr static value_type default_value = 3;
-        constexpr static value_type minimum_value = 0;
-        constexpr static value_type maximum_value = 10;
     };
 
     struct CheckBoxSetting
@@ -101,7 +72,11 @@ namespace erdo::ui
         using widget_type = QCheckBox;
         inline static const auto signal = &QCheckBox::toggled;
 
-        static void initialize(widget_type* checkbox, value_type value)
+        std::string_view section_name;
+        std::string_view name;
+        std::string_view display_name;
+
+        void initialize(widget_type* checkbox, value_type value) const
         {
             checkbox->setChecked(value);
         }
@@ -116,14 +91,60 @@ namespace erdo::ui
         std::unique_ptr<QDialog> dialog{};
 
         template<typename T>
-        friend class SettingBuilder;
+        friend class SettingMember;
 
     public:
-        SettingBuilder<CalculationDelay> calculation_delay{ *this };
+        SettingMember<int> calculation_delay{ SpinBoxSetting{
+            .section_name = "General",
+            .name = "calculation_delay",
+            .display_name = "Calculation Delay (ms)",
+            .default_value = 500,
+            .minimum_value = 100,
+            .maximum_value = 5000
+        } };
         
-        SettingBuilder<AttributeLevelLimit> attribute_level_limit{ *this };
+        SettingMember<int> attribute_level_limit{ SpinBoxSetting{
+            .section_name = "Elden Ring",
+            .name = "attribute_level_limit",
+            .display_name = "Attribute Level Limit (Ingame: 99)",
+            .default_value = 99,
+            .minimum_value = 0,
+            .maximum_value = 148
+        } };
 
-        SettingBuilder<DecimalPlaces> decimal_places{ *this };
+        SettingMember<int> decimal_places{ SpinBoxSetting{
+            .section_name = "Weapon Table",
+            .name = "decimal_places",
+            .display_name = "Decimal Places",
+            .default_value = 3,
+            .minimum_value = 0,
+            .maximum_value = 10
+        } };
+
+        SettingMember<int> plot_data_line_width{ SpinBoxSetting{
+            .section_name = "Plot",
+            .name = "plot_data_line_width",
+            .display_name = "Data Line Width",
+            .default_value = 2,
+            .minimum_value = 0,
+            .maximum_value = 10
+        } };
+        SettingMember<int> plot_axis_line_width{ SpinBoxSetting{
+            .section_name = "Plot",
+            .name = "plot_axis_line_width",
+            .display_name = "Axis Line Width",
+            .default_value = 2,
+            .minimum_value = 0,
+            .maximum_value = 10
+        } };
+        SettingMember<int> plot_grid_line_width{ SpinBoxSetting{
+            .section_name = "Plot",
+            .name = "plot_grid_line_width",
+            .display_name = "Grid Line Width",
+            .default_value = 1,
+            .minimum_value = 0,
+            .maximum_value = 10
+        } };
 
         Settings(int) {};
         Settings() : is_initialized{ true }, dialog{ std::make_unique<QDialog>() }, qsettings{ std::make_unique<QSettings>() }
@@ -230,23 +251,24 @@ namespace erdo::ui
 }
 
 template<typename T>
-erdo::ui::SettingBuilder<T>::SettingBuilder(Settings& settings)
+template<typename U> requires std::same_as<T, typename U::value_type>
+erdo::ui::SettingMember<T>::SettingMember(U&& member_info)
 {
     if (!settings.is_initialized)
         return;
     
-    auto widget = new T::widget_type{};
-    this->value = settings.qsettings->value(T::name, T::default_value).template value<typename T::value_type>();
-    T::initialize(widget, this->value);
+    auto widget = new U::widget_type{};
+    this->value = settings.qsettings->value(member_info.name, member_info.default_value).template value<T>();
+    member_info.initialize(widget, this->value);
 
-    connect(widget, T::signal, [&](T::value_type new_value){
+    settings.widgets.push_back({{member_info.section_name, member_info.display_name}, widget});
+
+    connect(widget, U::signal, [this, member_info = std::move(member_info)](T new_value){
         this->value = new_value;
-        settings.qsettings->setValue(T::name, new_value);
+        settings.qsettings->setValue(member_info.name, new_value);
         settings.qsettings->sync();
         emit this->changed();
     });
-
-    settings.widgets.push_back({{T::section_name, T::display_name}, widget});
 }
 
 void erdo::ui::Settings::initialize()
