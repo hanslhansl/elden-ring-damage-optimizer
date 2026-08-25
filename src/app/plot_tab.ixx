@@ -12,6 +12,7 @@ module;
 #include <KDChartWidget>
 #include <KDChartCartesianAxis>
 #include <KDChartLineDiagram>
+#include <qstandarditemmodel.h>
 export module erdo.ui.plot_tab;
 
 import std;
@@ -29,13 +30,13 @@ namespace erdo::ui
         FAITH,
         ARCAINE,
 
-        // UPGRADE_LEVEL
+        UPGRADE_LEVEL
     };
 }
 
 using namespace erdo;
 template<>
-constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 6> enum_string_mapping<ui::PlotVariable> = {
+constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 5> enum_string_mapping<ui::PlotVariable> = {
     std::pair{ui::PlotVariable::STRENGTH, "STRENGTH"},
     std::pair{ui::PlotVariable::DEXTERITY, "DEXTERITY"},
     std::pair{ui::PlotVariable::INTELLIGENCE, "INTELLIGENCE"},
@@ -46,6 +47,33 @@ constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 6> enum_stri
 
 namespace erdo::ui
 {
+    export template<PlotVariable variable>
+    struct VariableProjection;
+    template<PlotVariable variable>
+        requires (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
+    struct VariableProjection<variable>
+    {
+        static constexpr auto attribute_integral = std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH);
+        static constexpr auto attribute = integral_to_enum<calculator::RelevantAttribute>(attribute_integral);
+
+        static unsigned int& operator()(calculator::FullAttackOptions& attack_options)
+        {
+            return attack_options.stats[attribute_integral + calculator::irrelevant_attribute_count];
+        }
+    };
+    // template<>
+    // struct VariableProjection<PlotVariable::UPGRADE_LEVEL>
+    // {
+    //     static unsigned int& operator()(calculator::FullAttackOptions& attack_options)
+    //     {
+    //         return attack_options.upgrade_level;
+    //     }
+    // };
+    static constexpr auto variable_projections = [](auto){
+        static constexpr auto [...variables] = enumerators_of<PlotVariable>();
+        return std::array{ VariableProjection<variables>::operator()... };
+    }(1);
+
     export class PlotTab : public QSplitter
     {
         using Row = decltype([](auto){
@@ -64,6 +92,7 @@ namespace erdo::ui
         }(0));
 
         KDChart::Widget* chart;
+        QStandardItemModel *model;
         QComboBox* variable_combobox;
         QSpinBox* min_spinbox;
         QSpinBox* max_spinbox;
@@ -76,32 +105,51 @@ namespace erdo::ui
         {
             this->update_plot_timer->stop();
 
-            this->chart->resetData();
+            // this->chart->resetData();
+            this->model->removeRows(0, this->model->rowCount());
 
+            auto variable_index = this->variable_combobox->currentIndex();
+            auto variable = static_cast<PlotVariable>(variable_index);
+            auto variable_projection = variable_projections.at(variable_index);
             auto x = visit_enum(
-                static_cast<PlotVariable>(this->variable_combobox->currentIndex()),
+                variable,
                 [&](auto integral_constant) {
-                    if constexpr (is_valid_enum_integral<PlotVariable>(std::to_underlying(integral_constant.value)))
+                    if constexpr (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(integral_constant.value)))
                     {
-                        return std::views::iota(0, settings.attribute_level_limit.value)
-                            | std::ranges::to<QVector<qreal>>();
+                        return std::views::iota(0u, (unsigned int)settings.attribute_level_limit.value)
+                            | std::ranges::to<std::vector>();
                     }
                 }
             );
+            this->model->setRowCount(x.size());
+            this->model->setColumnCount(this->weapon_table->model->rows.size());
 
+            auto metric_projection = optimizer::projections.at(this->metric_combobox->currentIndex());
             for (auto&& [i, row] : this->weapon_table->model->rows | std::views::enumerate)
             {
-                auto&& weapon = row.attack.weapon.get();
+                auto&& attack_options = row.attack;
+                auto&& weapon = attack_options.weapon.get();
+                calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
-                auto xy = x
-                    | std::views::transform([&](qreal x){ return x*i/*QPair{ x*2, x*2 }*/; })
-                    | std::ranges::to<QVector<qreal/*QPair<qreal, qreal>*/>>();
-                this->chart->setDataset(i, xy, std::get<sections::NameSection>(row)[0][0].toString());
-                std::println("plot {}", weapon.full_name);
+                this->model->setHeaderData(i, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
+
+                for (auto [j, x_j] : x | std::views::enumerate)
+                {
+                    variable_projection(attack) = x_j;
+                    attack.calculate_inplace();
+                    auto y_ij = metric_projection(attack)/*x*i*//*QPair{ x*2, x*2 }*/;
+                    this->model->setData(model->index(j, i), y_ij);
+                }
+
+                // auto xy = x
+                //     | std::views::transform([&](unsigned int x){
+                //         variable_projection(attack) = x;
+                //         attack.calculate_inplace();
+                //         return metric_projection(attack)/*x*i*//*QPair{ x*2, x*2 }*/;
+                //     })
+                //     | std::ranges::to<QVector<qreal/*QPair<qreal, qreal>*/>>();
+                // this->chart->setDataset(i, xy, std::get<sections::NameSection>(row)[0][0].toString());
             }
-
-            this->chart->setDataset(this->weapon_table->model->rows.size(), x, "x-axis");
-
         }
 
     public:
@@ -117,6 +165,7 @@ namespace erdo::ui
             auto upper_widget = new QWidget(this);
             auto upper_layout = new QHBoxLayout(upper_widget);
 
+            this->model = new QStandardItemModel(this);
             this->chart = new KDChart::Widget(this);
             KDChart::CartesianAxis *xAxis = new KDChart::CartesianAxis( this->chart->lineDiagram() );
             KDChart::CartesianAxis *yAxis = new KDChart::CartesianAxis(this->chart->lineDiagram() );
@@ -178,8 +227,10 @@ namespace erdo::ui
 
         void remove_datasets(const std::vector<int>& attacks)
         {
-            this->weapon_table->model->remove_rows(attacks);
-            this->update_plot_impl();
+            // this->weapon_table->model->remove_rows(attacks);
+            for (auto&& attack_index : attacks)
+                this->chart->diagram()->setHidden(attack_index, true);
+            // this->update_plot_impl();
         }
     };
 }

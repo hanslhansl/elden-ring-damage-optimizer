@@ -169,9 +169,9 @@ namespace erdo::optimizer
     template<>
     struct Projection<Target::TOTAL_ATTACK_POWER>
     {
-        static const double& operator()(const AttackRating& attack_rating)
+        static const double& operator()(const Attack& attack)
         {
-            return attack_rating.total_attack_power[1];
+            return attack.total_attack_power[1];
         }
     };
     template<Target target> requires (is_valid_enum_integral<AttackPowerType>(std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER)))
@@ -180,17 +180,17 @@ namespace erdo::optimizer
         static constexpr auto attack_power_type_integral = std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER);
         static constexpr auto attack_power_type = integral_to_enum<AttackPowerType>(attack_power_type_integral);
 
-        static const double& operator()(const AttackRating& attack_rating)
+        static const double& operator()(const Attack& attack)
         {
-            return attack_rating.attack_powers[attack_power_type_integral][1];
+            return attack.attack_powers[attack_power_type_integral][1];
         }
     };
     template<>
     struct Projection<Target::SPELL_SCALING>
     {
-        static const double& operator()(const AttackRating& attack_rating)
+        static const double& operator()(const Attack& attack)
         {
-            return attack_rating.spell_scaling;
+            return attack.spell_scaling;
         }
     };
     template<Target target> requires (is_valid_enum_integral<RelevantAttribute>(std::to_underlying(target) - std::to_underlying(Target::STRENGTH_SCALING)))
@@ -199,17 +199,17 @@ namespace erdo::optimizer
         static constexpr auto attribute_integral = std::to_underlying(target) - std::to_underlying(Target::STRENGTH_SCALING);
         static constexpr auto attribute = integral_to_enum<calculator::RelevantAttribute>(attribute_integral);
 
-        static const double& operator()(const calculator::FullAttackOptions& attack_options)
+        static const double& operator()(const calculator::Attack& attack)
         {
-            return attack_options.attribute_scalings_at_upgrade_level()[attribute_integral];
+            return attack.attribute_scalings_at_upgrade_level()[attribute_integral];
         }
     };
     export template<Target target>
     constexpr Projection<target> projection{};
-    // constexpr auto projections = [](auto){
-    //     static constexpr auto [...targets] = enumerators_of<Target>();
-    //     return std::array{ Projection<targets>::operator()... };
-    // }(1);
+    export constexpr auto projections = [](auto){
+        static constexpr auto [...targets] = enumerators_of<Target>();
+        return std::array{ Projection<targets>::operator()... };
+    }(1);
 
     template<Target target>
     struct EfficientCalculateAttack;
