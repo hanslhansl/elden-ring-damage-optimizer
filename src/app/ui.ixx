@@ -814,7 +814,10 @@ namespace erdo::ui
                 }
             }
 
-            auto action = this->menu_choose_weapon_data->addAction(QString::fromStdString(action_text), [this, dir]() { this->set_active_weapon_data(dir); });
+            auto action = this->menu_choose_weapon_data->addAction(
+                QString::fromStdString(action_text),
+                [this, dir]() { this->set_active_weapon_data(dir); }
+            );
             action->setCheckable(true);
             this->menu_weapon_data_group->addAction(action);
             
