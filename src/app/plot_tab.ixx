@@ -1,4 +1,5 @@
 module;
+#include <QStandarditemmodel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -121,29 +122,31 @@ namespace erdo::ui
             return colors[index++ % colors.size()];
         }
 
-        static unsigned int get_dataset_length(PlotVariable variable)
-        {
-            if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
-            {
-                return settings.attribute_level_limit;
-            }
-            else if (variable == PlotVariable::UPGRADE_LEVEL)
-            {
-                return std::ranges::fold_left(calculator::max_upgrade_levels, 0, std::plus{});
-            }
-            throw std::runtime_error(std::format("Invalid variable for dataset length: {}", std::to_underlying(variable)));
-        }
         static const std::vector<double>& get_dataset_x_values(PlotVariable variable, const calculator::Weapon& weapon)
         {
             if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
             {
-                static const auto res = std::views::iota(0, settings.attribute_level_limit.value)
+                return get_universal_x_values(variable);
+            }
+            else if (variable == PlotVariable::UPGRADE_LEVEL)
+            {
+                static const auto res = std::views::iota(0u, calculator::max_upgrade_levels.at(weapon.upgrade_level_index) + 1)
+                    | std::ranges::to<std::vector<double>>();
+                return res;
+            }
+            throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
+        }
+        static const std::vector<double>& get_universal_x_values(PlotVariable variable)
+        {
+            if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
+            {
+                static const auto res = std::views::iota(0, settings.attribute_level_limit.value + 1)
                     | std::ranges::to<std::vector<double>>();
                     return res;
             }
             else if (variable == PlotVariable::UPGRADE_LEVEL)
             {
-                static const auto res = std::views::iota(0u, calculator::max_upgrade_levels.at(weapon.upgrade_level_index) + 1)
+                static const auto res = std::views::iota(0u, std::ranges::max(calculator::max_upgrade_levels) + 1)
                     | std::ranges::to<std::vector<double>>();
                 return res;
             }
@@ -163,7 +166,10 @@ namespace erdo::ui
             auto variable_index = this->variable_combobox->currentIndex();
             auto variable = static_cast<PlotVariable>(variable_index);
             auto variable_projection = variable_projections.at(variable_index);
-            auto dataset_length = get_dataset_length(variable);
+
+            auto&& universal_x = get_universal_x_values(variable);
+            for (auto&& x : universal_x)
+                this->model->setData(this->model->index(x, 0), x);
 
             auto metric_index = this->metric_combobox->currentIndex();
             auto metric = static_cast<optimizer::Target>(metric_index);
@@ -178,7 +184,7 @@ namespace erdo::ui
                 calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
                 auto&& xs = get_dataset_x_values(variable, weapon);
-                for(auto j = 0; j < dataset_length; ++j)
+                for(auto j = 0; j < universal_x.size(); ++j)
                 {
                     if (j < xs.size())
                     {
@@ -207,13 +213,20 @@ namespace erdo::ui
         void change_variable(int variable_index)
         {
             auto variable = static_cast<PlotVariable>(variable_index);
-            auto new_dataset_length = get_dataset_length(variable);
+            this->x_axis->setTitleText(enum_to_display(variable));
+            auto new_dataset_length = get_universal_x_values(variable).size();
             auto old_dataset_length = this->model->rowCount();
             if (new_dataset_length > old_dataset_length)
                 this->model->insertRows(old_dataset_length, new_dataset_length - old_dataset_length);
             else if (new_dataset_length < old_dataset_length)
                 this->model->removeRows(new_dataset_length, old_dataset_length - new_dataset_length);
 
+            this->update_all_datasets();
+        }
+        void change_metric(int metric_index)
+        {
+            auto metric = static_cast<optimizer::Target>(metric_index);
+            this->y_axis->setTitleText(enum_to_display(metric));
             this->update_all_datasets();
         }
 
@@ -296,18 +309,20 @@ namespace erdo::ui
             this->y_axis->setPosition(KDChart::CartesianAxis::Left);
             plotter->addAxis(this->y_axis);
 
-            // metric
-            this->metric_combobox = new QComboBox(this);
-            QSignalBlocker blocker(this->metric_combobox);
-            connect(this->metric_combobox, &QComboBox::currentTextChanged, this, &PlotTab::update_all_datasets);
-            for (const auto& target : enumerators_of<optimizer::Target>())
-                this->metric_combobox->addItem(enum_to_display(target));
-
             // variable
             this->variable_combobox = new QComboBox(this);
-            connect(this->variable_combobox, &QComboBox::currentIndexChanged, this, &PlotTab::change_variable);
             for (const auto& variable : enumerators_of<PlotVariable>())
                 this->variable_combobox->addItem(enum_to_display(variable));
+            connect(this->variable_combobox, &QComboBox::currentIndexChanged, this, &PlotTab::change_variable);
+
+            // metric
+            this->metric_combobox = new QComboBox(this);
+            for (const auto& target : enumerators_of<optimizer::Target>())
+                this->metric_combobox->addItem(enum_to_display(target));
+            connect(this->metric_combobox, &QComboBox::currentIndexChanged, this, &PlotTab::change_metric);
+            
+            this->change_variable(this->variable_combobox->currentIndex());
+            this->change_metric(this->metric_combobox->currentIndex());
 
             // Initialize the model with dummy data (KDChart::Plotter is buggy...)
             this->model->setData(this->model->index(0, 0), 0.);
