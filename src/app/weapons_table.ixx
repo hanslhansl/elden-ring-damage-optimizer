@@ -647,10 +647,9 @@ namespace erdo::ui
                 row.update(std::move(attack));
             emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
         }
-        void remove_rows(std::vector<int> row_indices)
+        void remove_rows(std::vector<int>& row_indices)
         {
             std::ranges::sort(row_indices);
-
             std::vector<Row> new_rows{};
             new_rows.reserve(this->rows.size() - row_indices.size());
             auto j = 0;
@@ -955,14 +954,14 @@ namespace erdo::ui
             {
                 auto selected_color = dialog.selectedColor();
                 model->setData(index, selected_color, Qt::EditRole);
-                emit row_color_changed(index.row(), selected_color);
+                emit row_color_changed(index, selected_color);
             }
             
             return true;
         }
     
     signals:
-        void row_color_changed(int, QColor);
+        void row_color_changed(QModelIndex, QColor);
     };
     
 
@@ -1138,6 +1137,7 @@ namespace erdo::ui
         {
             auto row_indices = this->selectionModel()->selectedRows()
                 | std::views::transform([this](const QModelIndex& index){
+                    // return index.row();
                     return this->proxy_model->mapToSource(index).row();
                 })
                 | std::ranges::to<std::vector>();
@@ -1231,7 +1231,9 @@ namespace erdo::ui
             {
                 auto delegate = new ColorDelegate(this);
                 this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>), delegate);
-                connect(delegate, &ColorDelegate::row_color_changed, this, &WeaponTable::row_color_changed);
+                connect(delegate, &ColorDelegate::row_color_changed, [this](QModelIndex index, QColor color){
+                    emit row_color_changed(this->proxy_model->mapToSource(index).row(), color);
+                });
             }
 
             // model
