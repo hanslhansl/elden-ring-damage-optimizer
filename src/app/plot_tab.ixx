@@ -1,6 +1,4 @@
 module;
-#include "KDChartLegend.h"
-#include "KDChartPlotter.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -14,7 +12,8 @@ module;
 #include <KDChartWidget>
 #include <KDChartCartesianAxis>
 #include <KDChartLineDiagram>
-#include <qstandarditemmodel.h>
+#include <KDChartGridAttributes>
+#include <KDChartPlotter>
 export module erdo.ui.plot_tab;
 
 import std;
@@ -76,6 +75,7 @@ namespace erdo::ui
         return std::array{ VariableProjection<variables>::operator()... };
     }(1);
 
+
     export class PlotTab : public QSplitter
     {
         using Row = decltype([](auto){
@@ -104,9 +104,6 @@ namespace erdo::ui
         QComboBox* metric_combobox;
         WeaponTable<Row>* weapon_table;
 
-        QTimer *update_plot_timer = new QTimer(this);
-        void update_plot_impl();
-
         static QColor get_distinctive_color()
         {
             static const QVector<QColor> colors = {
@@ -124,16 +121,119 @@ namespace erdo::ui
             return colors[index++ % colors.size()];
         }
 
-    public:
-        explicit PlotTab(QWidget *parent = nullptr);
-
-        void update_plot()
+        static unsigned int get_dataset_length(PlotVariable variable)
         {
-            this->update_plot_timer->start(settings.calculation_delay);
+            if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
+            {
+                return settings.attribute_level_limit;
+            }
+            else if (variable == PlotVariable::UPGRADE_LEVEL)
+            {
+                return std::ranges::fold_left(calculator::max_upgrade_levels, 0, std::plus{});
+            }
+            throw std::runtime_error(std::format("Invalid variable for dataset length: {}", std::to_underlying(variable)));
+        }
+        static const std::vector<double>& get_dataset_x_values(PlotVariable variable, const calculator::Weapon& weapon)
+        {
+            if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
+            {
+                static const auto res = std::views::iota(0, settings.attribute_level_limit.value)
+                    | std::ranges::to<std::vector<double>>();
+                    return res;
+            }
+            else if (variable == PlotVariable::UPGRADE_LEVEL)
+            {
+                static const auto res = std::views::iota(0u, calculator::max_upgrade_levels.at(weapon.upgrade_level_index) + 1)
+                    | std::ranges::to<std::vector<double>>();
+                return res;
+            }
+            throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
         }
 
+        int weapon_index_to_dataset(int i)
+        {
+            return i + 1;
+        }
+
+        void update_datasets(int index, int count)
+        {
+            if (index < 0 || index + count > this->weapon_table->model->rows.size())
+                throw std::runtime_error(std::format("Invalid range for update_datasets: index: {}, count: {}, rows: {}", index, count, this->weapon_table->model->rows.size()));
+
+            auto variable_index = this->variable_combobox->currentIndex();
+            auto variable = static_cast<PlotVariable>(variable_index);
+            auto variable_projection = variable_projections.at(variable_index);
+            auto dataset_length = get_dataset_length(variable);
+
+            auto metric_index = this->metric_combobox->currentIndex();
+            auto metric = static_cast<optimizer::Target>(metric_index);
+            auto metric_projection = optimizer::projections.at(metric_index);
+            for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate | std::views::drop(index) | std::views::take(count))
+            {
+                auto i = this->weapon_index_to_dataset(wi);
+                const auto column = i * 2;
+
+                auto&& attack_options = row.attack;
+                auto&& weapon = attack_options.weapon.get();
+                calculator::Attack attack{ weapon, attack_options.stats, attack_options };
+
+                auto&& xs = get_dataset_x_values(variable, weapon);
+                for(auto j = 0; j < dataset_length; ++j)
+                {
+                    if (j < xs.size())
+                    {
+                        auto&& x_j = xs[j];
+                        variable_projection(attack) = x_j;
+                        attack.calculate_inplace();
+                        auto y_ij = metric_projection(attack);
+
+                        this->model->setData(this->model->index(j, column), x_j);
+                        this->model->setData(this->model->index(j, column + 1), y_ij);
+                    }
+                    else
+                    {
+                        this->model->setData(this->model->index(j, column), QVariant());
+                        this->model->setData(this->model->index(j, column + 1), QVariant());
+                    }
+                }
+            }
+        }
+
+        void update_all_datasets()
+        {
+            this->update_datasets(0, this->weapon_table->model->rows.size());
+        }
+
+        void change_variable(int variable_index)
+        {
+            auto variable = static_cast<PlotVariable>(variable_index);
+            auto new_dataset_length = get_dataset_length(variable);
+            auto old_dataset_length = this->model->rowCount();
+            if (new_dataset_length > old_dataset_length)
+                this->model->insertRows(old_dataset_length, new_dataset_length - old_dataset_length);
+            else if (new_dataset_length < old_dataset_length)
+                this->model->removeRows(new_dataset_length, old_dataset_length - new_dataset_length);
+
+            this->update_all_datasets();
+        }
+
+        void remove_datasets(std::vector<int> indices)
+        {
+            this->weapon_table->model->remove_rows(indices);
+            std::ranges::sort(indices, std::greater{});
+            for (auto&& wi : indices)
+            {
+                auto i = this->weapon_index_to_dataset(wi);
+                const auto column = i * 2;
+                this->model->removeColumns(column, 2);
+            }
+        }
+
+    public:
         void add_datasets(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>& attacks_options)
         {
+            auto current_dataset_count = this->weapon_table->model->rows.size();
+
             this->weapon_table->model->add_rows(attacks_options
                 | std::views::transform([](const calculator::FullAttackOptions& attacks_option) {
                     auto row = Row(calculator::FullAttackOptions(attacks_option));
@@ -142,123 +242,150 @@ namespace erdo::ui
                 })
             );
 
-            this->update_plot_impl();
+            auto current_column_count = this->model->columnCount();
+            this->model->insertColumns(current_column_count, attacks_options.size() * 2);
+
+            for (auto&& [wi, row] : this->weapon_table->model->rows
+                | std::views::enumerate
+                | std::views::drop(current_dataset_count)
+                | std::views::take(attacks_options.size())
+            )
+            {
+                auto i = this->weapon_index_to_dataset(wi);
+                const auto column = i * 2;
+
+                this->model->setHeaderData(column, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
+                this->model->setHeaderData(column + 1, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
+                auto pen = this->plotter->pen(i);
+                pen.setCosmetic(true);
+                pen.setColor(std::get<sections::ColorSection>(row)[0].value<QColor>());
+                pen.setWidth(settings.plot_data_line_width);
+                this->plotter->setPen(i, pen);
+            }
+
+            this->update_datasets(current_dataset_count, attacks_options.size());
         }
 
-        void remove_datasets(const std::vector<int>& indices)
+        explicit PlotTab(QWidget *parent = nullptr) : QSplitter(Qt::Orientation::Vertical, parent)
         {
-            this->weapon_table->model->remove_rows(indices);
-            for (auto&& i : indices)
-                this->model->removeColumns(i * 2, 2);
+            // add this dependency so Qt6PrintSupport.dll is pulled in for KDChart, no idea why that's necessary
+            QPrinter printer;
+            Q_UNUSED(printer);
+
+            // weapon table (model)
+            this->weapon_table = new WeaponTable<Row>();
+            connect(this->weapon_table, &WeaponTable<Row>::remove_from_plot, this, &PlotTab::remove_datasets);
+            connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){
+                auto i = this->weapon_index_to_dataset(wi);
+                auto pen = this->plotter->pen(i);
+                pen.setColor(color);
+                this->plotter->setPen(i, pen);
+            });
+
+            // plotting backend
+            this->model = new QStandardItemModel(this);
+            // this->model->setRowCount(1);
+            this->model->setColumnCount(2);
+            this->chart = new KDChart::Chart(this);
+            this->plotter = new KDChart::Plotter();
+            this->plotter->setModel(this->model);
+            this->x_axis = new KDChart::CartesianAxis(plotter);
+            this->x_axis->setPosition(KDChart::CartesianAxis::Bottom);
+            plotter->addAxis(this->x_axis);
+            this->y_axis = new KDChart::CartesianAxis(plotter);
+            this->y_axis->setPosition(KDChart::CartesianAxis::Left);
+            plotter->addAxis(this->y_axis);
+
+            // metric
+            this->metric_combobox = new QComboBox(this);
+            QSignalBlocker blocker(this->metric_combobox);
+            connect(this->metric_combobox, &QComboBox::currentTextChanged, this, &PlotTab::update_all_datasets);
+            for (const auto& target : enumerators_of<optimizer::Target>())
+                this->metric_combobox->addItem(enum_to_display(target));
+
+            // variable
+            this->variable_combobox = new QComboBox(this);
+            connect(this->variable_combobox, &QComboBox::currentIndexChanged, this, &PlotTab::change_variable);
+            for (const auto& variable : enumerators_of<PlotVariable>())
+                this->variable_combobox->addItem(enum_to_display(variable));
+
+            // Initialize the model with dummy data (KDChart::Plotter is buggy...)
+            this->model->setData(this->model->index(0, 0), 0.);
+            this->model->setData(this->model->index(0, 0 + 1), 0.);
+            this->model->setData(this->model->index(1, 0), 1.);
+            this->model->setData(this->model->index(1, 0 + 1), 1.);
+            auto pen = this->plotter->pen(0);
+            pen.setCosmetic(true);
+            pen.setWidth(0);
+            this->plotter->setPen(0, Qt::NoPen);
+
+            // layout
+            auto upper_widget = new QWidget(this);
+            auto upper_layout = new QVBoxLayout(upper_widget);
+
+            auto upper_horizontal_layout = new QHBoxLayout();
+            upper_horizontal_layout->addStretch(1);
+            upper_layout->addLayout(upper_horizontal_layout);
+            
+            // variable combobox
+            auto x_axis_layout = new QFormLayout();
+            upper_horizontal_layout->addLayout(x_axis_layout);
+            x_axis_layout->addRow("Variable:", this->variable_combobox);
+
+            // metric combobox
+            auto y_axis_layout = new QFormLayout();
+            upper_horizontal_layout->addLayout(y_axis_layout);
+            y_axis_layout->addRow("Metric:", this->metric_combobox);
+            
+            upper_horizontal_layout->addStretch(1);
+
+            // chart widget
+            this->chart->coordinatePlane()->replaceDiagram(this->plotter);
+            upper_layout->addWidget(this->chart);
+            this->chart->coordinatePlane()->globalGridAttributes().setSubGridVisible(false);
+
+            auto set_data_line_width = [this](){
+                for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate)
+                {
+                    auto i = this->weapon_index_to_dataset(wi);
+
+                    auto pen = this->plotter->pen(i);
+                    pen.setWidth(settings.plot_data_line_width);
+                    this->plotter->setPen(i, pen);
+                }
+            };
+            set_data_line_width();
+            connect(&settings.plot_data_line_width, settings.plot_data_line_width.changed_member_pointer, set_data_line_width);
+
+            auto set_grid_line_width = [this](){
+                auto plane = this->chart->coordinatePlane();
+                auto grid = plane->globalGridAttributes();
+                grid.setSubGridVisible(false);
+                auto pen = grid.gridPen();
+                pen.setCosmetic(true);
+                pen.setWidth(settings.plot_grid_line_width);
+                grid.setGridPen(pen);
+                plane->setGlobalGridAttributes(grid);
+            };
+            set_grid_line_width();
+            connect(&settings.plot_grid_line_width, settings.plot_grid_line_width.changed_member_pointer, set_grid_line_width);
+
+            auto set_axis_line_width = [this](){
+                auto plane = this->chart->coordinatePlane();
+                auto grid = plane->globalGridAttributes();
+                auto pen = grid.zeroLinePen();
+                pen.setCosmetic(true);
+                pen.setWidth(settings.plot_axis_line_width);
+                pen.setColor(Qt::black);
+                grid.setZeroLinePen(pen);
+                plane->setGlobalGridAttributes(grid);
+            };
+            set_axis_line_width();
+            connect(&settings.plot_axis_line_width, settings.plot_axis_line_width.changed_member_pointer, set_axis_line_width);
+
+            this->addWidget(this->weapon_table);
         }
     };
 }
 
 module : private;
-
-
-void ui::PlotTab::update_plot_impl()
-{
-    this->update_plot_timer->stop();
-
-    this->model->clear();
-
-    auto variable_index = this->variable_combobox->currentIndex();
-    auto variable = static_cast<PlotVariable>(variable_index);
-    auto variable_projection = variable_projections.at(variable_index);
-    this->x_axis->setTitleText(enum_to_display(variable));
-    auto x = visit_enum(
-        variable,
-        [&](auto integral_constant) {
-            if constexpr (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(integral_constant.value)))
-            {
-                return std::views::iota(0u, (unsigned int)settings.attribute_level_limit.value)
-                    | std::ranges::to<std::vector>();
-            }
-        }
-    );
-    this->model->setRowCount(x.size());
-    this->model->setColumnCount(this->weapon_table->model->rows.size() * 2);
-
-    auto metric_index = this->metric_combobox->currentIndex();
-    auto metric = static_cast<optimizer::Target>(metric_index);
-    auto metric_projection = optimizer::projections.at(metric_index);
-    this->y_axis->setTitleText(enum_to_display(metric));
-    for (auto&& [i, row] : this->weapon_table->model->rows | std::views::enumerate)
-    {
-        const auto column = i * 2;
-
-        auto&& attack_options = row.attack;
-        auto&& weapon = attack_options.weapon.get();
-        calculator::Attack attack{ weapon, attack_options.stats, attack_options };
-
-        this->model->setHeaderData(column, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
-        this->plotter->setPen(i, std::get<sections::ColorSection>(this->weapon_table->model->rows[i])[0].value<QColor>());
-
-        for (auto [j, x_j] : x | std::views::enumerate)
-        {
-            variable_projection(attack) = x_j;
-            attack.calculate_inplace();
-            auto y_ij = metric_projection(attack);
-            this->model->setData(model->index(j, column), x_j);
-            this->model->setData(model->index(j, column + 1), y_ij);
-        }
-    }
-}
-
-ui::PlotTab::PlotTab(QWidget *parent) : QSplitter(Qt::Orientation::Vertical, parent)
-{
-    // add this dependency so Qt6PrintSupport.dll is pulled in for KDChart, no idea why that's necessary
-    QPrinter printer;
-    Q_UNUSED(printer);
-
-    this->update_plot_timer->setSingleShot(true);
-    connect(this->update_plot_timer, &QTimer::timeout, this, &PlotTab::update_plot_impl);
-
-    auto upper_widget = new QWidget(this);
-    auto upper_layout = new QVBoxLayout(upper_widget);
-
-    auto upper_horizontal_layout = new QHBoxLayout();
-    upper_horizontal_layout->addStretch(1);
-    upper_layout->addLayout(upper_horizontal_layout);
-
-    auto x_axis_layout = new QFormLayout();
-    upper_horizontal_layout->addLayout(x_axis_layout);
-    x_axis_layout->addRow("Variable:", this->variable_combobox = new QComboBox(this));
-    connect(this->variable_combobox, &QComboBox::currentTextChanged, this, &PlotTab::update_plot);
-    for (const auto& variable : enumerators_of<PlotVariable>())
-        this->variable_combobox->addItem(enum_to_display(variable));
-
-    auto y_axis_layout = new QFormLayout();
-    upper_horizontal_layout->addLayout(y_axis_layout);
-    y_axis_layout->addRow("Metric:", this->metric_combobox = new QComboBox(this));
-    connect(this->metric_combobox, &QComboBox::currentTextChanged, this, &PlotTab::update_plot);
-    for (const auto& target : enumerators_of<optimizer::Target>())
-        this->metric_combobox->addItem(enum_to_display(target));
-
-    upper_horizontal_layout->addStretch(1);
-
-    this->model = new QStandardItemModel(this);
-    this->chart = new KDChart::Chart(this);
-    upper_layout->addWidget(this->chart);
-
-    this->plotter = new KDChart::Plotter;
-    KDChart::LineAttributes attr;
-    attr.setDisplayArea(false);
-    this->plotter->setLineAttributes(0, attr);
-    this->plotter->setModel(model);
-    this->chart->coordinatePlane()->replaceDiagram(this->plotter);
-
-    this->x_axis = new KDChart::CartesianAxis(plotter);
-    this->y_axis = new KDChart::CartesianAxis(plotter);
-    this->x_axis->setPosition(KDChart::CartesianAxis::Bottom);
-    this->y_axis->setPosition(KDChart::CartesianAxis::Left);
-    plotter->addAxis(this->x_axis);
-    plotter->addAxis(this->y_axis);
-
-    this->weapon_table = new WeaponTable<Row>(this);
-    connect(this->weapon_table, &WeaponTable<Row>::remove_from_plot, this, &PlotTab::remove_datasets);
-    connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int index, QColor color){
-        this->plotter->setPen(index, color);
-    });
-};
