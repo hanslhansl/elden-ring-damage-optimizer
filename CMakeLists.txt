@@ -26,11 +26,14 @@ add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
 # add_link_options(-fuse-ld=lld -g -Wl,--pdb=)
 
 # download and include CPM.cmake
+# Define CPM_SOURCE_CACHE (before include CPM) to fix patch bug in CPM
+if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
+    set(ENV{CPM_SOURCE_CACHE} ${CMAKE_CURRENT_BINARY_DIR}/.cpm-cache)
+endif()
 file(
     DOWNLOAD
-    https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.8/CPM.cmake
+    https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
-    EXPECTED_HASH SHA256=78ba32abdf798bc616bab7c73aac32a17bbd7b06ad9e26a6add69de8f3ae4791
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
