@@ -14,6 +14,9 @@ CPMAddPackage(
         "KDChart_EXAMPLES OFF"
         "KDChart_TESTS OFF"
         "KDChart_DOCS OFF"
+
+    PATCHES
+        ${CMAKE_CURRENT_SOURCE_DIR}/patches/kdchart-normalplotter-nan.patch
 )
 add_library(KDChart::kdchart ALIAS kdchart)
 
