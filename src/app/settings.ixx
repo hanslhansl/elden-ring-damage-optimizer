@@ -127,7 +127,15 @@ namespace erdo::ui
             .display_name = "Data Line Width",
             .default_value = 2,
             .minimum_value = 0,
-            .maximum_value = 10
+            .maximum_value = 20
+        } };
+        SettingMember<int> plot_point_diameter{ SpinBoxSetting{
+            .section_name = "Plot",
+            .name = "plot_point_diameter",
+            .display_name = "Point Diameter",
+            .default_value = 2,
+            .minimum_value = 0,
+            .maximum_value = 20
         } };
         SettingMember<int> plot_axis_line_width{ SpinBoxSetting{
             .section_name = "Plot",
@@ -135,7 +143,7 @@ namespace erdo::ui
             .display_name = "Axis Line Width",
             .default_value = 2,
             .minimum_value = 0,
-            .maximum_value = 10
+            .maximum_value = 20
         } };
         SettingMember<int> plot_grid_line_width{ SpinBoxSetting{
             .section_name = "Plot",
@@ -143,7 +151,7 @@ namespace erdo::ui
             .display_name = "Grid Line Width",
             .default_value = 1,
             .minimum_value = 0,
-            .maximum_value = 10
+            .maximum_value = 20
         } };
 
         Settings(int) {};

@@ -1,4 +1,5 @@
 module;
+#include "KDChartDataValueAttributes.h"
 #include <QStandarditemmodel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -122,7 +123,7 @@ namespace erdo::ui
             return colors[index++ % colors.size()];
         }
 
-        static const std::vector<double>& get_dataset_x_values(PlotVariable variable, const calculator::Weapon& weapon)
+        static const std::vector<unsigned int>& get_dataset_x_values(PlotVariable variable, const calculator::Weapon& weapon)
         {
             if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
             {
@@ -131,27 +132,29 @@ namespace erdo::ui
             else if (variable == PlotVariable::UPGRADE_LEVEL)
             {
                 static const auto res = std::views::iota(0u, calculator::max_upgrade_levels.at(weapon.upgrade_level_index) + 1)
-                    | std::ranges::to<std::vector<double>>();
+                    | std::ranges::to<std::vector>();
                 return res;
             }
             throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
         }
-        static const std::vector<double>& get_universal_x_values(PlotVariable variable)
+        static const std::vector<unsigned int>& get_universal_x_values(PlotVariable variable)
         {
             if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
             {
-                static const auto res = std::views::iota(0, settings.attribute_level_limit.value + 1)
-                    | std::ranges::to<std::vector<double>>();
+                static const auto res = std::views::iota(0u, settings.attribute_level_limit.value + 1u)
+                    | std::ranges::to<std::vector>();
                     return res;
             }
             else if (variable == PlotVariable::UPGRADE_LEVEL)
             {
                 static const auto res = std::views::iota(0u, std::ranges::max(calculator::max_upgrade_levels) + 1)
-                    | std::ranges::to<std::vector<double>>();
+                    | std::ranges::to<std::vector>();
                 return res;
             }
             throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
         }
+
+        // static_assert(false, "next: implement upgrade level plotting, highlight dataset origin in plot");
 
         int weapon_index_to_dataset(int i)
         {
@@ -180,26 +183,51 @@ namespace erdo::ui
                 const auto column = i * 2;
 
                 auto&& attack_options = row.attack;
+                auto original_x = variable_projection(attack_options);
                 auto&& weapon = attack_options.weapon.get();
                 calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
                 auto&& xs = get_dataset_x_values(variable, weapon);
+                auto attributes_model = this->plotter->attributesModel();
+                bool already_hit_original_x = false;
                 for(auto j = 0; j < universal_x.size(); ++j)
                 {
+                    auto x_index = this->model->index(j, column);
+
                     if (j < xs.size())
                     {
-                        auto&& x_j = xs[j];
+                        auto x_j = xs[j];
                         variable_projection(attack) = x_j;
                         attack.calculate_inplace();
                         auto y_ij = metric_projection(attack);
 
-                        this->model->setData(this->model->index(j, column), x_j);
+                        this->model->setData(x_index, x_j);
                         this->model->setData(this->model->index(j, column + 1), y_ij);
+
+                        if (x_j == original_x)
+                        {
+                            already_hit_original_x = true;
+                            auto dva = this->plotter->dataValueAttributes(x_index);
+                            dva.setVisible(true);
+                            this->plotter->setDataValueAttributes(x_index, dva);
+                        }
+                        else
+                        {
+                            attributes_model->resetData(
+                                x_index,
+                                KDChart::DisplayRoles::DataValueLabelAttributesRole
+                            );
+                        }
                     }
                     else
                     {
-                        this->model->setData(this->model->index(j, column), QVariant());
+                        this->model->setData(x_index, QVariant());
                         this->model->setData(this->model->index(j, column + 1), QVariant());
+
+                        attributes_model->resetData(
+                            x_index,
+                            KDChart::DisplayRoles::DataValueLabelAttributesRole
+                        );
                     }
                 }
             }
@@ -266,14 +294,29 @@ namespace erdo::ui
             {
                 auto i = this->weapon_index_to_dataset(wi);
                 const auto column = i * 2;
+                auto dataset_color = std::get<sections::ColorSection>(row)[0].value<QColor>();
 
                 this->model->setHeaderData(column, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
                 this->model->setHeaderData(column + 1, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
                 auto pen = this->plotter->pen(i);
                 pen.setCosmetic(true);
-                pen.setColor(std::get<sections::ColorSection>(row)[0].value<QColor>());
+                pen.setColor(dataset_color);
                 pen.setWidth(settings.plot_data_line_width);
                 this->plotter->setPen(i, pen);
+
+                auto dva = this->plotter->dataValueAttributes(i);
+                auto marker = dva.markerAttributes();
+                // marker.setVisible(true);
+                // marker.setMarkerStyle(KDChart::MarkerAttributes::MarkerCircle);
+                // marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
+                marker.setMarkerColor(dataset_color);
+                dva.setMarkerAttributes(marker);
+
+                // auto text = dva.textAttributes();
+                // text.setVisible(false);
+                // dva.setTextAttributes(text);
+
+                this->plotter->setDataValueAttributes(i, dva);
             }
 
             this->update_datasets(current_dataset_count, attacks_options.size());
@@ -299,7 +342,6 @@ namespace erdo::ui
             this->model = new QStandardItemModel(this);
             // this->model->setRowCount(1);
             this->model->setColumnCount(2);
-            this->chart = new KDChart::Chart(this);
             this->plotter = new KDChart::Plotter();
             this->plotter->setModel(this->model);
             this->x_axis = new KDChart::CartesianAxis(plotter);
@@ -320,7 +362,7 @@ namespace erdo::ui
             for (const auto& target : enumerators_of<optimizer::Target>())
                 this->metric_combobox->addItem(enum_to_display(target));
             connect(this->metric_combobox, &QComboBox::currentIndexChanged, this, &PlotTab::change_metric);
-            
+
             this->change_variable(this->variable_combobox->currentIndex());
             this->change_metric(this->metric_combobox->currentIndex());
 
@@ -329,9 +371,6 @@ namespace erdo::ui
             this->model->setData(this->model->index(0, 0 + 1), 0.);
             this->model->setData(this->model->index(1, 0), 1.);
             this->model->setData(this->model->index(1, 0 + 1), 1.);
-            auto pen = this->plotter->pen(0);
-            pen.setCosmetic(true);
-            pen.setWidth(0);
             this->plotter->setPen(0, Qt::NoPen);
 
             // layout
@@ -355,8 +394,9 @@ namespace erdo::ui
             upper_horizontal_layout->addStretch(1);
 
             // chart widget
-            this->chart->coordinatePlane()->replaceDiagram(this->plotter);
+            this->chart = new KDChart::Chart(this);
             upper_layout->addWidget(this->chart);
+            this->chart->coordinatePlane()->replaceDiagram(this->plotter);
             this->chart->coordinatePlane()->globalGridAttributes().setSubGridVisible(false);
 
             auto set_data_line_width = [this](){
@@ -371,6 +411,32 @@ namespace erdo::ui
             };
             set_data_line_width();
             connect(&settings.plot_data_line_width, settings.plot_data_line_width.changed_member_pointer, set_data_line_width);
+
+            auto dva = this->plotter->dataValueAttributes();
+            auto marker = dva.markerAttributes();
+            marker.setVisible(true);
+            marker.setMarkerStyle(KDChart::MarkerAttributes::MarkerCircle);
+            marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
+            dva.setMarkerAttributes(marker);
+            auto text = dva.textAttributes();
+            text.setVisible(false);
+            dva.setTextAttributes(text);
+            this->plotter->setDataValueAttributes(dva);
+
+            auto set_point_diameter = [this](){
+                for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate)
+                {
+                    auto i = this->weapon_index_to_dataset(wi);
+
+                    auto dva = this->plotter->dataValueAttributes(i);
+                    auto marker = dva.markerAttributes();
+                    marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
+                    dva.setMarkerAttributes(marker);
+                    this->plotter->setDataValueAttributes(dva);
+                }
+            };
+            set_point_diameter();
+            connect(&settings.plot_point_diameter, settings.plot_point_diameter.changed_member_pointer, set_point_diameter);
 
             auto set_grid_line_width = [this](){
                 auto plane = this->chart->coordinatePlane();
