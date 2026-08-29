@@ -368,13 +368,16 @@ namespace erdo::ui
             Q_UNUSED(printer);
 
             // weapon table (model)
-            this->weapon_table = new WeaponTable<Row>();
-            connect(this->weapon_table, &WeaponTable<Row>::remove_from_plot, this, &PlotTab::remove_datasets);
+            this->weapon_table = new WeaponTable<Row>(true, this);
+            connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
             connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){
                 auto i = this->weapon_index_to_dataset(wi);
                 auto pen = this->plotter->pen(i);
                 pen.setColor(color);
                 this->plotter->setPen(i, pen);
+            });
+            connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, [this](){
+                throw std::runtime_error("Not implemented: add_new_to_plot");
             });
 
             // plotting backend

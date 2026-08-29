@@ -399,7 +399,7 @@ namespace erdo::ui
             });
 
             // weapon table view
-            this->weapon_table = new WeaponTable<Row>(this);
+            this->weapon_table = new WeaponTable<Row>(false, this);
             this->main_layout->addWidget(this->weapon_table, 1);
         };
 
@@ -942,10 +942,10 @@ namespace erdo::ui
 
             // add tabs
             this->tab_widget->addTab(this->stats, "Stats");
-            connect(this->stats->weapon_table, &WeaponTable<StatsTabBase::Row>::add_to_plot, this->plot, &PlotTab::add_datasets);
+            connect(this->stats->weapon_table, &WeaponTable<StatsTabBase::Row>::add_selection_to_plot, this->plot, &PlotTab::add_datasets);
 
             this->tab_widget->addTab(this->optimize, "Optimize");
-            connect(this->optimize->weapon_table, &WeaponTable<StatsTabBase::Row>::add_to_plot, this->plot, &PlotTab::add_datasets);
+            connect(this->optimize->weapon_table, &WeaponTable<StatsTabBase::Row>::add_selection_to_plot, this->plot, &PlotTab::add_datasets);
 
             this->tab_widget->addTab(this->plot, "Plot");
 

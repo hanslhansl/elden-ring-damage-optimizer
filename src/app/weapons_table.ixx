@@ -973,14 +973,17 @@ namespace erdo::ui
         using QTableView::QTableView;
 
     signals:
-        void add_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&);
-        void remove_from_plot(const std::vector<int>&);
+        void add_new_to_plot();
+        void add_selection_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&);
+        void remove_selection_from_plot(const std::vector<int>&);
         void row_color_changed(int, QColor);
     };
 
     export template<typename Row>
     class WeaponTable : public WeaponTableBase
     {
+        bool is_plot_table;
+
         QTimer *resize_timer = new QTimer(this);
         void resize_columns_to_contents_short_delay()
         {
@@ -1129,59 +1132,68 @@ namespace erdo::ui
         {
             auto row_indices = this->selectionModel()->selectedRows()
                 | std::views::transform([this](const QModelIndex& index){
-                    // return index.row();
                     return this->proxy_model->mapToSource(index).row();
                 })
                 | std::ranges::to<std::vector>();
-
-            if (row_indices.empty())
-                return;
 
             auto selection_name = row_indices.size() == 1
                 ? this->model->rows.at(row_indices.front()).attack.weapon.get().full_name
                 : std::format("Selection ({})", row_indices.size());
 
-
             QMenu menu(this);
 
-            auto action_fandom = menu.addAction(QString::fromStdString(std::format("Show {} on Fandom", selection_name)));
-            auto action_fextralife = menu.addAction(QString::fromStdString(std::format("Show {} on Fextralife", selection_name)));
-
-            QAction* action_add_to_plot;
-            auto add_to_plot_has_receivers = this->receivers(
-                SIGNAL(add_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&))
-            ) != 0;
-            if (add_to_plot_has_receivers)
+            if(row_indices.size() > 0)
             {
-                menu.addSeparator();
-                action_add_to_plot = menu.addAction(QString::fromStdString(std::format("Add {} to Plot", selection_name)));
-            }
-
-            QAction* action_remove_from_plot;
-            auto remove_from_plot_has_receivers = this->receivers(SIGNAL(remove_from_plot(const std::vector<int>&))) != 0;
-            if (remove_from_plot_has_receivers)
-            {
-                menu.addSeparator();
-                action_remove_from_plot = menu.addAction(QString::fromStdString(std::format("Remove {} from Plot", selection_name)));
-            }
-
-            auto selected_action = menu.exec(this->viewport()->mapToGlobal(pos));
-
-            if (selected_action == action_fandom)
-                for (auto row_index : row_indices)
-                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fandom_url())));
-            else if (selected_action == action_fextralife)
-                for (auto row_index : row_indices)
-                    QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
-            else if (add_to_plot_has_receivers && selected_action == action_add_to_plot)
-                emit add_to_plot(row_indices
-                    | std::views::transform([this](auto row_index){
-                        return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
-                    })
-                    | std::ranges::to<std::vector>()
+                menu.addAction(
+                    QString::fromStdString(std::format("Show {} on Fandom", selection_name)),
+                    [&](){
+                        for (auto row_index : row_indices)
+                            QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fandom_url())));
+                    }
                 );
-            else if (remove_from_plot_has_receivers && selected_action == action_remove_from_plot)
-                emit remove_from_plot(row_indices);
+                menu.addAction(
+                    QString::fromStdString(std::format("Show {} on Fextralife", selection_name)),
+                    [&](){
+                        for (auto row_index : row_indices)
+                            QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
+                    }
+                );
+            }
+
+            if(!is_plot_table && row_indices.size() > 0)
+            {
+                menu.addSeparator();
+                menu.addAction(
+                    QString::fromStdString(std::format("Add {} to Plot", selection_name)),
+                    [&](){
+                        emit this->add_selection_to_plot(row_indices
+                            | std::views::transform([this](auto row_index){
+                                return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
+                            })
+                            | std::ranges::to<std::vector>()
+                        );
+                    }
+                );
+            }
+
+            if (is_plot_table && row_indices.size() > 0)
+            {
+                menu.addSeparator();
+                menu.addAction(
+                    QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
+                    [&](){ emit this->remove_selection_from_plot(row_indices); }
+                );
+                menu.addSeparator();
+            }
+
+            if (is_plot_table)
+            {
+                menu.addAction("Add New Weapon", [&](){
+                    emit this->add_new_to_plot();
+                });
+            }
+
+            menu.exec(this->viewport()->mapToGlobal(pos));
         }
 
     protected:
@@ -1204,7 +1216,7 @@ namespace erdo::ui
         RowSortFilterModel<Row>* proxy_model = new RowSortFilterModel<Row>(this);
         RotatedHeaderView<Row>* header = new RotatedHeaderView<Row>(Qt::Horizontal, RotatedHeaderView<Row>::Rotation::Clockwise, this);
 
-        explicit WeaponTable(QWidget *parent = nullptr) : WeaponTableBase(parent)
+        explicit WeaponTable(bool is_plot_table, QWidget *parent = nullptr) : is_plot_table{is_plot_table}, WeaponTableBase(parent)
         {
             // table resize timer
             this->resize_timer->setSingleShot(true);
