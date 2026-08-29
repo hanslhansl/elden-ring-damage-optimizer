@@ -192,42 +192,30 @@ namespace erdo::ui
                 bool already_hit_original_x = false;
                 for(auto j = 0; j < universal_x.size(); ++j)
                 {
-                    auto x_index = this->model->index(j, column);
-
                     if (j < xs.size())
                     {
                         auto x_j = xs[j];
+                        std::println("x_j {}", x_j);
                         variable_projection(attack) = x_j;
                         attack.calculate_inplace();
                         auto y_ij = metric_projection(attack);
 
-                        this->model->setData(x_index, x_j);
-                        this->model->setData(this->model->index(j, column + 1), y_ij);
-
+                        auto new_j = j;
                         if (x_j == original_x)
                         {
                             already_hit_original_x = true;
-                            auto dva = this->plotter->dataValueAttributes(x_index);
-                            dva.setVisible(true);
-                            this->plotter->setDataValueAttributes(x_index, dva);
+                            new_j = 0;
                         }
                         else
-                        {
-                            attributes_model->resetData(
-                                x_index,
-                                KDChart::DisplayRoles::DataValueLabelAttributesRole
-                            );
-                        }
+                            new_j += !already_hit_original_x;
+
+                        this->model->setData(this->model->index(new_j, column), x_j);
+                        this->model->setData(this->model->index(new_j, column + 1), y_ij);
                     }
                     else
                     {
-                        this->model->setData(x_index, QVariant());
+                        this->model->setData(this->model->index(j, column), QVariant());
                         this->model->setData(this->model->index(j, column + 1), QVariant());
-
-                        attributes_model->resetData(
-                            x_index,
-                            KDChart::DisplayRoles::DataValueLabelAttributesRole
-                        );
                     }
                 }
             }
@@ -304,19 +292,13 @@ namespace erdo::ui
                 pen.setWidth(settings.plot_data_line_width);
                 this->plotter->setPen(i, pen);
 
-                auto dva = this->plotter->dataValueAttributes(i);
+                auto index = this->model->index(0, column);
+                auto dva = this->plotter->dataValueAttributes(index);
                 auto marker = dva.markerAttributes();
-                // marker.setVisible(true);
-                // marker.setMarkerStyle(KDChart::MarkerAttributes::MarkerCircle);
-                // marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
                 marker.setMarkerColor(dataset_color);
                 dva.setMarkerAttributes(marker);
-
-                // auto text = dva.textAttributes();
-                // text.setVisible(false);
-                // dva.setTextAttributes(text);
-
-                this->plotter->setDataValueAttributes(i, dva);
+                dva.setVisible(true);
+                this->plotter->setDataValueAttributes(index, dva);
             }
 
             this->update_datasets(current_dataset_count, attacks_options.size());
@@ -422,46 +404,55 @@ namespace erdo::ui
             text.setVisible(false);
             dva.setTextAttributes(text);
             this->plotter->setDataValueAttributes(dva);
-
             auto set_point_diameter = [this](){
                 for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate)
                 {
                     auto i = this->weapon_index_to_dataset(wi);
+                    auto column = i * 2;
+                    auto index = this->model->index(0, column);
 
-                    auto dva = this->plotter->dataValueAttributes(i);
+                    auto dva = this->plotter->dataValueAttributes(index);
                     auto marker = dva.markerAttributes();
                     marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
                     dva.setMarkerAttributes(marker);
-                    this->plotter->setDataValueAttributes(dva);
+                    this->plotter->setDataValueAttributes(index, dva);
+                    this->plotter->update(); // dont know why but the new size only applies after a repaint
                 }
             };
-            set_point_diameter();
             connect(&settings.plot_point_diameter, settings.plot_point_diameter.changed_member_pointer, set_point_diameter);
 
+            auto plane = this->chart->coordinatePlane();
+            auto grid = plane->globalGridAttributes();
+            grid.setSubGridVisible(false);
+            auto pen = grid.gridPen();
+            pen.setCosmetic(true);
+            pen.setWidth(settings.plot_grid_line_width);
+            grid.setGridPen(pen);
+            plane->setGlobalGridAttributes(grid);
             auto set_grid_line_width = [this](){
                 auto plane = this->chart->coordinatePlane();
                 auto grid = plane->globalGridAttributes();
-                grid.setSubGridVisible(false);
                 auto pen = grid.gridPen();
-                pen.setCosmetic(true);
                 pen.setWidth(settings.plot_grid_line_width);
                 grid.setGridPen(pen);
                 plane->setGlobalGridAttributes(grid);
             };
-            set_grid_line_width();
             connect(&settings.plot_grid_line_width, settings.plot_grid_line_width.changed_member_pointer, set_grid_line_width);
 
+            pen = grid.zeroLinePen();
+            pen.setCosmetic(true);
+            pen.setWidth(settings.plot_axis_line_width);
+            pen.setColor(Qt::black);
+            grid.setZeroLinePen(pen);
+            plane->setGlobalGridAttributes(grid);
             auto set_axis_line_width = [this](){
                 auto plane = this->chart->coordinatePlane();
                 auto grid = plane->globalGridAttributes();
                 auto pen = grid.zeroLinePen();
-                pen.setCosmetic(true);
                 pen.setWidth(settings.plot_axis_line_width);
-                pen.setColor(Qt::black);
                 grid.setZeroLinePen(pen);
                 plane->setGlobalGridAttributes(grid);
             };
-            set_axis_line_width();
             connect(&settings.plot_axis_line_width, settings.plot_axis_line_width.changed_member_pointer, set_axis_line_width);
 
             this->addWidget(this->weapon_table);
