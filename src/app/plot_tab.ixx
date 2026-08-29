@@ -77,6 +77,58 @@ namespace erdo::ui
         return std::array{ VariableProjection<variables>::operator()... };
     }(1);
 
+    class SplitterHandle : public QSplitterHandle
+    {
+    public:
+        explicit SplitterHandle(Qt::Orientation orientation, QSplitter *parent) : QSplitterHandle(orientation, parent)
+        {
+            setCursor(Qt::SplitVCursor);
+        }
+
+    protected:
+        void enterEvent(QEnterEvent *) override
+        {
+            update();
+        }
+
+        void leaveEvent(QEvent *) override
+        {
+            update();
+        }
+
+        void paintEvent(QPaintEvent *) override
+        {
+            QPainter painter(this);
+            painter.setRenderHint(QPainter::Antialiasing);
+
+            // Entire handle = white
+            painter.fillRect(this->rect(), Qt::white);
+
+            // Actual visual handle
+            const int visualHeight = this->height()-8;
+            const int y = (this->height() - visualHeight) / 2;
+
+            const bool hovered = this->underMouse();
+            painter.fillRect(
+                0, y, this->width(), visualHeight,
+                hovered ? QColor("#b0b0b0") : QColor("#d6d6d6")
+            );
+
+            // Grip dots
+            const int dotSize = 3;
+            const int spacing = 5;
+
+            const int totalWidth = 3 * dotSize + 2 * spacing;
+            const int startX = (this->width() - totalWidth) / 2;
+            const int dotY = y + (visualHeight - dotSize) / 2;
+
+            painter.setBrush(QColor("#777777"));
+            painter.setPen(Qt::NoPen);
+
+            for (int i = 0; i < 3; ++i)
+                painter.drawEllipse(startX + i * (dotSize + spacing), dotY, dotSize, dotSize);
+        }
+    };
 
     export class PlotTab : public QSplitter
     {
@@ -278,6 +330,11 @@ namespace erdo::ui
                 this->set_dataset_attributes(wi);
         }
 
+        QSplitterHandle *createHandle() override
+        {
+            return new SplitterHandle(Qt::Vertical, this);
+        }
+
     public:
         void add_datasets(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>& attacks_options)
         {
@@ -361,6 +418,7 @@ namespace erdo::ui
             this->plotter->setPen(0, Qt::NoPen);
 
             // layout
+            this->setHandleWidth(12);
             auto upper_widget = new QWidget(this);
             auto upper_layout = new QVBoxLayout(upper_widget);
 

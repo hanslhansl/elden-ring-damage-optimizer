@@ -155,56 +155,35 @@ namespace erdo::ui
         // Connections
         // ---------------------------------------------------------------------
 
-        QObject::connect(
-            &watcher,
-            &QFutureWatcher<T>::progressRangeChanged,
-            &progress,
-            [&](int min, int max)
-            {
-                progress.setRange(min, max);
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressRangeChanged, &progress, [&](int min, int max) {
+            progress.setRange(min, max);
 
-                cachedEta.clear();
-                lastEtaUpdate = -1000;
+            cachedEta.clear();
+            lastEtaUpdate = -1000;
 
-                updateLabel();
-            });
+            updateLabel();
+        });
 
-        QObject::connect(
-            &watcher,
-            &QFutureWatcher<T>::progressTextChanged,
-            [&](const QString& text)
-            {
-                progressText = text;
-                updateLabel();
-            });
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressTextChanged, [&](const QString& text) {
+            progressText = text;
+            updateLabel();
+        });
 
-        QObject::connect(
-            &watcher,
-            &QFutureWatcher<T>::progressValueChanged,
-            [&](int value)
-            {
-                progress.setValue(value);
-                updateLabel();
-            });
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressValueChanged, [&](int value) {
+            progress.setValue(value);
+            updateLabel();
+        });
 
-        QObject::connect(
-            &watcher,
-            &QFutureWatcher<T>::finished,
-            &progress,
-            &QDialog::accept);
+        QObject::connect(&watcher, &QFutureWatcher<T>::finished, &progress, &QDialog::accept);
 
         QObject::disconnect(&progress, &QProgressDialog::canceled, nullptr, nullptr);
-        QObject::connect(
-            &progress,
-            &QProgressDialog::canceled,
-            [&]()
-            {
-                // future.cancel();
-                progress.setCancelButton(nullptr);
-                progress.setLabelText("Canceling…");
-                progress.setRange(0, 0);
-                future.cancel();
-            });
+        QObject::connect(&progress,  &QProgressDialog::canceled, [&]() {
+            // future.cancel();
+            progress.setCancelButton(nullptr);
+            progress.setLabelText("Canceling…");
+            progress.setRange(0, 0);
+            future.cancel();
+        });
 
         progress.exec();
 
@@ -540,16 +519,19 @@ namespace erdo::ui
             // temporary attack object to avoid copying the weapon data multiple times
             calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
-            std::vector<Row> rows{};
-            rows.reserve(this->active_weapon_data->size());
-            rows.append_range(*this->active_weapon_data
+            this->weapon_table->model->set_rows(*this->active_weapon_data
                 | std::views::transform([&](const calculator::Weapon& w) {
                     attack.weapon = w;
                     attack.calculate_inplace();
                     return Row(attack);
                 })
+                | std::ranges::to<std::vector>());
+
+            QMessageBox::information(
+                this,
+                "Info",
+                QString::fromStdString(std::format("Successfully loaded {} weapons.", this->active_weapon_data->size()))
             );
-            this->weapon_table->model->set_rows(std::move(rows));
         }
         
         void calculate_weapon_stats()

@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>246</width>
+    <width>250</width>
     <height>258</height>
    </rect>
   </property>
@@ -95,7 +95,7 @@
      <item row="8" column="1">
       <widget class="QLabel" name="v2_variations_label">
        <property name="text">
-        <string>TextLabel</string>
+        <string/>
        </property>
       </widget>
      </item>
@@ -109,7 +109,7 @@
      <item row="9" column="1">
       <widget class="QLabel" name="v2_iterations_label">
        <property name="text">
-        <string>TextLabel</string>
+        <string/>
        </property>
       </widget>
      </item>
