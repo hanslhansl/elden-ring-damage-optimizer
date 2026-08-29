@@ -159,11 +159,28 @@ namespace erdo::ui
             throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
         }
 
-        // static_assert(false, "next: implement upgrade level plotting, highlight dataset origin in plot");
-
         int weapon_index_to_dataset(int i)
         {
             return i + 1;
+        }
+
+        void set_dataset_attributes(int wi)
+        {
+            auto i = this->weapon_index_to_dataset(wi);
+            const auto column = i * 2;
+            auto dataset_color = std::get<sections::ColorSection>(this->weapon_table->model->rows.at(wi))[0].value<QColor>();
+            
+            auto pen = this->plotter->pen(i);
+            pen.setColor(dataset_color);
+            this->plotter->setPen(i, pen);
+
+            auto index = this->model->index(0, column);
+            auto dva = this->plotter->dataValueAttributes(index);
+            auto marker = dva.markerAttributes();
+            marker.setMarkerColor(dataset_color);
+            dva.setMarkerAttributes(marker);
+            dva.setVisible(true);
+            this->plotter->setDataValueAttributes(index, dva);
         }
 
         void update_datasets(int index, int count)
@@ -175,9 +192,9 @@ namespace erdo::ui
             auto variable = static_cast<PlotVariable>(variable_index);
             auto variable_projection = variable_projections.at(variable_index);
 
-            auto&& universal_x = get_universal_x_values(variable);
-            for (auto&& x : universal_x)
-                this->model->setData(this->model->index(x, 0), x);
+            auto&& universal_xs = get_universal_x_values(variable);
+            for(auto j = 0; j < universal_xs.size(); ++j)
+                this->model->setData(this->model->index(j, 0), universal_xs[j]);
 
             auto metric_index = this->metric_combobox->currentIndex();
             auto metric = static_cast<optimizer::Target>(metric_index);
@@ -193,35 +210,30 @@ namespace erdo::ui
                 calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
                 auto&& xs = get_dataset_x_values(variable, weapon);
-                auto attributes_model = this->plotter->attributesModel();
                 bool already_hit_original_x = false;
-                for(auto j = 0; j < universal_x.size(); ++j)
+                for(auto j = 0; j < xs.size(); ++j)
                 {
-                    if (j < xs.size())
+                    auto x_j = xs[j];
+                    variable_projection(attack) = x_j;
+                    attack.calculate_inplace();
+                    auto y_ij = metric_projection(attack);
+
+                    auto new_j = j;
+                    if (x_j == original_x)
                     {
-                        auto x_j = xs[j];
-                        std::println("x_j {}", x_j);
-                        variable_projection(attack) = x_j;
-                        attack.calculate_inplace();
-                        auto y_ij = metric_projection(attack);
-
-                        auto new_j = j;
-                        if (x_j == original_x)
-                        {
-                            already_hit_original_x = true;
-                            new_j = 0;
-                        }
-                        else
-                            new_j += !already_hit_original_x;
-
-                        this->model->setData(this->model->index(new_j, column), x_j);
-                        this->model->setData(this->model->index(new_j, column + 1), y_ij);
+                        already_hit_original_x = true;
+                        new_j = 0;
                     }
                     else
-                    {
-                        this->model->setData(this->model->index(j, column), QVariant());
-                        this->model->setData(this->model->index(j, column + 1), QVariant());
-                    }
+                        new_j += !already_hit_original_x;
+
+                    this->model->setData(this->model->index(new_j, column), x_j);
+                    this->model->setData(this->model->index(new_j, column + 1), y_ij);
+                }
+                for(auto j = xs.size(); j < universal_xs.size(); ++j)
+                {
+                    this->model->setData(this->model->index(j, column), QVariant());
+                    this->model->setData(this->model->index(j, column + 1), QVariant());
                 }
             }
         }
@@ -261,6 +273,9 @@ namespace erdo::ui
                 const auto column = i * 2;
                 this->model->removeColumns(column, 2);
             }
+
+            for (auto wi = indices.back(); wi < this->weapon_table->model->rows.size(); ++wi)
+                this->set_dataset_attributes(wi);
         }
 
     public:
@@ -284,27 +299,7 @@ namespace erdo::ui
                 | std::views::drop(current_dataset_count)
                 | std::views::take(attacks_options.size())
             )
-            {
-                auto i = this->weapon_index_to_dataset(wi);
-                const auto column = i * 2;
-                auto dataset_color = std::get<sections::ColorSection>(row)[0].value<QColor>();
-
-                this->model->setHeaderData(column, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
-                this->model->setHeaderData(column + 1, Qt::Horizontal, std::get<sections::NameSection>(row)[0][0].toString());
-                auto pen = this->plotter->pen(i);
-                pen.setCosmetic(true);
-                pen.setColor(dataset_color);
-                pen.setWidth(settings.plot_data_line_width);
-                this->plotter->setPen(i, pen);
-
-                auto index = this->model->index(0, column);
-                auto dva = this->plotter->dataValueAttributes(index);
-                auto marker = dva.markerAttributes();
-                marker.setMarkerColor(dataset_color);
-                dva.setMarkerAttributes(marker);
-                dva.setVisible(true);
-                this->plotter->setDataValueAttributes(index, dva);
-            }
+                this->set_dataset_attributes(wi);
 
             this->update_datasets(current_dataset_count, attacks_options.size());
         }
@@ -337,6 +332,11 @@ namespace erdo::ui
             this->y_axis = new KDChart::CartesianAxis(plotter);
             this->y_axis->setPosition(KDChart::CartesianAxis::Left);
             plotter->addAxis(this->y_axis);
+
+            auto pen = this->plotter->pen();
+            pen.setCosmetic(true);
+            pen.setWidth(settings.plot_data_line_width);
+            this->plotter->setPen(pen);
 
             // variable
             this->variable_combobox = new QComboBox(this);
@@ -429,7 +429,7 @@ namespace erdo::ui
             auto plane = this->chart->coordinatePlane();
             auto grid = plane->globalGridAttributes();
             grid.setSubGridVisible(false);
-            auto pen = grid.gridPen();
+            pen = grid.gridPen();
             pen.setCosmetic(true);
             pen.setWidth(settings.plot_grid_line_width);
             grid.setGridPen(pen);
