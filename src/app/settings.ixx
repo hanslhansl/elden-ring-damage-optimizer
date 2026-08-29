@@ -102,7 +102,7 @@ namespace erdo::ui
             .minimum_value = 100,
             .maximum_value = 5000
         } };
-        
+
         SettingMember<int> decimal_places{ SpinBoxSetting{
             .section_name = "Weapon Table",
             .name = "decimal_places",
