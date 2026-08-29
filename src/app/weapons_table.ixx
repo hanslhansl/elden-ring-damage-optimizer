@@ -974,6 +974,7 @@ namespace erdo::ui
 
     signals:
         void add_new_to_plot();
+        void edit_row(int);
         void add_selection_to_plot(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>&);
         void remove_selection_from_plot(const std::vector<int>&);
         void row_color_changed(int, QColor);
@@ -1177,8 +1178,18 @@ namespace erdo::ui
             }
 
             if (is_plot_table && row_indices.size() > 0)
-            {
                 menu.addSeparator();
+
+            if (is_plot_table && row_indices.size() == 1)
+            {
+                menu.addAction(
+                    QString::fromStdString(std::format("Edit {}", selection_name)),
+                    [&](){ emit this->edit_row(row_indices.front()); }
+                );
+            }
+
+            if (is_plot_table && row_indices.size() > 0)
+            {
                 menu.addAction(
                     QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
                     [&](){ emit this->remove_selection_from_plot(row_indices); }

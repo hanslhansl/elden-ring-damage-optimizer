@@ -376,6 +376,9 @@ namespace erdo::ui
                 pen.setColor(color);
                 this->plotter->setPen(i, pen);
             });
+            connect(this->weapon_table, &WeaponTable<Row>::edit_row, [this](int row_index){
+                throw std::runtime_error("Not implemented: add_new_to_plot");
+            });
             connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, [this](){
                 throw std::runtime_error("Not implemented: add_new_to_plot");
             });
