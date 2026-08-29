@@ -103,15 +103,6 @@ namespace erdo::ui
             .maximum_value = 5000
         } };
         
-        SettingMember<int> attribute_level_limit{ SpinBoxSetting{
-            .section_name = "Elden Ring",
-            .name = "attribute_level_limit",
-            .display_name = "Attribute Level Limit (Ingame: 99)",
-            .default_value = 99,
-            .minimum_value = 0,
-            .maximum_value = 148
-        } };
-
         SettingMember<int> decimal_places{ SpinBoxSetting{
             .section_name = "Weapon Table",
             .name = "decimal_places",

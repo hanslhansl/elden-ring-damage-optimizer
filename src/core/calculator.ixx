@@ -129,6 +129,7 @@ export namespace erdo::calculator
         return character_level + 79;
     }
 
+    constexpr auto attribute_level_limit = 99;
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
     using RelevantAttributeLevelsArray = std::array<unsigned int, enumerators_of<RelevantAttribute>().size()>;
     using RelevantAttributeLevels = std::span<const unsigned int, enumerators_of<RelevantAttribute>().size()>;
@@ -411,7 +412,7 @@ export namespace erdo::calculator
                 effective_two_handing = true;
 
             if (effective_two_handing && !this->disable_two_handing_attack_power_bonus)
-                adjusted_relevant_stats[std::to_underlying(Attribute::STRENGTH)] *= 1.5;
+                adjusted_relevant_stats.at(std::to_underlying(Attribute::STRENGTH)) *= 1.5;
 
             return adjusted_relevant_stats;
         }
@@ -423,17 +424,17 @@ export namespace erdo::calculator
 
         const AttributeScalings& attribute_scalings_at_upgrade_level() const
         {
-            return this->weapon.get().attribute_scalings_at_upgrade_levels[this->upgrade_level()];
+            return this->weapon.get().attribute_scalings_at_upgrade_levels.at(this->upgrade_level());
         }
 
         const BaseAttackPowers& base_attack_powers() const
         {
-            return this->weapon.get().base_attack_powers_at_upgrade_levels[this->upgrade_level()];
+            return this->weapon.get().base_attack_powers_at_upgrade_levels.at(this->upgrade_level());
         }
     
         const AttributeScalings& attack_power_type_attribute_scalings(AttackPowerType apt) const
         {
-            return this->weapon.get().attack_power_types_attribute_scalings[std::to_underlying(apt)];
+            return this->weapon.get().attack_power_types_attribute_scalings.at(std::to_underlying(apt));
         }
     };
 
@@ -536,8 +537,10 @@ export namespace erdo::calculator
                 scaling_curve
             );
 
-            this->attack_powers[attack_power_type_integral][0] = base_attack_power;
-            this->attack_powers[attack_power_type_integral][1] = base_attack_power * this->total_scalings[attack_power_type_integral];
+            this->attack_powers[attack_power_type_integral] = {
+                base_attack_power,
+                base_attack_power * this->total_scalings[attack_power_type_integral]
+            };
         }
     
     public:
