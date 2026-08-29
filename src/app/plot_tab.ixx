@@ -39,13 +39,13 @@ namespace erdo::ui
 
 using namespace erdo;
 template<>
-constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 5> enum_string_mapping<ui::PlotVariable> = {
+constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 6> enum_string_mapping<ui::PlotVariable> = {
     std::pair{ui::PlotVariable::STRENGTH, "STRENGTH"},
     std::pair{ui::PlotVariable::DEXTERITY, "DEXTERITY"},
     std::pair{ui::PlotVariable::INTELLIGENCE, "INTELLIGENCE"},
     std::pair{ui::PlotVariable::FAITH, "FAITH"},
     std::pair{ui::PlotVariable::ARCAINE, "ARCAINE"},
-    // std::pair{ui::PlotVariable::UPGRADE_LEVEL, "UPGRADE_LEVEL"}
+    std::pair{ui::PlotVariable::UPGRADE_LEVEL, "UPGRADE_LEVEL"}
 };
 
 namespace erdo::ui
@@ -64,14 +64,14 @@ namespace erdo::ui
             return attack_options.stats[attribute_integral + calculator::irrelevant_attribute_count];
         }
     };
-    // template<>
-    // struct VariableProjection<PlotVariable::UPGRADE_LEVEL>
-    // {
-    //     static unsigned int& operator()(calculator::FullAttackOptions& attack_options)
-    //     {
-    //         return attack_options.upgrade_level;
-    //     }
-    // };
+    template<>
+    struct VariableProjection<PlotVariable::UPGRADE_LEVEL>
+    {
+        static unsigned int& operator()(calculator::FullAttackOptions& attack_options)
+        {
+            return attack_options.upgrade_levels.at(attack_options.weapon.get().upgrade_level_index);
+        }
+    };
     static constexpr auto variable_projections = [](auto){
         static constexpr auto [...variables] = enumerators_of<PlotVariable>();
         return std::array{ VariableProjection<variables>::operator()... };
@@ -131,9 +131,14 @@ namespace erdo::ui
             }
             else if (variable == PlotVariable::UPGRADE_LEVEL)
             {
-                static const auto res = std::views::iota(0u, calculator::max_upgrade_levels.at(weapon.upgrade_level_index) + 1)
+                static const auto res = calculator::max_upgrade_levels
+                    | std::views::transform([](unsigned int max_upgrade_level){
+                        return std::views::iota(0u, max_upgrade_level + 1)
+                            | std::ranges::to<std::vector>();
+                    })
                     | std::ranges::to<std::vector>();
-                return res;
+
+                return res.at(weapon.upgrade_level_index);
             }
             throw std::runtime_error(std::format("Invalid variable for dataset x values: {}", std::to_underlying(variable)));
         }
@@ -141,7 +146,7 @@ namespace erdo::ui
         {
             if (is_valid_enum_integral<calculator::RelevantAttribute>(std::to_underlying(variable) - std::to_underlying(PlotVariable::STRENGTH)))
             {
-                static const auto res = std::views::iota(0u, settings.attribute_level_limit.value + 1u)
+                static const auto res = std::views::iota(0u, calculator::attribute_level_limit + 1u)
                     | std::ranges::to<std::vector>();
                     return res;
             }

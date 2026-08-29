@@ -367,10 +367,7 @@ namespace erdo::ui
             {
                 auto attribute_spinbox = this->attribute_spinboxes.emplace_back(new QSpinBox());
                 attribute_spinbox->setMinimum(0);
-
-                auto lambda = [attribute_spinbox]() { attribute_spinbox->setMaximum(settings.attribute_level_limit); };
-                lambda();
-                connect(&settings.attribute_level_limit, settings.attribute_level_limit.changed_member_pointer, lambda);
+                attribute_spinbox->setMaximum(calculator::attribute_level_limit);
 
                 this->character_stats_layout->insertRow(
                     this->character_stats_layout->rowCount() - 1,
@@ -608,7 +605,7 @@ namespace erdo::ui
             auto stat_variation_count = optimizer::get_stat_variation_count(
                 free_attribute_points,
                 min_stats.relevant_stats(),
-                make_filled_array<calculator::RelevantAttributeLevels>(settings.attribute_level_limit)
+                make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
             );
             this->brute_force_variations_label->setText(QString::number(stat_variation_count));
             this->brute_force_iterations_label->setText(QString::number(stat_variation_count * this->filtered_active_weapon_data.size()));
@@ -661,7 +658,7 @@ namespace erdo::ui
                             attack_options,
                             free_attribute_points,
                             min_stats,
-                            settings.attribute_level_limit.value
+                            calculator::attribute_level_limit
                         };
                         this->v2_variations_label->setText(
                             QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
@@ -684,7 +681,7 @@ namespace erdo::ui
                             attack_options,
                             free_attribute_points,
                             min_stats,
-                            settings.attribute_level_limit.value
+                            calculator::attribute_level_limit
                         };
 
                         optimizer_visitor(brute_force_optimizer);

@@ -124,7 +124,7 @@ namespace erdo::ui
             .section_name = "Plot",
             .name = "plot_point_diameter",
             .display_name = "Point Diameter",
-            .default_value = 2,
+            .default_value = 8,
             .minimum_value = 0,
             .maximum_value = 20
         } };
