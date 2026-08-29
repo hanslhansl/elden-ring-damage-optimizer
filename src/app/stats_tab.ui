@@ -211,6 +211,13 @@
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
+         <widget class="QLineEdit" name="base_name_line_edit">
+          <property name="placeholderText">
+           <string>Search...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QListWidget" name="base_name_list">
           <property name="locale">
            <locale language="English" country="AmericanSamoa"/>

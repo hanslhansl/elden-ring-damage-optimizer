@@ -383,6 +383,21 @@ namespace erdo::ui
             connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_base_name_filter);
             connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_affinity_list_filter);
 
+            // filter for the weapon base name filter
+            connect(this->base_name_line_edit, &QLineEdit::textChanged, [this](const QString &text)
+            {
+                const QString query = text.trimmed();
+
+                for (int i = 0; i < this->base_name_list->count(); ++i)
+                {
+                    QListWidgetItem *item = this->base_name_list->item(i);
+
+                    const bool match = query.isEmpty() || item->text().contains(query, Qt::CaseInsensitive);
+
+                    item->setHidden(!match);
+                }
+            });
+
             // weapon table view
             this->weapon_table = new WeaponTable<Row>(this);
             this->main_layout->addWidget(this->weapon_table, 1);
