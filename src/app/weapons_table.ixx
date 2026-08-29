@@ -991,8 +991,6 @@ namespace erdo::ui
         }
         void resize_columns_to_contents_impl()
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
             this->resize_timer->stop();
 
             const int columns = this->model->columnCount();
@@ -1103,12 +1101,6 @@ namespace erdo::ui
                         this->header->resizeSection(c, new_width);
                 }
             }
-
-            
-
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::println("Resize columns to contents took {}", duration);
         }
 
         void show_header_context_menu(const QPoint &pos)
