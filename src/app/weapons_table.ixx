@@ -1240,7 +1240,7 @@ namespace erdo::ui
 
             if (is_plot_table)
             {
-                menu.addAction("Add New Weapon", [&](){
+                menu.addAction("Add New Dataset", [&](){
                     emit this->add_new_to_plot();
                 });
             }
@@ -1253,7 +1253,14 @@ namespace erdo::ui
         {
             QTableView::paintEvent(event);
 
-            draw_column_group_separators<Row>(this->viewport(), this->horizontalHeader());
+            if (this->model->rowCount() == 0)
+            {
+                QPainter painter(this->viewport());
+                painter.setPen(Qt::gray);
+                painter.drawText(this->viewport()->rect(), Qt::AlignCenter, this->placeholder_string);
+            }
+            else
+                draw_column_group_separators<Row>(this->viewport(), this->horizontalHeader());
         }
     
         void showEvent(QShowEvent *event) override
@@ -1264,11 +1271,13 @@ namespace erdo::ui
         }
     
     public:
+        QString placeholder_string;
         RowModel<Row>* model = new RowModel<Row>(this);
         RowSortFilterModel<Row>* proxy_model = new RowSortFilterModel<Row>(this);
         RotatedHeaderView<Row>* header = new RotatedHeaderView<Row>(Qt::Horizontal, RotatedHeaderView<Row>::Rotation::Clockwise, this);
 
-        explicit WeaponTable(bool is_plot_table, QWidget *parent = nullptr) : is_plot_table{is_plot_table}, WeaponTableBase(parent)
+        explicit WeaponTable(bool is_plot_table, QString placeholder_string, QWidget *parent = nullptr)
+            : is_plot_table{is_plot_table}, placeholder_string{placeholder_string}, WeaponTableBase(parent)
         {
             // table resize timer
             this->resize_timer->setSingleShot(true);

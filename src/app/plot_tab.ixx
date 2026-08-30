@@ -771,7 +771,7 @@ namespace erdo::ui
             Q_UNUSED(printer);
 
             // weapon table (model)
-            this->weapon_table = new WeaponTable<Row>(true, this);
+            this->weapon_table = new WeaponTable<Row>(true, "No datasets to display, add with right-click or from other tabs.", this);
             connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
             connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){
                 auto i = this->weapon_index_to_dataset(wi);

@@ -400,7 +400,7 @@ namespace erdo::ui
             });
 
             // weapon table view
-            this->weapon_table = new WeaponTable<Row>(false, this);
+            this->weapon_table = new WeaponTable<Row>(false, "No items to display", this);
             this->weapon_table->set_section_hidden<sections::UpgradeLevelSection>(true);
             this->weapon_table->set_section_hidden<sections::TwoHandingSection>(true);
 
@@ -689,6 +689,8 @@ namespace erdo::ui
     public:
         explicit OptimizeTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
+            this->weapon_table->placeholder_string = "No items to display, start an optimization first.";
+
             this->character_stats_box->setTitle("Min Character Attributes");
 
             auto max_character_stats_box = new QGroupBox("Max Character Attributes");
