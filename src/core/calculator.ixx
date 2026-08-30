@@ -441,6 +441,19 @@ export namespace erdo::calculator
         {
             return this->weapon.get().attack_power_types_attribute_scalings.at(std::to_underlying(apt));
         }
+
+        std::vector<std::string> calculate_scaling_tiers() const
+        {
+            auto&& attribute_scalings_at_upgrade_level = this->attribute_scalings_at_upgrade_level();
+            std::vector<std::string> scaling_tiers{ attribute_scalings_at_upgrade_level.size() };
+            for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings_at_upgrade_level, scaling_tiers))
+            {
+                for (auto&& [threshold, tier] : this->weapon.get().scaling_tiers)
+                    if (scaling >= threshold)
+                        scaling_tier = tier;
+            }
+            return scaling_tiers;
+        }
     };
 
     struct AttackRating
@@ -611,19 +624,6 @@ export namespace erdo::calculator
                 this->total_attack_power[0] += attack_power[0];
                 this->total_attack_power[1] += attack_power[1];
             }
-        }
-
-        std::vector<std::string> calculate_scaling_tiers() const
-        {
-            auto&& attribute_scalings_at_upgrade_level = this->attribute_scalings_at_upgrade_level();
-            std::vector<std::string> scaling_tiers{ attribute_scalings_at_upgrade_level.size() };
-            for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings_at_upgrade_level, scaling_tiers))
-            {
-                for (auto&& [threshold, tier] : this->weapon.get().scaling_tiers)
-                    if (scaling >= threshold)
-                        scaling_tier = tier;
-            }
-            return scaling_tiers;
         }
 
         bool is_total_attack_power_ineffective() const

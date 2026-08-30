@@ -533,7 +533,8 @@ namespace erdo::ui
                 sections::TwoHandingSection,
                 sections::CharacterLevelSection,
                 sections::Stats,
-                sections::Requirements
+                sections::Requirements,
+                sections::AttributeScalings
             >{};
         }(0));
 
@@ -866,7 +867,7 @@ namespace erdo::ui
         }
         void add_new_dataset_dialog()
         {
-            calculator::FullAttackOptions attack_options{ calculator::Weapon::dummy, {}, {} };
+            calculator::FullAttackOptions attack_options{ this->active_weapon_data->front(), {}, {} };
 
             auto dialog_was_accepted = this->edit_dataset_dialog_impl(attack_options, "Add New Dataset to Plot");
 
@@ -908,6 +909,7 @@ namespace erdo::ui
 
             // weapon table (model)
             this->weapon_table = new WeaponTable<Row>(true, "No datasets to display, add with right-click or from other tabs.", this);
+            this->weapon_table->set_section_hidden<sections::AttributeScalings>(true);
             connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
             connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){ this->update_datasets(wi, 1); });
             connect(this->weapon_table, &WeaponTable<Row>::edit_row, this, &PlotTab::edit_dataset_dialog);

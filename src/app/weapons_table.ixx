@@ -375,6 +375,10 @@ namespace erdo::ui
             {
                 this->update(attack);
             }
+            explicit AttributeScalings(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
+            }
 
             void update(const calculator::Attack& attack)
             {
@@ -392,6 +396,22 @@ namespace erdo::ui
                         arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
                     arr[1] = attribute_scaling * 100;
                     arr[2] = foreground_color(is_ineffective);
+                }
+            }
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                auto&& weapon = attack_options.weapon.get();
+
+                for (auto&& [attribute_scaling, scaling_tier, arr] : std::views::zip(
+                    attack_options.attribute_scalings_at_upgrade_level(),
+                    attack_options.calculate_scaling_tiers(),
+                    *this))
+                {
+                    if (scaling_tier.empty())
+                        arr[0] = format_number(attribute_scaling * 100);
+                    else
+                        arr[0] = format_number(attribute_scaling * 100) + " (" + QString::fromStdString(scaling_tier) + ")";
+                    arr[1] = attribute_scaling * 100;
                 }
             }
         };
@@ -1194,7 +1214,7 @@ namespace erdo::ui
             if(row_indices.size() > 0)
             {
                 menu.addSeparator();
-                
+
                 if (is_plot_table)
                 {
                     if (row_indices.size() == 1)
