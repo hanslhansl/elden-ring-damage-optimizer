@@ -924,6 +924,7 @@ namespace erdo::ui
             connect(&settings.plot_axis_line_width, settings.plot_axis_line_width.changed_member_pointer, set_axis_line_width);
 
             this->addWidget(this->weapon_table);
+            this->setSizes({600, 400});
         }
     };
 }
