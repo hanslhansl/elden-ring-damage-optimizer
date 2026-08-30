@@ -1,5 +1,4 @@
 module;
-#include "KDChartDataValueAttributes.h"
 #include <QStandarditemmodel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -9,6 +8,14 @@ module;
 #include <QComboBox>
 #include <QSpinBox>
 #include <QPrinter>
+#include <QCompleter>
+#include <QKeyEvent>
+#include <QModelIndex>
+#include <QRegularExpression>
+#include <QSortFilterProxyModel>
+#include <QLineEdit>
+#include <QDialogButtonBox>
+#include <QCheckBox>
 
 #include <KDChartChart>
 #include <KDChartWidget>
@@ -16,6 +23,7 @@ module;
 #include <KDChartLineDiagram>
 #include <KDChartGridAttributes>
 #include <KDChartPlotter>
+#include <KDChartDataValueAttributes>
 export module erdo.ui.plot_tab;
 
 import std;
@@ -76,6 +84,261 @@ namespace erdo::ui
         static constexpr auto [...variables] = enumerators_of<PlotVariable>();
         return std::array{ VariableProjection<variables>::operator()... };
     }(1);
+
+    class SearchableComboBox : public QComboBox
+    {
+        Q_OBJECT
+
+    public:
+        explicit SearchableComboBox(QWidget* parent = nullptr)
+            : QComboBox(parent) , m_filterModel(new QSortFilterProxyModel(this)) , m_completer(new QCompleter(m_filterModel, this)) , m_lastValidIndex(-1)
+        {
+            setFocusPolicy(Qt::ClickFocus);
+            setEditable(true);
+            setInsertPolicy(QComboBox::NoInsert);
+
+            // ------------------------------------------------------------------
+            // Filter model
+            // ------------------------------------------------------------------
+
+            m_filterModel->setSourceModel(model());
+            m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+            m_filterModel->setFilterRole(Qt::DisplayRole);
+            m_filterModel->setFilterKeyColumn(modelColumn());
+
+            // ------------------------------------------------------------------
+            // Completer
+            // ------------------------------------------------------------------
+
+            m_completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
+            m_completer->setCaseSensitivity(Qt::CaseInsensitive);
+            m_completer->setCompletionRole(Qt::DisplayRole);
+            m_completer->setCompletionColumn(modelColumn());
+
+            setCompleter(m_completer);
+
+            // ------------------------------------------------------------------
+            // Signals
+            // ------------------------------------------------------------------
+
+            connect(
+                lineEdit(),
+                &QLineEdit::textEdited,
+                this,
+                &SearchableComboBox::onTextEdited
+            );
+
+            connect(
+                m_completer,
+                qOverload<const QModelIndex&>(&QCompleter::activated),
+                this,
+                &SearchableComboBox::onCompleterActivated
+            );
+
+            connect(
+                this,
+                &QComboBox::currentIndexChanged,
+                this,
+                &SearchableComboBox::onCurrentIndexChanged
+            );
+        }
+
+    protected:
+        void keyPressEvent(QKeyEvent* event) override
+        {
+            // --------------------------------------------------------------
+            // Enter / Return
+            //
+            // Complete the search by committing the first matching item.
+            // --------------------------------------------------------------
+
+            if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+            {
+                acceptFirstMatch();
+                event->accept();
+                return;
+            }
+
+            // --------------------------------------------------------------
+            // Escape
+            //
+            // Cancel the current search and restore the last valid item.
+            // --------------------------------------------------------------
+
+            if (event->key() == Qt::Key_Escape)
+            {
+                m_completer->popup()->hide();
+                restoreLastValidSelection();
+
+                event->accept();
+                return;
+            }
+
+            QComboBox::keyPressEvent(event);
+        }
+
+        void focusOutEvent(QFocusEvent* event) override
+        {
+            // The search text is temporary. Once focus leaves, restore the
+            // committed item's text.
+            m_completer->popup()->hide();
+            restoreLastValidSelection();
+
+            QComboBox::focusOutEvent(event);
+        }
+
+    public slots:
+        void setModel(QAbstractItemModel* model) override
+        {
+            QComboBox::setModel(model);
+
+            m_filterModel->setSourceModel(model);
+            m_filterModel->setFilterKeyColumn(modelColumn());
+
+            m_completer->setModel(m_filterModel);
+            m_completer->setCompletionColumn(modelColumn());
+
+            if (currentIndex() >= 0)
+                m_lastValidIndex = currentIndex();
+            else
+                m_lastValidIndex = -1;
+        }
+
+        void setModelColumn(int column)
+        {
+            QComboBox::setModelColumn(column);
+
+            m_filterModel->setFilterKeyColumn(column);
+            m_completer->setCompletionColumn(column);
+        }
+
+    private slots:
+        void onTextEdited(const QString& text)
+        {
+            // Escape the user input so it is treated as literal text rather
+            // than regular-expression syntax.
+            const QString pattern = QRegularExpression::escape(text);
+
+            m_filterModel->setFilterRegularExpression(pattern);
+
+            // No match: keep the existing valid selection.
+            if (m_filterModel->rowCount() == 0)
+            {
+                m_completer->popup()->hide();
+                return;
+            }
+
+            // Select the first matching item.
+            const QModelIndex proxyIndex = m_filterModel->index(0, modelColumn());
+
+            if (!proxyIndex.isValid())
+                return;
+
+            const QModelIndex sourceIndex = m_filterModel->mapToSource(proxyIndex);
+
+            if (!sourceIndex.isValid())
+                return;
+
+            // IMPORTANT:
+            //
+            // setCurrentIndex() on an editable QComboBox changes the line-edit
+            // text as well. Save the search text and cursor position, change
+            // the current item, then restore the search text.
+            const QString searchText = text;
+            const int cursorPosition = lineEdit()->cursorPosition();
+
+            setCurrentIndex(sourceIndex.row());
+            m_lastValidIndex = sourceIndex.row();
+
+            setEditText(searchText);
+
+            lineEdit()->setCursorPosition(qMin(cursorPosition, searchText.length()));
+
+            // Show the filtered results while typing.
+            if (!searchText.isEmpty())
+                m_completer->complete();
+            else
+                m_completer->popup()->hide();
+        }
+
+        void onCompleterActivated(const QModelIndex& index)
+        {
+            if (!index.isValid())
+                return;
+
+            // QCompleter can potentially emit an index from another model.
+            // Only map indexes that actually belong to our proxy model.
+            if (index.model() != m_filterModel)
+                return;
+
+            const QModelIndex sourceIndex = m_filterModel->mapToSource(index);
+
+            if (!sourceIndex.isValid())
+                return;
+
+            commitRow(sourceIndex.row());
+        }
+
+        void onCurrentIndexChanged(int index)
+        {
+            if (index >= 0)
+                m_lastValidIndex = index;
+        }
+
+    private:
+        void commitRow(int row)
+        {
+            if (row < 0 || row >= count())
+                return;
+
+            setCurrentIndex(row);
+            m_lastValidIndex = row;
+
+            // A committed selection should display its actual text.
+            setEditText(itemText(row));
+
+            m_completer->popup()->hide();
+        }
+
+        void acceptFirstMatch()
+        {
+            if (m_filterModel->rowCount() == 0)
+            {
+                restoreLastValidSelection();
+                return;
+            }
+
+            const QModelIndex proxyIndex = m_filterModel->index(0, modelColumn());
+
+            if (!proxyIndex.isValid())
+                return;
+
+            const QModelIndex sourceIndex = m_filterModel->mapToSource(proxyIndex);
+
+            if (!sourceIndex.isValid())
+                return;
+
+            commitRow(sourceIndex.row());
+        }
+
+        void restoreLastValidSelection()
+        {
+            if (m_lastValidIndex < 0 || m_lastValidIndex >= count())
+            {
+                return;
+            }
+
+            const int row = m_lastValidIndex;
+
+            setCurrentIndex(row);
+            setEditText(itemText(row));
+        }
+
+    private:
+        QSortFilterProxyModel* m_filterModel;
+        QCompleter* m_completer;
+        int m_lastValidIndex;
+    };
 
     class SplitterHandle : public QSplitterHandle
     {
@@ -141,12 +404,17 @@ namespace erdo::ui
                 sections::BaseNameSection,
                 sections::AffinitySection,
                 sections::TypeSection,
-                sections::Stats,
-                sections::Requirements,
+                sections::BaseGameDLCSection,
+
+                sections::UpgradeLevelSection,
+                sections::TwoHandingSection,
                 sections::CharacterLevelSection,
-                sections::BaseGameDLCSection
+                sections::Stats,
+                sections::Requirements
             >{};
         }(0));
+
+        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
 
         QStandardItemModel *model;
         KDChart::Chart* chart;
@@ -335,6 +603,136 @@ namespace erdo::ui
             return new SplitterHandle(Qt::Vertical, this);
         }
 
+        bool edit_dataset_dialog_impl(calculator::FullAttackOptions& attack_options, QString title)
+        {
+            QDialog dialog(this);
+            dialog.setWindowTitle(title);
+
+            // create widgets
+            auto base_name_combobox = new SearchableComboBox(&dialog);
+            auto affinity_combobox = new QComboBox(&dialog);
+            auto upgrade_level_spinbox = new QSpinBox(&dialog);
+            upgrade_level_spinbox->setValue(attack_options.upgrade_level());
+            upgrade_level_spinbox->setMinimum(0);
+            auto two_handing_checkbox = new QCheckBox(&dialog);
+            two_handing_checkbox->setChecked(attack_options.two_handing);
+            auto buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+
+            std::set<
+                std::reference_wrapper<const calculator::Weapon>,
+                decltype([](const calculator::Weapon& a, const calculator::Weapon& b){
+                    return a.affinity < b.affinity;
+                })
+            > possible_weapons{};
+
+            auto set_weapon = [&](){
+                auto weapon_it = std::ranges::find(
+                    possible_weapons,
+                    static_cast<calculator::Weapon::Affinity>(affinity_combobox->currentData().toInt()),
+                    &calculator::Weapon::affinity
+                );
+                if (weapon_it == possible_weapons.end())
+                    throw std::runtime_error("No weapon found for selected affinity");
+
+                auto&& weapon = weapon_it->get();
+                attack_options.weapon = weapon;
+                upgrade_level_spinbox->setMaximum(weapon.max_upgrade_level());
+            };
+
+            // connect to weapon base name
+            connect(base_name_combobox, &QComboBox::currentTextChanged, [&](const QString& text){
+                possible_weapons.clear();
+                possible_weapons.insert_range(
+                    *this->active_weapon_data
+                    | std::views::filter([&](const calculator::Weapon& w) {
+                        return w.base_name.data() == text;
+                    })
+                );
+
+                auto blocker = QSignalBlocker(affinity_combobox);
+                affinity_combobox->clear();
+                for (auto&& affinity : possible_weapons
+                    | std::views::transform(&calculator::Weapon::affinity)
+                )
+                    affinity_combobox->addItem(enum_to_display(affinity), std::to_underlying(affinity));
+
+                set_weapon();
+            });
+
+            // connect to weapon affinity
+            connect(affinity_combobox, &QComboBox::currentIndexChanged, set_weapon);
+
+            // connect to upgrade level
+            connect(upgrade_level_spinbox, &QSpinBox::valueChanged, [&attack_options](int value){
+                attack_options.upgrade_levels.at(attack_options.weapon.get().upgrade_level_index) = value;
+            });
+
+            // connect to two-handing
+            connect(two_handing_checkbox, &QCheckBox::toggled, [&attack_options](bool checked){
+                attack_options.two_handing = checked;
+            });
+
+            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+            // create layout and add widgets
+            QFormLayout *form = new QFormLayout(&dialog);
+            form->addRow("Weapon Name:", base_name_combobox);
+            form->addRow("Weapon Affinity:", affinity_combobox);
+            form->addRow("Upgrade Level:", upgrade_level_spinbox);
+            form->addRow("Two-Handing:", two_handing_checkbox);
+
+            // character attributes spinboxes
+            for (auto [i, attribute] : enumerators_of<calculator::Attribute>() | std::views::enumerate)
+            {
+                auto attribute_spinbox = new QSpinBox();
+                attribute_spinbox->setValue(attack_options.stats.at(i));
+                attribute_spinbox->setMinimum(0);
+                attribute_spinbox->setMaximum(calculator::attribute_level_limit);
+
+                form->addRow(enum_to_display(attribute) + ":", attribute_spinbox);
+
+                connect(attribute_spinbox, &QSpinBox::valueChanged, [&, i](int value) {
+                    attack_options.stats.at(i) = value;
+                });
+            }
+
+            form->addRow(buttons);
+
+            // populate weapon base name
+            for (auto&& base_name : *this->active_weapon_data
+                | std::views::transform(&calculator::Weapon::base_name)
+                | std::ranges::to<std::set>()
+            )
+                base_name_combobox->addItem(QString::fromStdString(base_name));
+
+            return dialog.exec() == QDialog::Accepted;
+        }
+        void edit_dataset_dialog(int wi)
+        {
+            auto attack_options = this->weapon_table->model->rows.at(wi).attack;
+
+            auto dialog_was_accepted = this->edit_dataset_dialog_impl(attack_options, "Edit Dataset");
+
+            if (dialog_was_accepted)
+            {
+                this->weapon_table->model->update_row(wi, std::move(attack_options));
+                this->set_dataset_attributes(wi);
+                this->update_datasets(wi, 1);
+            }
+        }
+        void add_new_dataset_dialog()
+        {
+            calculator::FullAttackOptions attack_options{ calculator::Weapon::dummy, {}, {} };
+
+            auto dialog_was_accepted = this->edit_dataset_dialog_impl(attack_options, "Add New Dataset to Plot");
+
+            if (dialog_was_accepted)
+            {
+                this->add_datasets({ attack_options });
+            }
+        }
+
     public:
         void add_datasets(const std::vector<std::reference_wrapper<const calculator::FullAttackOptions>>& attacks_options)
         {
@@ -361,6 +759,11 @@ namespace erdo::ui
             this->update_datasets(current_dataset_count, attacks_options.size());
         }
 
+        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
+        {
+            this->active_weapon_data = std::move(active_weapon_data);
+        }
+
         explicit PlotTab(QWidget *parent = nullptr) : QSplitter(Qt::Orientation::Vertical, parent)
         {
             // add this dependency so Qt6PrintSupport.dll is pulled in for KDChart, no idea why that's necessary
@@ -376,12 +779,8 @@ namespace erdo::ui
                 pen.setColor(color);
                 this->plotter->setPen(i, pen);
             });
-            connect(this->weapon_table, &WeaponTable<Row>::edit_row, [this](int row_index){
-                throw std::runtime_error("Not implemented: add_new_to_plot");
-            });
-            connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, [this](){
-                throw std::runtime_error("Not implemented: add_new_to_plot");
-            });
+            connect(this->weapon_table, &WeaponTable<Row>::edit_row, this, &PlotTab::edit_dataset_dialog);
+            connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, this, &PlotTab::add_new_dataset_dialog);
 
             // plotting backend
             this->model = new QStandardItemModel(this);
@@ -529,4 +928,4 @@ namespace erdo::ui
     };
 }
 
-module : private;
+#include "plot_tab.moc"

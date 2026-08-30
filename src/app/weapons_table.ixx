@@ -62,7 +62,97 @@ namespace erdo::ui
             void update(const calculator::FullAttackOptions& attack_options) { }
         };
 
-        export struct BinaryTextSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
+        struct UnaryTextSection : SectionBase<std::array<QVariant, 1>>
+        {
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole || role == Qt::UserRole)
+                    return (*this)[0];
+                
+                return {};
+            }
+        };
+        export struct BaseNameSection : UnaryTextSection
+        {
+            static constexpr std::array column_names { "Base Name" };
+
+            using UnaryTextSection::UnaryTextSection;
+            explicit BaseNameSection(const calculator::FullAttackOptions& attack_options)
+            {
+                (*this)[0] = QString::fromStdString(attack_options.weapon.get().base_name);
+            }
+        };
+
+        struct AlignedUnaryTextSection : UnaryTextSection
+        {
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::TextAlignmentRole)
+                    return alignment_center;
+                
+                return this->UnaryTextSection::data(column, role);
+            }
+        };
+        export struct CharacterLevelSection : AlignedUnaryTextSection
+        {
+            static constexpr bool expand_section = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
+
+            static constexpr std::array column_names { "Character Level" };
+
+            using AlignedUnaryTextSection::AlignedUnaryTextSection;
+            explicit CharacterLevelSection(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
+            }
+
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                (*this)[0] = attack_options.stats.character_level();
+            }
+        };
+        export struct UpgradeLevelSection : AlignedUnaryTextSection
+        {
+            static constexpr bool expand_section = true;
+            static constexpr bool draw_section_header_labels_rotated = true;
+            
+            static constexpr std::array column_names { "Upgrade Level" };
+
+            using AlignedUnaryTextSection::AlignedUnaryTextSection;
+            explicit UpgradeLevelSection(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
+            }
+
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                (*this)[0] = attack_options.upgrade_level();
+            }
+        };
+
+        export struct ColorSection : SectionBase<std::array<QVariant, 1>>
+        {
+            static constexpr std::array column_names { "Color" };
+
+            using SectionBase::SectionBase;
+            explicit ColorSection(const calculator::FullAttackOptions& attack_options)
+            {
+                (*this)[0] = QColor();
+            }
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DecorationRole || role == Qt::EditRole || role == Qt::UserRole)
+                    return (*this)[0];
+
+                if (role == Qt::TextAlignmentRole)
+                    return alignment_center;
+
+                return {};
+            }
+        };
+
+        struct BinaryTextSection : SectionBase<std::array<std::array<QVariant, 2>, 1>>
         {
             QVariant data(int column, int role) const
             {
@@ -119,19 +209,9 @@ namespace erdo::ui
                 (*this)[0][1] = std::to_underlying(weapon.type);
             }
         };
-        export struct BaseGameDLCSection : BinaryTextSection
+
+        struct AlignedBinaryTextSection : BinaryTextSection
         {
-            static constexpr std::array column_names { "Base Game\nDLC" };
-
-            using BinaryTextSection::BinaryTextSection;
-            explicit BaseGameDLCSection(const calculator::FullAttackOptions& attack_options)
-            {
-                auto&& weapon = attack_options.weapon.get();
-
-                (*this)[0][0] = weapon.dlc ? "DLC" : "Base Game";
-                (*this)[0][1] = weapon.dlc;
-            }
-
             QVariant data(int column, int role) const
             {
                 if (role == Qt::TextAlignmentRole)
@@ -140,76 +220,36 @@ namespace erdo::ui
                 return this->BinaryTextSection::data(column, role);
             }
         };
-
-        export struct BaseNameSection : SectionBase<std::array<QVariant, 1>>
+        export struct BaseGameDLCSection : AlignedBinaryTextSection
         {
-            static constexpr std::array column_names { "Base Name" };
+            static constexpr std::array column_names { "Base Game\nDLC" };
 
-            using SectionBase::SectionBase;
-            explicit BaseNameSection(const calculator::FullAttackOptions& attack_options)
+            using AlignedBinaryTextSection::AlignedBinaryTextSection;
+            explicit BaseGameDLCSection(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0] = QString::fromStdString(attack_options.weapon.get().base_name);
-            }
+                auto&& weapon = attack_options.weapon.get();
 
-            QVariant data(int column, int role) const
-            {
-                if (role == Qt::DisplayRole || role == Qt::UserRole)
-                    return (*this)[column];
-                
-                return {};
+                (*this)[0][0] = weapon.dlc ? "DLC" : "Base Game";
+                (*this)[0][1] = weapon.dlc;
             }
         };
-
-        export struct ColorSection : SectionBase<std::array<QVariant, 1>>
-        {
-            static constexpr std::array column_names { "Color" };
-
-            using SectionBase::SectionBase;
-            explicit ColorSection(const calculator::FullAttackOptions& attack_options)
-            {
-                (*this)[0] = QColor();
-            }
-
-            QVariant data(int column, int role) const
-            {
-                if (role == Qt::DecorationRole || role == Qt::EditRole || role == Qt::UserRole)
-                    return (*this)[column];
-
-                if (role == Qt::TextAlignmentRole)
-                    return alignment_center;
-
-                return {};
-            }
-        };
-        
-        export struct CharacterLevelSection : SectionBase<std::array<QVariant, 1>>
+        export struct TwoHandingSection : AlignedBinaryTextSection
         {
             static constexpr bool expand_section = true;
             static constexpr bool draw_section_header_labels_rotated = true;
-            static constexpr bool draw_section_seperators = true;
 
-            static constexpr std::array column_names { "Character Level" };
+            static constexpr std::array column_names { "Two-Handing" };
 
-            using SectionBase::SectionBase;
-            explicit CharacterLevelSection(const calculator::FullAttackOptions& attack_options)
+            using AlignedBinaryTextSection::AlignedBinaryTextSection;
+            explicit TwoHandingSection(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
 
             void update(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0] = attack_options.stats.character_level();
-            }
-
-            QVariant data(int column, int role) const
-            {
-                if (role == Qt::DisplayRole || role == Qt::UserRole)
-                    return (*this)[column];
-                
-                if (role == Qt::TextAlignmentRole)
-                    return alignment_center;
-
-                return {};
+                (*this)[0][0] = attack_options.two_handing ? "yes" : "no";
+                (*this)[0][1] = attack_options.two_handing;
             }
         };
 
@@ -638,6 +678,14 @@ namespace erdo::ui
             this->rows.append_range(std::forward<decltype(rows)>(rows));
             this->endInsertRows();
         }
+        void update_row(int i, auto&& attack)
+        {
+            if (i < 0 || i >= this->rows.size())
+                throw std::invalid_argument("index out of bounds");
+
+            this->rows[i].update(std::move(attack));
+            emit dataChanged(this->index(i, 0), this->index(i, this->columnCount() - 1));
+        }
         void update_rows(std::ranges::sized_range auto&& attacks)
         {
             if (this->rows.size() != std::ranges::size(attacks))
@@ -986,13 +1034,6 @@ namespace erdo::ui
         bool is_plot_table;
 
         QTimer *resize_timer = new QTimer(this);
-        void resize_columns_to_contents_short_delay()
-        {
-            if (!this->isVisible())
-                return;
-
-            this->resize_timer->start(100);
-        }
         void resize_columns_to_contents_impl()
         {
             this->resize_timer->stop();
@@ -1123,7 +1164,7 @@ namespace erdo::ui
 
                 connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
                     this->header->set_section_hidden(section_index, !visible);
-                    this->resize_columns_to_contents_impl();
+                    this->resize_columns_to_contents();
                 });
             }
 
@@ -1219,7 +1260,7 @@ namespace erdo::ui
         {
             QTableView::showEvent(event);
 
-            this->resize_columns_to_contents_impl();
+            this->resize_columns_to_contents();
         }
     
     public:
@@ -1257,7 +1298,8 @@ namespace erdo::ui
             this->proxy_model->setFilterCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
             this->proxy_model->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
             connect(this->model, &RowModel<Row>::dataChanged, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents_short_delay);
+            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents);
+            connect(this->model, &RowModel<Row>::rowsInserted, this, &WeaponTable::resize_columns_to_contents);
 
             // header
             this->setHorizontalHeader(this->header);

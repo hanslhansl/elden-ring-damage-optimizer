@@ -374,6 +374,11 @@ export namespace erdo::calculator
             return std::format("{} +{}", this->full_name, upgrade_level);
         }
 
+        int max_upgrade_level() const
+        {
+            return max_upgrade_levels.at(this->upgrade_level_index);
+        }
+
         static const Weapon dummy;
     };
     const Weapon Weapon::dummy { .upgrade_level_index = 0 };

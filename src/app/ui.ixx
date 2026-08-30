@@ -262,7 +262,7 @@ namespace erdo::ui
             for (int i = 0; i < this->base_name_list->count(); ++i)
             {
                 auto item = this->base_name_list->item(i);
-                const QString base_name = item->data(Qt::UserRole).toString();
+                const QString base_name = item->text();
                 auto visible = visible_base_names.isEmpty() || visible_base_names.contains(base_name.toStdString());
                 item->setHidden(!visible);
                 if (visible && item->isSelected())
@@ -303,17 +303,18 @@ namespace erdo::ui
                 sections::BaseNameSection,
                 sections::AffinitySection,
                 sections::TypeSection,
+                sections::BaseGameDLCSection,
+
+                sections::UpgradeLevelSection,
+                sections::TwoHandingSection,
+                sections::CharacterLevelSection,
+                sections::Stats,
+                sections::Requirements,
                 sections::AttackPowers,
                 sections::StatusEffects,
                 sections::SpellScaling,
                 sections::AttributeScalings,
-                sections::Stats,
-                sections::Requirements,
-                sections::CharacterLevelSection,
-
-                sections::AttackPowerTypeAttributeScalings<apts>...,
-
-                sections::BaseGameDLCSection
+                sections::AttackPowerTypeAttributeScalings<apts>...
             >{};
         }(1));
 
@@ -400,6 +401,9 @@ namespace erdo::ui
 
             // weapon table view
             this->weapon_table = new WeaponTable<Row>(false, this);
+            this->weapon_table->set_section_hidden<sections::UpgradeLevelSection>(true);
+            this->weapon_table->set_section_hidden<sections::TwoHandingSection>(true);
+
             this->main_layout->addWidget(this->weapon_table, 1);
         };
 
@@ -459,7 +463,6 @@ namespace erdo::ui
             )
             {
                 auto item = new QListWidgetItem(QString::fromStdString(base_name), this->base_name_list);
-                item->setData(Qt::UserRole, QString::fromStdString(base_name));
             }
 
             // affinity list widget
@@ -517,8 +520,8 @@ namespace erdo::ui
             );
 
             // weapon table view
-            this->weapon_table->set_section_hidden<sections::Stats>(true);
             this->weapon_table->set_section_hidden<sections::CharacterLevelSection>(true);
+            this->weapon_table->set_section_hidden<sections::Stats>(true);
         }
 
         void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
@@ -541,12 +544,6 @@ namespace erdo::ui
                     return Row(attack);
                 })
                 | std::ranges::to<std::vector>());
-
-            QMessageBox::information(
-                this,
-                "Info",
-                QString::fromStdString(std::format("Successfully loaded {} weapons.", this->active_weapon_data->size()))
-            );
         }
         
         void calculate_weapon_stats()
@@ -776,6 +773,13 @@ namespace erdo::ui
 
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
+            this->plot->set_active_weapon_data(this->active_weapon_data);
+
+            QMessageBox::information(
+                this,
+                "Info",
+                QString::fromStdString(std::format("Successfully loaded {} weapons.", this->active_weapon_data->size()))
+            );
         }
 
         QAction* add_weapon_data(std::filesystem::path dir)
