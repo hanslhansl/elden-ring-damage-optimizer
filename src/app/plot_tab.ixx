@@ -784,12 +784,10 @@ namespace erdo::ui
 
                 const QString text = base_name_combobox->itemText(index);
 
+                auto first_invocation = possible_weapons.empty();
                 possible_weapons.clear();
                 possible_weapons.insert_range(
-                    *this->active_weapon_data
-                    | std::views::filter([&](const calculator::Weapon& w) {
-                        return w.base_name.data() == text;
-                    })
+                    *this->active_weapon_data | std::views::filter([&](const calculator::Weapon& w) { return w.base_name.data() == text; })
                 );
                 if (possible_weapons.empty())
                     throw std::runtime_error(std::format("No weapons found for base name: {}", text.toStdString()));
@@ -799,7 +797,11 @@ namespace erdo::ui
                 for (auto&& affinity : possible_weapons
                     | std::views::transform(&calculator::Weapon::affinity)
                 )
+                {
                     affinity_combobox->addItem(enum_to_display(affinity), std::to_underlying(affinity));
+                    if(first_invocation && affinity == attack_options.weapon.get().affinity)
+                        affinity_combobox->setCurrentIndex(affinity_combobox->count() - 1);
+                }
 
                 set_weapon();
             });
@@ -845,11 +847,19 @@ namespace erdo::ui
             form->addRow(buttons);
 
             // populate weapon base name
+            auto blocker = QSignalBlocker(base_name_combobox);
             for (auto&& base_name : *this->active_weapon_data
                 | std::views::transform(&calculator::Weapon::base_name)
                 | std::ranges::to<std::set>()
             )
+            {
+                if (base_name == attack_options.weapon.get().base_name)
+                    blocker.unblock();
                 base_name_combobox->addItem(QString::fromStdString(base_name));
+                if (base_name == attack_options.weapon.get().base_name)
+                    base_name_combobox->setCurrentIndex(base_name_combobox->count() - 1);
+                
+            }
 
             return dialog.exec() == QDialog::Accepted;
         }
