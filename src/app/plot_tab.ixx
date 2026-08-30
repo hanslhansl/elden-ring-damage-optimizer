@@ -85,260 +85,392 @@ namespace erdo::ui
         return std::array{ VariableProjection<variables>::operator()... };
     }(1);
 
-    class SearchableComboBox : public QComboBox
+
+class SearchableComboBox : public QComboBox
+{
+    Q_OBJECT
+
+public:
+    explicit SearchableComboBox(QWidget* parent = nullptr)
+        : QComboBox(parent)
+        , m_filterModel(new QSortFilterProxyModel(this))
+        , m_completer(new QCompleter(m_filterModel, this))
+        , m_lastValidIndex(-1)
+        , m_updatePending(false)
+        , m_internalUpdate(false)
     {
-        Q_OBJECT
+        setFocusPolicy(Qt::ClickFocus);
+        setEditable(true);
+        setInsertPolicy(QComboBox::NoInsert);
 
-    public:
-        explicit SearchableComboBox(QWidget* parent = nullptr)
-            : QComboBox(parent) , m_filterModel(new QSortFilterProxyModel(this)) , m_completer(new QCompleter(m_filterModel, this)) , m_lastValidIndex(-1)
+        // ------------------------------------------------------------------
+        // Filter model
+        // ------------------------------------------------------------------
+
+        m_filterModel->setSourceModel(model());
+        m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+        m_filterModel->setFilterRole(Qt::DisplayRole);
+        m_filterModel->setFilterKeyColumn(modelColumn());
+
+        // ------------------------------------------------------------------
+        // Completer
+        // ------------------------------------------------------------------
+
+        m_completer->setCompletionMode(
+            QCompleter::UnfilteredPopupCompletion
+        );
+        m_completer->setCaseSensitivity(Qt::CaseInsensitive);
+        m_completer->setCompletionRole(Qt::DisplayRole);
+        m_completer->setCompletionColumn(modelColumn());
+
+        setCompleter(m_completer);
+
+        // ------------------------------------------------------------------
+        // Signals
+        // ------------------------------------------------------------------
+
+        connect(
+            lineEdit(),
+            &QLineEdit::textEdited,
+            this,
+            &SearchableComboBox::onTextEdited
+        );
+
+        connect(
+            m_completer,
+            qOverload<const QModelIndex&>(&QCompleter::activated),
+            this,
+            &SearchableComboBox::onCompleterActivated
+        );
+
+        connect(
+            this,
+            &QComboBox::currentIndexChanged,
+            this,
+            &SearchableComboBox::onCurrentIndexChanged
+        );
+
+        if (currentIndex() >= 0)
+            m_lastValidIndex = currentIndex();
+    }
+
+    // ----------------------------------------------------------------------
+    // Model handling
+    // ----------------------------------------------------------------------
+
+    void setModel(QAbstractItemModel* model) override
+    {
+        QComboBox::setModel(model);
+
+        m_filterModel->setSourceModel(model);
+        updateModelColumn();
+
+        m_completer->setModel(m_filterModel);
+
+        if (currentIndex() >= 0)
+            m_lastValidIndex = currentIndex();
+        else
+            m_lastValidIndex = -1;
+    }
+
+    /*
+     * QComboBox::setModelColumn() is not virtual, hence no "override".
+     */
+    void setModelColumn(int column)
+    {
+        QComboBox::setModelColumn(column);
+        updateModelColumn();
+    }
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override
+    {
+        // --------------------------------------------------------------
+        // Enter / Return
+        //
+        // Complete the current partial search with the first match.
+        // --------------------------------------------------------------
+
+        if (event->key() == Qt::Key_Return ||
+            event->key() == Qt::Key_Enter)
         {
-            setFocusPolicy(Qt::ClickFocus);
-            setEditable(true);
-            setInsertPolicy(QComboBox::NoInsert);
-
-            // ------------------------------------------------------------------
-            // Filter model
-            // ------------------------------------------------------------------
-
-            m_filterModel->setSourceModel(model());
-            m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-            m_filterModel->setFilterRole(Qt::DisplayRole);
-            m_filterModel->setFilterKeyColumn(modelColumn());
-
-            // ------------------------------------------------------------------
-            // Completer
-            // ------------------------------------------------------------------
-
-            m_completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
-            m_completer->setCaseSensitivity(Qt::CaseInsensitive);
-            m_completer->setCompletionRole(Qt::DisplayRole);
-            m_completer->setCompletionColumn(modelColumn());
-
-            setCompleter(m_completer);
-
-            // ------------------------------------------------------------------
-            // Signals
-            // ------------------------------------------------------------------
-
-            connect(
-                lineEdit(),
-                &QLineEdit::textEdited,
-                this,
-                &SearchableComboBox::onTextEdited
-            );
-
-            connect(
-                m_completer,
-                qOverload<const QModelIndex&>(&QCompleter::activated),
-                this,
-                &SearchableComboBox::onCompleterActivated
-            );
-
-            connect(
-                this,
-                &QComboBox::currentIndexChanged,
-                this,
-                &SearchableComboBox::onCurrentIndexChanged
-            );
+            acceptFirstMatch();
+            event->accept();
+            return;
         }
 
-    protected:
-        void keyPressEvent(QKeyEvent* event) override
+        // --------------------------------------------------------------
+        // Escape
+        // --------------------------------------------------------------
+
+        if (event->key() == Qt::Key_Escape)
         {
-            // --------------------------------------------------------------
-            // Enter / Return
-            //
-            // Complete the search by committing the first matching item.
-            // --------------------------------------------------------------
-
-            if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
-            {
-                acceptFirstMatch();
-                event->accept();
-                return;
-            }
-
-            // --------------------------------------------------------------
-            // Escape
-            //
-            // Cancel the current search and restore the last valid item.
-            // --------------------------------------------------------------
-
-            if (event->key() == Qt::Key_Escape)
-            {
-                m_completer->popup()->hide();
-                restoreLastValidSelection();
-
-                event->accept();
-                return;
-            }
-
-            QComboBox::keyPressEvent(event);
-        }
-
-        void focusOutEvent(QFocusEvent* event) override
-        {
-            // The search text is temporary. Once focus leaves, restore the
-            // committed item's text.
             m_completer->popup()->hide();
             restoreLastValidSelection();
 
-            QComboBox::focusOutEvent(event);
+            event->accept();
+            return;
         }
 
-    public slots:
-        void setModel(QAbstractItemModel* model) override
+        QComboBox::keyPressEvent(event);
+    }
+
+    void focusOutEvent(QFocusEvent* event) override
+    {
+        m_completer->popup()->hide();
+        restoreLastValidSelection();
+
+        QComboBox::focusOutEvent(event);
+    }
+
+private slots:
+
+    void onTextEdited(const QString& text)
+    {
+        /*
+         * Do not immediately modify currentIndex().
+         *
+         * QComboBox has its own internal handling of edits to an editable
+         * combo. In particular, when the text becomes empty, that handling
+         * can change the current index and/or line-edit contents.
+         *
+         * Queue our processing so QComboBox has finished processing the
+         * user's edit first.
+         */
+        m_pendingSearchText = text;
+
+        if (m_updatePending)
+            return;
+
+        m_updatePending = true;
+
+        QTimer::singleShot(
+            0,
+            this,
+            &SearchableComboBox::processPendingSearch
+        );
+    }
+
+    void processPendingSearch()
+    {
+        m_updatePending = false;
+
+        if (m_internalUpdate)
+            return;
+
+        const QString searchText = m_pendingSearchText;
+
+        // Remember the cursor position from the actual current edit.
+        const int cursorPosition = lineEdit()->cursorPosition();
+
+        // --------------------------------------------------------------
+        // Filter
+        // --------------------------------------------------------------
+
+        m_filterModel->setFilterRegularExpression(
+            QRegularExpression::escape(searchText)
+        );
+
+        // --------------------------------------------------------------
+        // No matches
+        // --------------------------------------------------------------
+
+        if (m_filterModel->rowCount() == 0)
         {
-            QComboBox::setModel(model);
+            m_completer->popup()->hide();
 
-            m_filterModel->setSourceModel(model);
-            m_filterModel->setFilterKeyColumn(modelColumn());
-
-            m_completer->setModel(m_filterModel);
-            m_completer->setCompletionColumn(modelColumn());
-
-            if (currentIndex() >= 0)
-                m_lastValidIndex = currentIndex();
-            else
-                m_lastValidIndex = -1;
+            /*
+             * The current selection remains untouched.
+             *
+             * Restore the search text after QComboBox's own processing.
+             */
+            restoreSearchText(searchText, cursorPosition);
+            return;
         }
 
-        void setModelColumn(int column)
+        // --------------------------------------------------------------
+        // First match
+        // --------------------------------------------------------------
+
+        const QModelIndex proxyIndex =
+            m_filterModel->index(0, modelColumn());
+
+        if (!proxyIndex.isValid())
+            return;
+
+        const QModelIndex sourceIndex =
+            m_filterModel->mapToSource(proxyIndex);
+
+        if (!sourceIndex.isValid())
+            return;
+
+        const int row = sourceIndex.row();
+
+        /*
+         * Changing the current index causes an editable QComboBox to update
+         * its line edit. That is exactly what we do NOT want while searching.
+         */
+        m_internalUpdate = true;
+
+        setCurrentIndex(row);
+        m_lastValidIndex = row;
+
+        m_internalUpdate = false;
+
+        // Put the user's search text back.
+        restoreSearchText(searchText, cursorPosition);
+
+        // --------------------------------------------------------------
+        // Popup
+        // --------------------------------------------------------------
+
+        if (searchText.isEmpty())
         {
-            QComboBox::setModelColumn(column);
-
-            m_filterModel->setFilterKeyColumn(column);
-            m_completer->setCompletionColumn(column);
-        }
-
-    private slots:
-        void onTextEdited(const QString& text)
-        {
-            // Escape the user input so it is treated as literal text rather
-            // than regular-expression syntax.
-            const QString pattern = QRegularExpression::escape(text);
-
-            m_filterModel->setFilterRegularExpression(pattern);
-
-            // No match: keep the existing valid selection.
-            if (m_filterModel->rowCount() == 0)
-            {
-                m_completer->popup()->hide();
-                return;
-            }
-
-            // Select the first matching item.
-            const QModelIndex proxyIndex = m_filterModel->index(0, modelColumn());
-
-            if (!proxyIndex.isValid())
-                return;
-
-            const QModelIndex sourceIndex = m_filterModel->mapToSource(proxyIndex);
-
-            if (!sourceIndex.isValid())
-                return;
-
-            // IMPORTANT:
-            //
-            // setCurrentIndex() on an editable QComboBox changes the line-edit
-            // text as well. Save the search text and cursor position, change
-            // the current item, then restore the search text.
-            const QString searchText = text;
-            const int cursorPosition = lineEdit()->cursorPosition();
-
-            setCurrentIndex(sourceIndex.row());
-            m_lastValidIndex = sourceIndex.row();
-
-            setEditText(searchText);
-
-            lineEdit()->setCursorPosition(qMin(cursorPosition, searchText.length()));
-
-            // Show the filtered results while typing.
-            if (!searchText.isEmpty())
-                m_completer->complete();
-            else
-                m_completer->popup()->hide();
-        }
-
-        void onCompleterActivated(const QModelIndex& index)
-        {
-            if (!index.isValid())
-                return;
-
-            // QCompleter can potentially emit an index from another model.
-            // Only map indexes that actually belong to our proxy model.
-            if (index.model() != m_filterModel)
-                return;
-
-            const QModelIndex sourceIndex = m_filterModel->mapToSource(index);
-
-            if (!sourceIndex.isValid())
-                return;
-
-            commitRow(sourceIndex.row());
-        }
-
-        void onCurrentIndexChanged(int index)
-        {
-            if (index >= 0)
-                m_lastValidIndex = index;
-        }
-
-    private:
-        void commitRow(int row)
-        {
-            if (row < 0 || row >= count())
-                return;
-
-            setCurrentIndex(row);
-            m_lastValidIndex = row;
-
-            // A committed selection should display its actual text.
-            setEditText(itemText(row));
-
             m_completer->popup()->hide();
         }
-
-        void acceptFirstMatch()
+        else
         {
-            if (m_filterModel->rowCount() == 0)
-            {
-                restoreLastValidSelection();
-                return;
-            }
+            m_completer->complete();
+        }
+    }
 
-            const QModelIndex proxyIndex = m_filterModel->index(0, modelColumn());
+    void onCompleterActivated(const QModelIndex& index)
+    {
+        if (!index.isValid())
+            return;
 
-            if (!proxyIndex.isValid())
-                return;
+        if (index.model() != m_filterModel)
+            return;
 
-            const QModelIndex sourceIndex = m_filterModel->mapToSource(proxyIndex);
+        const QModelIndex sourceIndex =
+            m_filterModel->mapToSource(index);
 
-            if (!sourceIndex.isValid())
-                return;
+        if (!sourceIndex.isValid())
+            return;
 
-            commitRow(sourceIndex.row());
+        commitRow(sourceIndex.row());
+    }
+
+    void onCurrentIndexChanged(int index)
+    {
+        /*
+         * Only remember real selections.
+         *
+         * During user editing QComboBox may temporarily move to -1.
+         * That must never replace our last valid selection.
+         */
+        if (index >= 0)
+            m_lastValidIndex = index;
+    }
+
+private:
+
+    void updateModelColumn()
+    {
+        const int column = modelColumn();
+
+        m_filterModel->setFilterKeyColumn(column);
+        m_completer->setCompletionColumn(column);
+    }
+
+    void restoreSearchText(
+        const QString& text,
+        int cursorPosition)
+    {
+        /*
+         * Block QLineEdit signals so restoring the search text does not
+         * trigger another search cycle.
+         */
+        const QSignalBlocker blocker(lineEdit());
+
+        lineEdit()->setText(text);
+
+        lineEdit()->setCursorPosition(
+            qMin(cursorPosition, text.size())
+        );
+    }
+
+    void commitRow(int row)
+    {
+        if (row < 0 || row >= count())
+            return;
+
+        m_internalUpdate = true;
+
+        setCurrentIndex(row);
+        m_lastValidIndex = row;
+
+        // A real committed selection displays its complete item text.
+        setEditText(itemText(row));
+
+        m_internalUpdate = false;
+
+        m_completer->popup()->hide();
+    }
+
+    void acceptFirstMatch()
+    {
+        if (m_filterModel->rowCount() == 0)
+        {
+            restoreLastValidSelection();
+            return;
         }
 
-        void restoreLastValidSelection()
+        const QModelIndex proxyIndex =
+            m_filterModel->index(0, modelColumn());
+
+        if (!proxyIndex.isValid())
+            return;
+
+        const QModelIndex sourceIndex =
+            m_filterModel->mapToSource(proxyIndex);
+
+        if (!sourceIndex.isValid())
+            return;
+
+        commitRow(sourceIndex.row());
+    }
+
+    void restoreLastValidSelection()
+    {
+        if (m_lastValidIndex < 0 ||
+            m_lastValidIndex >= count())
         {
-            if (m_lastValidIndex < 0 || m_lastValidIndex >= count())
-            {
-                return;
-            }
-
-            const int row = m_lastValidIndex;
-
-            setCurrentIndex(row);
-            setEditText(itemText(row));
+            return;
         }
 
-    private:
-        QSortFilterProxyModel* m_filterModel;
-        QCompleter* m_completer;
-        int m_lastValidIndex;
-    };
+        const int row = m_lastValidIndex;
+
+        m_internalUpdate = true;
+
+        setCurrentIndex(row);
+        setEditText(itemText(row));
+
+        m_internalUpdate = false;
+    }
+
+private:
+    QSortFilterProxyModel* m_filterModel;
+    QCompleter* m_completer;
+
+    int m_lastValidIndex;
+
+    // Search processing is queued to the event loop.
+    bool m_updatePending;
+
+    // True while we deliberately modify the combo/edit ourselves.
+    bool m_internalUpdate;
+
+    QString m_pendingSearchText;
+};
+
+
+
+
+
+
+
+
 
     class SplitterHandle : public QSplitterHandle
     {
