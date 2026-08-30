@@ -776,12 +776,6 @@ namespace erdo::ui
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
             this->plot->set_active_weapon_data(this->active_weapon_data);
-
-            QMessageBox::information(
-                this,
-                "Info",
-                QString::fromStdString(std::format("Successfully loaded {} weapons.", this->active_weapon_data->size()))
-            );
         }
 
         QAction* add_weapon_data(std::filesystem::path dir)

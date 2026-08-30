@@ -640,7 +640,12 @@ namespace erdo::ui
             };
 
             // connect to weapon base name
-            connect(base_name_combobox, &QComboBox::currentTextChanged, [&](const QString& text){
+            connect(base_name_combobox, &QComboBox::currentIndexChanged, [&](int index){
+                if (index < 0)
+                    throw std::runtime_error("Invalid base name index");
+
+                const QString text = base_name_combobox->itemText(index);
+
                 possible_weapons.clear();
                 possible_weapons.insert_range(
                     *this->active_weapon_data
@@ -648,6 +653,8 @@ namespace erdo::ui
                         return w.base_name.data() == text;
                     })
                 );
+                if (possible_weapons.empty())
+                    throw std::runtime_error(std::format("No weapons found for base name: {}", text.toStdString()));
 
                 auto blocker = QSignalBlocker(affinity_combobox);
                 affinity_combobox->clear();
