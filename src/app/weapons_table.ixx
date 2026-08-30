@@ -1184,8 +1184,48 @@ namespace erdo::ui
 
             QMenu menu(this);
 
+            if (is_plot_table)
+            {
+                menu.addAction("Add New Dataset", [&](){
+                    emit this->add_new_to_plot();
+                });
+            }
+
             if(row_indices.size() > 0)
             {
+                menu.addSeparator();
+                
+                if (is_plot_table)
+                {
+                    if (row_indices.size() == 1)
+                    {
+                        menu.addAction(
+                            QString::fromStdString(std::format("Edit {}", selection_name)),
+                            [&](){ emit this->edit_row(row_indices.front()); }
+                        );
+                    }
+
+                    menu.addAction(
+                        QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
+                        [&](){ emit this->remove_selection_from_plot(row_indices); }
+                    );
+                }
+                else
+                {
+                    menu.addAction(
+                        QString::fromStdString(std::format("Add {} to Plot", selection_name)),
+                        [&](){
+                            emit this->add_selection_to_plot(row_indices
+                                | std::views::transform([this](auto row_index){
+                                    return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
+                                })
+                                | std::ranges::to<std::vector>()
+                            );
+                        }
+                    );
+                }
+                
+                menu.addSeparator();
                 menu.addAction(
                     QString::fromStdString(std::format("Show {} on Fandom", selection_name)),
                     [&](){
@@ -1200,49 +1240,6 @@ namespace erdo::ui
                             QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
                     }
                 );
-            }
-
-            if(!is_plot_table && row_indices.size() > 0)
-            {
-                menu.addSeparator();
-                menu.addAction(
-                    QString::fromStdString(std::format("Add {} to Plot", selection_name)),
-                    [&](){
-                        emit this->add_selection_to_plot(row_indices
-                            | std::views::transform([this](auto row_index){
-                                return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
-                            })
-                            | std::ranges::to<std::vector>()
-                        );
-                    }
-                );
-            }
-
-            if (is_plot_table && row_indices.size() > 0)
-                menu.addSeparator();
-
-            if (is_plot_table && row_indices.size() == 1)
-            {
-                menu.addAction(
-                    QString::fromStdString(std::format("Edit {}", selection_name)),
-                    [&](){ emit this->edit_row(row_indices.front()); }
-                );
-            }
-
-            if (is_plot_table && row_indices.size() > 0)
-            {
-                menu.addAction(
-                    QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
-                    [&](){ emit this->remove_selection_from_plot(row_indices); }
-                );
-                menu.addSeparator();
-            }
-
-            if (is_plot_table)
-            {
-                menu.addAction("Add New Dataset", [&](){
-                    emit this->add_new_to_plot();
-                });
             }
 
             menu.exec(this->viewport()->mapToGlobal(pos));

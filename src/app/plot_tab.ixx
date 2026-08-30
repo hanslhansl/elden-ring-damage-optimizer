@@ -31,6 +31,7 @@ import erdo;
 import erdo.ui.settings;
 import erdo.ui.weapons_table;
 
+
 namespace erdo::ui
 {
     enum class PlotVariable
@@ -44,7 +45,6 @@ namespace erdo::ui
         UPGRADE_LEVEL
     };
 }
-
 using namespace erdo;
 template<>
 constexpr std::array<std::pair<ui::PlotVariable, std::string_view>, 6> enum_string_mapping<ui::PlotVariable> = {
@@ -85,392 +85,383 @@ namespace erdo::ui
         return std::array{ VariableProjection<variables>::operator()... };
     }(1);
 
-
-class SearchableComboBox : public QComboBox
-{
-    Q_OBJECT
-
-public:
-    explicit SearchableComboBox(QWidget* parent = nullptr)
-        : QComboBox(parent)
-        , m_filterModel(new QSortFilterProxyModel(this))
-        , m_completer(new QCompleter(m_filterModel, this))
-        , m_lastValidIndex(-1)
-        , m_updatePending(false)
-        , m_internalUpdate(false)
+    class SearchableComboBox : public QComboBox
     {
-        setFocusPolicy(Qt::ClickFocus);
-        setEditable(true);
-        setInsertPolicy(QComboBox::NoInsert);
+        Q_OBJECT
 
-        // ------------------------------------------------------------------
-        // Filter model
-        // ------------------------------------------------------------------
-
-        m_filterModel->setSourceModel(model());
-        m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-        m_filterModel->setFilterRole(Qt::DisplayRole);
-        m_filterModel->setFilterKeyColumn(modelColumn());
-
-        // ------------------------------------------------------------------
-        // Completer
-        // ------------------------------------------------------------------
-
-        m_completer->setCompletionMode(
-            QCompleter::UnfilteredPopupCompletion
-        );
-        m_completer->setCaseSensitivity(Qt::CaseInsensitive);
-        m_completer->setCompletionRole(Qt::DisplayRole);
-        m_completer->setCompletionColumn(modelColumn());
-
-        setCompleter(m_completer);
-
-        // ------------------------------------------------------------------
-        // Signals
-        // ------------------------------------------------------------------
-
-        connect(
-            lineEdit(),
-            &QLineEdit::textEdited,
-            this,
-            &SearchableComboBox::onTextEdited
-        );
-
-        connect(
-            m_completer,
-            qOverload<const QModelIndex&>(&QCompleter::activated),
-            this,
-            &SearchableComboBox::onCompleterActivated
-        );
-
-        connect(
-            this,
-            &QComboBox::currentIndexChanged,
-            this,
-            &SearchableComboBox::onCurrentIndexChanged
-        );
-
-        if (currentIndex() >= 0)
-            m_lastValidIndex = currentIndex();
-    }
-
-    // ----------------------------------------------------------------------
-    // Model handling
-    // ----------------------------------------------------------------------
-
-    void setModel(QAbstractItemModel* model) override
-    {
-        QComboBox::setModel(model);
-
-        m_filterModel->setSourceModel(model);
-        updateModelColumn();
-
-        m_completer->setModel(m_filterModel);
-
-        if (currentIndex() >= 0)
-            m_lastValidIndex = currentIndex();
-        else
-            m_lastValidIndex = -1;
-    }
-
-    /*
-     * QComboBox::setModelColumn() is not virtual, hence no "override".
-     */
-    void setModelColumn(int column)
-    {
-        QComboBox::setModelColumn(column);
-        updateModelColumn();
-    }
-
-protected:
-    void keyPressEvent(QKeyEvent* event) override
-    {
-        // --------------------------------------------------------------
-        // Enter / Return
-        //
-        // Complete the current partial search with the first match.
-        // --------------------------------------------------------------
-
-        if (event->key() == Qt::Key_Return ||
-            event->key() == Qt::Key_Enter)
+    public:
+        explicit SearchableComboBox(QWidget* parent = nullptr)
+            : QComboBox(parent)
+            , m_filterModel(new QSortFilterProxyModel(this))
+            , m_completer(new QCompleter(m_filterModel, this))
+            , m_lastValidIndex(-1)
+            , m_updatePending(false)
+            , m_internalUpdate(false)
         {
-            acceptFirstMatch();
-            event->accept();
-            return;
+            setFocusPolicy(Qt::ClickFocus);
+            setEditable(true);
+            setInsertPolicy(QComboBox::NoInsert);
+
+            // ------------------------------------------------------------------
+            // Filter model
+            // ------------------------------------------------------------------
+
+            m_filterModel->setSourceModel(model());
+            m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+            m_filterModel->setFilterRole(Qt::DisplayRole);
+            m_filterModel->setFilterKeyColumn(modelColumn());
+
+            // ------------------------------------------------------------------
+            // Completer
+            // ------------------------------------------------------------------
+
+            m_completer->setCompletionMode(
+                QCompleter::UnfilteredPopupCompletion
+            );
+            m_completer->setCaseSensitivity(Qt::CaseInsensitive);
+            m_completer->setCompletionRole(Qt::DisplayRole);
+            m_completer->setCompletionColumn(modelColumn());
+
+            setCompleter(m_completer);
+
+            // ------------------------------------------------------------------
+            // Signals
+            // ------------------------------------------------------------------
+
+            connect(
+                lineEdit(),
+                &QLineEdit::textEdited,
+                this,
+                &SearchableComboBox::onTextEdited
+            );
+
+            connect(
+                m_completer,
+                qOverload<const QModelIndex&>(&QCompleter::activated),
+                this,
+                &SearchableComboBox::onCompleterActivated
+            );
+
+            connect(
+                this,
+                &QComboBox::currentIndexChanged,
+                this,
+                &SearchableComboBox::onCurrentIndexChanged
+            );
+
+            if (currentIndex() >= 0)
+                m_lastValidIndex = currentIndex();
         }
 
-        // --------------------------------------------------------------
-        // Escape
-        // --------------------------------------------------------------
+        // ----------------------------------------------------------------------
+        // Model handling
+        // ----------------------------------------------------------------------
 
-        if (event->key() == Qt::Key_Escape)
+        void setModel(QAbstractItemModel* model) override
+        {
+            QComboBox::setModel(model);
+
+            m_filterModel->setSourceModel(model);
+            updateModelColumn();
+
+            m_completer->setModel(m_filterModel);
+
+            if (currentIndex() >= 0)
+                m_lastValidIndex = currentIndex();
+            else
+                m_lastValidIndex = -1;
+        }
+
+        /*
+        * QComboBox::setModelColumn() is not virtual, hence no "override".
+        */
+        void setModelColumn(int column)
+        {
+            QComboBox::setModelColumn(column);
+            updateModelColumn();
+        }
+
+    protected:
+        void keyPressEvent(QKeyEvent* event) override
+        {
+            // --------------------------------------------------------------
+            // Enter / Return
+            //
+            // Complete the current partial search with the first match.
+            // --------------------------------------------------------------
+
+            if (event->key() == Qt::Key_Return ||
+                event->key() == Qt::Key_Enter)
+            {
+                acceptFirstMatch();
+                event->accept();
+                return;
+            }
+
+            // --------------------------------------------------------------
+            // Escape
+            // --------------------------------------------------------------
+
+            if (event->key() == Qt::Key_Escape)
+            {
+                m_completer->popup()->hide();
+                restoreLastValidSelection();
+
+                event->accept();
+                return;
+            }
+
+            QComboBox::keyPressEvent(event);
+        }
+
+        void focusOutEvent(QFocusEvent* event) override
         {
             m_completer->popup()->hide();
             restoreLastValidSelection();
 
-            event->accept();
-            return;
+            QComboBox::focusOutEvent(event);
         }
 
-        QComboBox::keyPressEvent(event);
-    }
+    private slots:
 
-    void focusOutEvent(QFocusEvent* event) override
-    {
-        m_completer->popup()->hide();
-        restoreLastValidSelection();
-
-        QComboBox::focusOutEvent(event);
-    }
-
-private slots:
-
-    void onTextEdited(const QString& text)
-    {
-        /*
-         * Do not immediately modify currentIndex().
-         *
-         * QComboBox has its own internal handling of edits to an editable
-         * combo. In particular, when the text becomes empty, that handling
-         * can change the current index and/or line-edit contents.
-         *
-         * Queue our processing so QComboBox has finished processing the
-         * user's edit first.
-         */
-        m_pendingSearchText = text;
-
-        if (m_updatePending)
-            return;
-
-        m_updatePending = true;
-
-        QTimer::singleShot(
-            0,
-            this,
-            &SearchableComboBox::processPendingSearch
-        );
-    }
-
-    void processPendingSearch()
-    {
-        m_updatePending = false;
-
-        if (m_internalUpdate)
-            return;
-
-        const QString searchText = m_pendingSearchText;
-
-        // Remember the cursor position from the actual current edit.
-        const int cursorPosition = lineEdit()->cursorPosition();
-
-        // --------------------------------------------------------------
-        // Filter
-        // --------------------------------------------------------------
-
-        m_filterModel->setFilterRegularExpression(
-            QRegularExpression::escape(searchText)
-        );
-
-        // --------------------------------------------------------------
-        // No matches
-        // --------------------------------------------------------------
-
-        if (m_filterModel->rowCount() == 0)
+        void onTextEdited(const QString& text)
         {
-            m_completer->popup()->hide();
+            /*
+            * Do not immediately modify currentIndex().
+            *
+            * QComboBox has its own internal handling of edits to an editable
+            * combo. In particular, when the text becomes empty, that handling
+            * can change the current index and/or line-edit contents.
+            *
+            * Queue our processing so QComboBox has finished processing the
+            * user's edit first.
+            */
+            m_pendingSearchText = text;
+
+            if (m_updatePending)
+                return;
+
+            m_updatePending = true;
+
+            QTimer::singleShot(
+                0,
+                this,
+                &SearchableComboBox::processPendingSearch
+            );
+        }
+
+        void processPendingSearch()
+        {
+            m_updatePending = false;
+
+            if (m_internalUpdate)
+                return;
+
+            const QString searchText = m_pendingSearchText;
+
+            // Remember the cursor position from the actual current edit.
+            const int cursorPosition = lineEdit()->cursorPosition();
+
+            // --------------------------------------------------------------
+            // Filter
+            // --------------------------------------------------------------
+
+            m_filterModel->setFilterRegularExpression(
+                QRegularExpression::escape(searchText)
+            );
+
+            // --------------------------------------------------------------
+            // No matches
+            // --------------------------------------------------------------
+
+            if (m_filterModel->rowCount() == 0)
+            {
+                m_completer->popup()->hide();
+
+                /*
+                * The current selection remains untouched.
+                *
+                * Restore the search text after QComboBox's own processing.
+                */
+                restoreSearchText(searchText, cursorPosition);
+                return;
+            }
+
+            // --------------------------------------------------------------
+            // First match
+            // --------------------------------------------------------------
+
+            const QModelIndex proxyIndex =
+                m_filterModel->index(0, modelColumn());
+
+            if (!proxyIndex.isValid())
+                return;
+
+            const QModelIndex sourceIndex =
+                m_filterModel->mapToSource(proxyIndex);
+
+            if (!sourceIndex.isValid())
+                return;
+
+            const int row = sourceIndex.row();
 
             /*
-             * The current selection remains untouched.
-             *
-             * Restore the search text after QComboBox's own processing.
-             */
+            * Changing the current index causes an editable QComboBox to update
+            * its line edit. That is exactly what we do NOT want while searching.
+            */
+            m_internalUpdate = true;
+
+            setCurrentIndex(row);
+            m_lastValidIndex = row;
+
+            m_internalUpdate = false;
+
+            // Put the user's search text back.
             restoreSearchText(searchText, cursorPosition);
-            return;
+
+            // --------------------------------------------------------------
+            // Popup
+            // --------------------------------------------------------------
+
+            if (searchText.isEmpty())
+            {
+                m_completer->popup()->hide();
+            }
+            else
+            {
+                m_completer->complete();
+            }
         }
 
-        // --------------------------------------------------------------
-        // First match
-        // --------------------------------------------------------------
-
-        const QModelIndex proxyIndex =
-            m_filterModel->index(0, modelColumn());
-
-        if (!proxyIndex.isValid())
-            return;
-
-        const QModelIndex sourceIndex =
-            m_filterModel->mapToSource(proxyIndex);
-
-        if (!sourceIndex.isValid())
-            return;
-
-        const int row = sourceIndex.row();
-
-        /*
-         * Changing the current index causes an editable QComboBox to update
-         * its line edit. That is exactly what we do NOT want while searching.
-         */
-        m_internalUpdate = true;
-
-        setCurrentIndex(row);
-        m_lastValidIndex = row;
-
-        m_internalUpdate = false;
-
-        // Put the user's search text back.
-        restoreSearchText(searchText, cursorPosition);
-
-        // --------------------------------------------------------------
-        // Popup
-        // --------------------------------------------------------------
-
-        if (searchText.isEmpty())
+        void onCompleterActivated(const QModelIndex& index)
         {
+            if (!index.isValid())
+                return;
+
+            if (index.model() != m_filterModel)
+                return;
+
+            const QModelIndex sourceIndex =
+                m_filterModel->mapToSource(index);
+
+            if (!sourceIndex.isValid())
+                return;
+
+            commitRow(sourceIndex.row());
+        }
+
+        void onCurrentIndexChanged(int index)
+        {
+            /*
+            * Only remember real selections.
+            *
+            * During user editing QComboBox may temporarily move to -1.
+            * That must never replace our last valid selection.
+            */
+            if (index >= 0)
+                m_lastValidIndex = index;
+        }
+
+    private:
+
+        void updateModelColumn()
+        {
+            const int column = modelColumn();
+
+            m_filterModel->setFilterKeyColumn(column);
+            m_completer->setCompletionColumn(column);
+        }
+
+        void restoreSearchText(
+            const QString& text,
+            int cursorPosition)
+        {
+            /*
+            * Block QLineEdit signals so restoring the search text does not
+            * trigger another search cycle.
+            */
+            const QSignalBlocker blocker(lineEdit());
+
+            lineEdit()->setText(text);
+
+            lineEdit()->setCursorPosition(
+                qMin(cursorPosition, text.size())
+            );
+        }
+
+        void commitRow(int row)
+        {
+            if (row < 0 || row >= count())
+                return;
+
+            m_internalUpdate = true;
+
+            setCurrentIndex(row);
+            m_lastValidIndex = row;
+
+            // A real committed selection displays its complete item text.
+            setEditText(itemText(row));
+
+            m_internalUpdate = false;
+
             m_completer->popup()->hide();
         }
-        else
+
+        void acceptFirstMatch()
         {
-            m_completer->complete();
-        }
-    }
+            if (m_filterModel->rowCount() == 0)
+            {
+                restoreLastValidSelection();
+                return;
+            }
 
-    void onCompleterActivated(const QModelIndex& index)
-    {
-        if (!index.isValid())
-            return;
+            const QModelIndex proxyIndex =
+                m_filterModel->index(0, modelColumn());
 
-        if (index.model() != m_filterModel)
-            return;
+            if (!proxyIndex.isValid())
+                return;
 
-        const QModelIndex sourceIndex =
-            m_filterModel->mapToSource(index);
+            const QModelIndex sourceIndex =
+                m_filterModel->mapToSource(proxyIndex);
 
-        if (!sourceIndex.isValid())
-            return;
+            if (!sourceIndex.isValid())
+                return;
 
-        commitRow(sourceIndex.row());
-    }
-
-    void onCurrentIndexChanged(int index)
-    {
-        /*
-         * Only remember real selections.
-         *
-         * During user editing QComboBox may temporarily move to -1.
-         * That must never replace our last valid selection.
-         */
-        if (index >= 0)
-            m_lastValidIndex = index;
-    }
-
-private:
-
-    void updateModelColumn()
-    {
-        const int column = modelColumn();
-
-        m_filterModel->setFilterKeyColumn(column);
-        m_completer->setCompletionColumn(column);
-    }
-
-    void restoreSearchText(
-        const QString& text,
-        int cursorPosition)
-    {
-        /*
-         * Block QLineEdit signals so restoring the search text does not
-         * trigger another search cycle.
-         */
-        const QSignalBlocker blocker(lineEdit());
-
-        lineEdit()->setText(text);
-
-        lineEdit()->setCursorPosition(
-            qMin(cursorPosition, text.size())
-        );
-    }
-
-    void commitRow(int row)
-    {
-        if (row < 0 || row >= count())
-            return;
-
-        m_internalUpdate = true;
-
-        setCurrentIndex(row);
-        m_lastValidIndex = row;
-
-        // A real committed selection displays its complete item text.
-        setEditText(itemText(row));
-
-        m_internalUpdate = false;
-
-        m_completer->popup()->hide();
-    }
-
-    void acceptFirstMatch()
-    {
-        if (m_filterModel->rowCount() == 0)
-        {
-            restoreLastValidSelection();
-            return;
+            commitRow(sourceIndex.row());
         }
 
-        const QModelIndex proxyIndex =
-            m_filterModel->index(0, modelColumn());
-
-        if (!proxyIndex.isValid())
-            return;
-
-        const QModelIndex sourceIndex =
-            m_filterModel->mapToSource(proxyIndex);
-
-        if (!sourceIndex.isValid())
-            return;
-
-        commitRow(sourceIndex.row());
-    }
-
-    void restoreLastValidSelection()
-    {
-        if (m_lastValidIndex < 0 ||
-            m_lastValidIndex >= count())
+        void restoreLastValidSelection()
         {
-            return;
+            if (m_lastValidIndex < 0 ||
+                m_lastValidIndex >= count())
+            {
+                return;
+            }
+
+            const int row = m_lastValidIndex;
+
+            m_internalUpdate = true;
+
+            setCurrentIndex(row);
+            setEditText(itemText(row));
+
+            m_internalUpdate = false;
         }
 
-        const int row = m_lastValidIndex;
+    private:
+        QSortFilterProxyModel* m_filterModel;
+        QCompleter* m_completer;
 
-        m_internalUpdate = true;
+        int m_lastValidIndex;
 
-        setCurrentIndex(row);
-        setEditText(itemText(row));
+        // Search processing is queued to the event loop.
+        bool m_updatePending;
 
-        m_internalUpdate = false;
-    }
+        // True while we deliberately modify the combo/edit ourselves.
+        bool m_internalUpdate;
 
-private:
-    QSortFilterProxyModel* m_filterModel;
-    QCompleter* m_completer;
-
-    int m_lastValidIndex;
-
-    // Search processing is queued to the event loop.
-    bool m_updatePending;
-
-    // True while we deliberately modify the combo/edit ourselves.
-    bool m_internalUpdate;
-
-    QString m_pendingSearchText;
-};
-
-
-
-
-
-
-
-
+        QString m_pendingSearchText;
+    };
 
     class SplitterHandle : public QSplitterHandle
     {
@@ -616,29 +607,10 @@ private:
             return i + 1;
         }
 
-        void set_dataset_attributes(int wi)
+        void update_datasets(int wi, int w_count)
         {
-            auto i = this->weapon_index_to_dataset(wi);
-            const auto column = i * 2;
-            auto dataset_color = std::get<sections::ColorSection>(this->weapon_table->model->rows.at(wi))[0].value<QColor>();
-            
-            auto pen = this->plotter->pen(i);
-            pen.setColor(dataset_color);
-            this->plotter->setPen(i, pen);
-
-            auto index = this->model->index(0, column);
-            auto dva = this->plotter->dataValueAttributes(index);
-            auto marker = dva.markerAttributes();
-            marker.setMarkerColor(dataset_color);
-            dva.setMarkerAttributes(marker);
-            dva.setVisible(true);
-            this->plotter->setDataValueAttributes(index, dva);
-        }
-
-        void update_datasets(int index, int count)
-        {
-            if (index < 0 || index + count > this->weapon_table->model->rows.size())
-                throw std::runtime_error(std::format("Invalid range for update_datasets: index: {}, count: {}, rows: {}", index, count, this->weapon_table->model->rows.size()));
+            if (wi < 0 || wi + w_count > this->weapon_table->model->rows.size())
+                throw std::runtime_error(std::format("Invalid range for update_datasets: index: {}, count: {}, rows: {}", wi, w_count, this->weapon_table->model->rows.size()));
 
             auto variable_index = this->variable_combobox->currentIndex();
             auto variable = static_cast<PlotVariable>(variable_index);
@@ -651,7 +623,8 @@ private:
             auto metric_index = this->metric_combobox->currentIndex();
             auto metric = static_cast<optimizer::Target>(metric_index);
             auto metric_projection = optimizer::projections.at(metric_index);
-            for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate | std::views::drop(index) | std::views::take(count))
+            auto attributes_model = this->plotter->attributesModel();
+            for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate | std::views::drop(wi) | std::views::take(w_count))
             {
                 auto i = this->weapon_index_to_dataset(wi);
                 const auto column = i * 2;
@@ -661,8 +634,28 @@ private:
                 auto&& weapon = attack_options.weapon.get();
                 calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
+                auto dataset_color = std::get<sections::ColorSection>(this->weapon_table->model->rows.at(wi))[0].value<QColor>();
+                auto pen = this->plotter->pen(i);
+                pen.setColor(dataset_color);
+                this->plotter->setPen(i, pen);
+
+                this->model->setHeaderData(
+                    column,
+                    Qt::Horizontal,
+                    this->weapon_table->model->rows.at(wi).attack.weapon.get().full_name.data()
+                );
+
+                // this->model->setData(index,
+                //     QString("<table><tr><td>Row</td><td>Column</td>"
+                //     "<td>Value</td></tr>"
+                //     "<tr><th>%1</th><th>%2</th><th>%3</th></tr></table>")
+                //     .arg(0)
+                //     .arg(column)
+                //     .arg(this->model->data(index).toInt()),
+                //     Qt::ToolTipRole
+                // );
+
                 auto&& xs = get_dataset_x_values(variable, weapon);
-                bool already_hit_original_x = false;
                 for(auto j = 0; j < xs.size(); ++j)
                 {
                     auto x_j = xs[j];
@@ -670,24 +663,36 @@ private:
                     attack.calculate_inplace();
                     auto y_ij = metric_projection(attack);
 
-                    auto new_j = j;
+                    auto x_index = this->model->index(j, column);
+                    auto y_index = this->model->index(j, column + 1);
+
                     if (x_j == original_x)
                     {
-                        already_hit_original_x = true;
-                        new_j = 0;
+                        auto dva = this->plotter->dataValueAttributes(x_index);
+                        auto marker = dva.markerAttributes();
+                        marker.setMarkerColor(dataset_color);
+                        marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
+                        dva.setMarkerAttributes(marker);
+                        dva.setVisible(true);
+                        this->plotter->setDataValueAttributes(x_index, dva);
                     }
                     else
-                        new_j += !already_hit_original_x;
+                    {
+                        attributes_model->resetData(x_index, KDChart::DataValueLabelAttributesRole);
+                    }
 
-                    this->model->setData(this->model->index(new_j, column), x_j);
-                    this->model->setData(this->model->index(new_j, column + 1), y_ij);
+                    this->model->setData(x_index, x_j);
+                    this->model->setData(y_index, y_ij);
                 }
                 for(auto j = xs.size(); j < universal_xs.size(); ++j)
                 {
                     this->model->setData(this->model->index(j, column), QVariant());
                     this->model->setData(this->model->index(j, column + 1), QVariant());
+                    attributes_model->resetData(this->model->index(j, column), KDChart::DataValueLabelAttributesRole);
                 }
             }
+
+            this->plotter->update();
         }
 
         void update_all_datasets()
@@ -727,7 +732,7 @@ private:
             }
 
             for (auto wi = indices.back(); wi < this->weapon_table->model->rows.size(); ++wi)
-                this->set_dataset_attributes(wi);
+                this->update_datasets(wi, 1);
         }
 
         QSplitterHandle *createHandle() override
@@ -856,7 +861,6 @@ private:
             if (dialog_was_accepted)
             {
                 this->weapon_table->model->update_row(wi, std::move(attack_options));
-                this->set_dataset_attributes(wi);
                 this->update_datasets(wi, 1);
             }
         }
@@ -888,13 +892,6 @@ private:
             auto current_column_count = this->model->columnCount();
             this->model->insertColumns(current_column_count, attacks_options.size() * 2);
 
-            for (auto&& [wi, row] : this->weapon_table->model->rows
-                | std::views::enumerate
-                | std::views::drop(current_dataset_count)
-                | std::views::take(attacks_options.size())
-            )
-                this->set_dataset_attributes(wi);
-
             this->update_datasets(current_dataset_count, attacks_options.size());
         }
 
@@ -912,12 +909,7 @@ private:
             // weapon table (model)
             this->weapon_table = new WeaponTable<Row>(true, "No datasets to display, add with right-click or from other tabs.", this);
             connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
-            connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){
-                auto i = this->weapon_index_to_dataset(wi);
-                auto pen = this->plotter->pen(i);
-                pen.setColor(color);
-                this->plotter->setPen(i, pen);
-            });
+            connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){ this->update_datasets(wi, 1); });
             connect(this->weapon_table, &WeaponTable<Row>::edit_row, this, &PlotTab::edit_dataset_dialog);
             connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, this, &PlotTab::add_new_dataset_dialog);
 
@@ -1005,28 +997,12 @@ private:
             auto marker = dva.markerAttributes();
             marker.setVisible(true);
             marker.setMarkerStyle(KDChart::MarkerAttributes::MarkerCircle);
-            marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
             dva.setMarkerAttributes(marker);
             auto text = dva.textAttributes();
             text.setVisible(false);
             dva.setTextAttributes(text);
             this->plotter->setDataValueAttributes(dva);
-            auto set_point_diameter = [this](){
-                for (auto&& [wi, row] : this->weapon_table->model->rows | std::views::enumerate)
-                {
-                    auto i = this->weapon_index_to_dataset(wi);
-                    auto column = i * 2;
-                    auto index = this->model->index(0, column);
-
-                    auto dva = this->plotter->dataValueAttributes(index);
-                    auto marker = dva.markerAttributes();
-                    marker.setMarkerSize(QSizeF(settings.plot_point_diameter, settings.plot_point_diameter));
-                    dva.setMarkerAttributes(marker);
-                    this->plotter->setDataValueAttributes(index, dva);
-                    this->plotter->update(); // dont know why but the new size only applies after a repaint
-                }
-            };
-            connect(&settings.plot_point_diameter, settings.plot_point_diameter.changed_member_pointer, set_point_diameter);
+            connect(&settings.plot_point_diameter, settings.plot_point_diameter.changed_member_pointer, this, &PlotTab::update_all_datasets);
 
             auto plane = this->chart->coordinatePlane();
             auto grid = plane->globalGridAttributes();
