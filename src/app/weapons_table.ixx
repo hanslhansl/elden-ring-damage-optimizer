@@ -1032,7 +1032,6 @@ namespace erdo::ui
         void row_color_changed(QModelIndex, QColor);
     };
     
-
     class WeaponTableBase : public QTableView
     {
         Q_OBJECT
@@ -1053,11 +1052,8 @@ namespace erdo::ui
     {
         bool is_plot_table;
 
-        QTimer *resize_timer = new QTimer(this);
-        void resize_columns_to_contents_impl()
+        void resize_columns_to_contents()
         {
-            this->resize_timer->stop();
-
             const int columns = this->model->columnCount();
 
             this->header->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -1184,7 +1180,6 @@ namespace erdo::ui
 
                 connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
                     this->header->set_section_hidden(section_index, !visible);
-                    this->resize_columns_to_contents();
                 });
             }
 
@@ -1262,6 +1257,12 @@ namespace erdo::ui
                 );
             }
 
+            menu.addSeparator();
+            menu.addAction(
+                QString::fromStdString("Adjust Column Widths to Contents"),
+                [&](){ this->resize_columns_to_contents(); }
+            );
+
             menu.exec(this->viewport()->mapToGlobal(pos));
         }
 
@@ -1280,13 +1281,6 @@ namespace erdo::ui
                 draw_column_group_separators<Row>(this->viewport(), this->horizontalHeader());
         }
     
-        void showEvent(QShowEvent *event) override
-        {
-            QTableView::showEvent(event);
-
-            this->resize_columns_to_contents();
-        }
-    
     public:
         QString placeholder_string;
         RowModel<Row>* model = new RowModel<Row>(this);
@@ -1296,10 +1290,6 @@ namespace erdo::ui
         explicit WeaponTable(bool is_plot_table, QString placeholder_string, QWidget *parent = nullptr)
             : is_plot_table{is_plot_table}, placeholder_string{placeholder_string}, WeaponTableBase(parent)
         {
-            // table resize timer
-            this->resize_timer->setSingleShot(true);
-            connect(this->resize_timer, &QTimer::timeout, this, &WeaponTable::resize_columns_to_contents_impl);
-
             // view
             this->setFrameStyle(QFrame::Box);
             this->setSortingEnabled(true);
@@ -1323,9 +1313,6 @@ namespace erdo::ui
             this->setModel(this->proxy_model);
             this->proxy_model->setFilterCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
             this->proxy_model->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
-            connect(this->model, &RowModel<Row>::dataChanged, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel<Row>::modelReset, this, &WeaponTable::resize_columns_to_contents);
-            connect(this->model, &RowModel<Row>::rowsInserted, this, &WeaponTable::resize_columns_to_contents);
 
             // header
             this->setHorizontalHeader(this->header);
@@ -1344,14 +1331,6 @@ namespace erdo::ui
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
             }(1);
-        }
-
-        void resize_columns_to_contents()
-        {
-            if (!this->isVisible())
-                return;
-
-            this->resize_timer->start(settings.calculation_delay);
         }
 
         template<typename ColumnType>
