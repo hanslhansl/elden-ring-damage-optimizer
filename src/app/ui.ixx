@@ -934,14 +934,14 @@ namespace erdo::ui
             this->menu_file->addSeparator();
             this->menu_file->addAction("Settings", [](){ settings.show(); });
 
-            this->menu_help->addAction("About erdo", [](){
+            this->menu_help->addAction("About elden-ring-damage-optimizer", [](){
                 QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer"));
             });
             this->menu_help->addAction("About Qt", QApplication::aboutQt);
 
 
             // add tabs
-            this->tab_widget->addTab(this->stats, "Stats");
+            this->tab_widget->addTab(this->stats, "Calculate");
             connect(this->stats->weapon_table, &WeaponTable<StatsTabBase::Row>::add_selection_to_plot, this->plot, &PlotTab::add_datasets);
 
             this->tab_widget->addTab(this->optimize, "Optimize");

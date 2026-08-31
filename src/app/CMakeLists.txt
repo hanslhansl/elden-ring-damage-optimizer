@@ -47,6 +47,7 @@ target_link_libraries(erdo_ui PUBLIC#PRIVATE
 add_executable(erdo
     main.cpp
 )
+set_target_properties(erdo PROPERTIES OUTPUT_NAME "elden-ring-damage-optimizer")
 target_link_libraries(erdo PRIVATE
     erdo_ui
 )

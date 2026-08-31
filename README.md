@@ -1,8 +1,18 @@
 # elden-ring-damage-optimizer
-A tool to calculate and optimize attack rating in Elden Ring. It finds the optimal way to allocate attribute points to maximize attack rating with any weapon.
+A tool to calculate, optimize and plot Elden Ring attack rating. It finds the optimal way to allocate attribute points to maximize attack rating with any weapon.
 
-## download and running
-Download the latest release [here](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). After unzipping the directory run *erdo.exe*. Windows will tell you that this application is unrecognized and might put your PC at risk. It won't, of course, but unfortunatelly, there is nothing I can do about this pop-up. If you decide to trust me press *More info* and *Run anyway*. You can also [build](#building) this project by yourself.
+## Downloading and Running
+Download the latest release [here](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). After unzipping the directory run *elden-ring-damage-optimizer.exe*. Windows will tell you that this application is unrecognized and might put your PC at risk. It won't, of course, but unfortunatelly, there is nothing I can do about this pop-up. If you decide to trust me press *More info* and *Run anyway*. You can also [build](#Building) this project by yourself.
+
+## Usage
+
+### Calculate
+![test](images/calculate.png)
+
+### Optimize
+
+
+### Plot
 
 ## notes on the optimization algorithm
 The *brute force* algorithm is pretty simple: It tries every attribute variation (satisfying the provided minimum attributes and maximum character level) with every weapon (according to the weapon filter options) and returns the best result.
