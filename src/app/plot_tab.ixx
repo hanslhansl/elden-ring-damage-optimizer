@@ -619,7 +619,10 @@ namespace erdo::ui
 
             auto&& universal_xs = get_universal_x_values(variable);
             for(auto j = 0; j < universal_xs.size(); ++j)
+            {
                 this->model->setData(this->model->index(j, 0), universal_xs[j]);
+                this->model->setData(this->model->index(j, 1), double(j == 1));
+            }
 
             auto metric_index = this->metric_combobox->currentIndex();
             auto metric = static_cast<optimizer::Target>(metric_index);
@@ -927,7 +930,7 @@ namespace erdo::ui
             // plotting backend
             this->model = new QStandardItemModel(this);
             // this->model->setRowCount(1);
-            this->model->setColumnCount(2);
+            this->model->setColumnCount(2); // dummy dataset for KDChart::Plotter to not crash
             this->plotter = new KDChart::Plotter();
             this->plotter->setModel(this->model);
             this->x_axis = new KDChart::CartesianAxis(plotter);
@@ -957,11 +960,7 @@ namespace erdo::ui
             this->change_variable(this->variable_combobox->currentIndex());
             this->change_metric(this->metric_combobox->currentIndex());
 
-            // Initialize the model with dummy data (KDChart::Plotter is buggy...)
-            this->model->setData(this->model->index(0, 0), 0.);
-            this->model->setData(this->model->index(0, 0 + 1), 0.);
-            this->model->setData(this->model->index(1, 0), 1.);
-            this->model->setData(this->model->index(1, 0 + 1), 1.);
+            // set dummy dataset invisible (KDChart::Plotter is buggy...)
             this->plotter->setPen(0, Qt::NoPen);
 
             // layout
