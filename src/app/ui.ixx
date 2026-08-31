@@ -298,7 +298,7 @@ namespace erdo::ui
         using Row = decltype([](auto){
             static constexpr auto [...apts] = enumerators_of<calculator::AttackPowerType>();
 
-            return BasicRow<false,
+            return BasicRow<
                 sections::NameSection,
                 sections::BaseNameSection,
                 sections::AffinitySection,

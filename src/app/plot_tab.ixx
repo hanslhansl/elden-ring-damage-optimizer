@@ -520,8 +520,7 @@ namespace erdo::ui
     {
         using Row = decltype([](auto){
             static constexpr auto [...apts] = enumerators_of<calculator::AttackPowerType>();
-
-            return BasicRow<true,
+            return BasicRow<
                 sections::ColorSection,
                 sections::NameSection,
                 sections::BaseNameSection,
@@ -537,6 +536,7 @@ namespace erdo::ui
                 sections::AttributeScalings
             >{};
         }(0));
+        static_assert(Row::sparse);
 
         std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
 

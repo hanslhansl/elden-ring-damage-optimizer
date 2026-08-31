@@ -516,13 +516,17 @@ namespace erdo::ui
         };
     }
 
-    export template<bool _sparse, std::default_initializable...Args>
-        requires (!_sparse) || (std::constructible_from<Args, const calculator::FullAttackOptions&> && ...)
+    template<typename T>
+    concept sparse = std::default_initializable<T>
+        && std::constructible_from<T, const calculator::FullAttackOptions&>
+        && requires (T t, const calculator::FullAttackOptions& attack_options) { t.update(attack_options); };
+
+    export template<std::default_initializable...Args>
     struct BasicRow : _tuple_base<std::tuple<Args...>>
     {
         using _tuple_base = _tuple_base<std::tuple<Args...>>;
         using _tuple_base::_tuple_base;
-        static constexpr auto sparse = _sparse;
+        static constexpr auto sparse = (ui::sparse<Args> && ...);
 
         std::conditional_t<sparse, calculator::FullAttackOptions, calculator::Attack> attack { calculator::Weapon::dummy, {}, {} };
 
