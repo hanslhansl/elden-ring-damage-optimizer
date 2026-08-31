@@ -1173,6 +1173,12 @@ namespace erdo::ui
         {
             QMenu menu;
 
+            menu.addAction(
+                QString::fromStdString("Adjust Column Widths to Contents"),
+                [&](){ this->resize_columns_to_contents(); }
+            );
+            menu.addSeparator();
+
             for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
                 auto name = Row::section_name(section_index);
