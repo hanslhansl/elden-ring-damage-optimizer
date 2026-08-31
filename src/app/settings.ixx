@@ -95,7 +95,7 @@ namespace erdo::ui
 
     public:
         SettingMember<int> decimal_places{ SpinBoxSetting{
-            .section_name = "Weapon Table",
+            .section_name = "General",
             .name = "decimal_places",
             .display_name = "Decimal Places",
             .default_value = 3,
@@ -203,8 +203,9 @@ namespace erdo::ui
         auto s = QString::number(x, 'f', settings.decimal_places.value);
 
         // Remove trailing zeros
-        while (s.endsWith('0'))
-            s.chop(1);
+        if (s.contains('.'))
+            while (s.endsWith('0'))
+                s.chop(1);
 
         // Remove trailing decimal point
         if (s.endsWith('.'))
