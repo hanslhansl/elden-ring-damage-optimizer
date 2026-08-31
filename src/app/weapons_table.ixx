@@ -145,9 +145,6 @@ namespace erdo::ui
                 if (role == Qt::DecorationRole || role == Qt::EditRole || role == Qt::UserRole)
                     return (*this)[0];
 
-                if (role == Qt::TextAlignmentRole)
-                    return alignment_center;
-
                 return {};
             }
         };
@@ -368,7 +365,7 @@ namespace erdo::ui
         };
         export struct AttributeScalings : EnumDataSection<calculator::RelevantAttribute>
         {
-            static inline const QString section_name = "Attribute Scaling at Upgrade Level";
+            static inline const QString section_name = "Attribute Scaling";
 
             using EnumDataSection::EnumDataSection;
             explicit AttributeScalings(const calculator::Attack& attack)
@@ -552,27 +549,21 @@ namespace erdo::ui
         static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
         static constexpr std::array draw_column_header_label_rotated = [](){
             std::array<bool, total_size> result{};
-            if constexpr (sparse)
-                result.fill(false);
-            
-            else
-                for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(
-                    std::array{ Args::draw_section_header_labels_rotated... },
-                    section_index_offsets,
-                    section_sizes
-                ))
-                    if (draw_rotated)
-                        std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
-            
+            for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(
+                std::array{ Args::draw_section_header_labels_rotated... },
+                section_index_offsets,
+                section_sizes
+            ))
+                if (draw_rotated)
+                    std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
             return result;
         }();
         static constexpr std::array expand_column = [](){
-            std::array expand_section = { Args::expand_section... };
             std::array<bool, total_size> result{};
+            std::array expand_section = { Args::expand_section... };
             for (auto [expand, section_index_offset, section_size] : std::views::zip(expand_section, section_index_offsets, section_sizes))
                 if (expand)
                     std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
-            
             return result;
         }();
 
@@ -865,7 +856,7 @@ namespace erdo::ui
                 size.rheight() += 8;
             }
             else
-                size.rheight() = this->group_header_height()*2;
+                size.rheight() += this->group_header_height();
 
             // size.rheight() += this->group_header_height();
 
@@ -1032,6 +1023,20 @@ namespace erdo::ui
             return true;
         }
     
+        void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+        {
+            QStyleOptionViewItem opt = option;
+            initStyleOption(&opt, index);
+            opt.decorationAlignment = Qt::AlignCenter;
+            opt.decorationSize = option.rect.size();
+            option.widget->style()->drawControl(
+                QStyle::CE_ItemViewItem,
+                &opt,
+                painter,
+                option.widget
+            );
+        }
+
     signals:
         void row_color_changed(QModelIndex, QColor);
     };
@@ -1075,11 +1080,7 @@ namespace erdo::ui
                 if (this->header->isSectionHidden(c))
                     continue;
 
-                widths[c] = std::max({
-                    this->header->sectionSize(c),
-                    this->header->sectionSizeHint(c),
-                    this->header->minimumSectionSize()
-                });
+                widths[c] = this->columnWidth(c)/*this->header->sectionSize(c)*/;
                 sum_total_width += widths[c];
                 visible_columns.push_back(c);
 

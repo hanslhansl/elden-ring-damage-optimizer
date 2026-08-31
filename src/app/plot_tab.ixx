@@ -919,7 +919,6 @@ namespace erdo::ui
 
             // weapon table (model)
             this->weapon_table = new WeaponTable<Row>(true, "No datasets to display, add with right-click or from other tabs.", this);
-            this->weapon_table->set_section_hidden<sections::AttributeScalings>(true);
             connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
             connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){ this->update_datasets(wi, 1); });
             connect(this->weapon_table, &WeaponTable<Row>::edit_row, this, &PlotTab::edit_dataset_dialog);
