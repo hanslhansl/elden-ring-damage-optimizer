@@ -94,14 +94,14 @@ namespace erdo::ui
         friend class SettingMember;
 
     public:
-        SettingMember<int> calculation_delay{ SpinBoxSetting{
-            .section_name = "General",
-            .name = "calculation_delay",
-            .display_name = "Calculation Delay (ms)",
-            .default_value = 500,
-            .minimum_value = 100,
-            .maximum_value = 5000
-        } };
+        // SettingMember<int> calculation_delay{ SpinBoxSetting{
+        //     .section_name = "General",
+        //     .name = "calculation_delay",
+        //     .display_name = "Calculation Delay (ms)",
+        //     .default_value = 500,
+        //     .minimum_value = 100,
+        //     .maximum_value = 5000
+        // } };
 
         SettingMember<int> decimal_places{ SpinBoxSetting{
             .section_name = "Weapon Table",
