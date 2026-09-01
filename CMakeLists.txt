@@ -21,9 +21,15 @@ add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>")
 # enable g++ module support
 add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
 
+# ASan and UBSan for debug builds
+add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
+add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fno-omit-frame-pointer>)
+add_link_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
+
 
 # add_compile_options(-g -gcodeview)
 # add_link_options(-fuse-ld=lld -g -Wl,--pdb=)
+
 
 # download and include CPM.cmake
 # Define CPM_SOURCE_CACHE (before include CPM) to fix patch bug in CPM
