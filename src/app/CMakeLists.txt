@@ -53,14 +53,12 @@ target_link_libraries(erdo PRIVATE
 )
 copy_xml_data(erdo)
 
-install(TARGETS erdo
-    # RUNTIME DESTINATION .
-)
+install(TARGETS erdo)
 
+# copy readme and license files
 install(FILES ${CMAKE_SOURCE_DIR}/README.md ${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_SOURCE_DIR}/THIRD-PARTY-NOTICES.txt
     TYPE BIN
 )
-
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/LICENSES
     TYPE BIN
 )
