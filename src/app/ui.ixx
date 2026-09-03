@@ -308,11 +308,11 @@ namespace erdo::ui
                 sections::TwoHandingSection,
                 sections::CharacterLevelSection,
 
-                sections::Stats,
-                sections::Requirements,
                 sections::AttackPowers,
                 sections::StatusEffects,
                 sections::SpellScaling,
+                sections::Stats,
+                sections::Requirements,
                 sections::AttributeScalings,
                 sections::AttackPowerTypeAttributeScalings<apts>...
             >{};

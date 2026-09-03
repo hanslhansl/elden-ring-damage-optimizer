@@ -1,0 +1,11 @@
+Qt
+
+This product uses Qt, licensed under the GNU Lesser General Public License version 3 (LGPLv3).
+
+The complete corresponding source code for the Qt libraries used to build this product, including any modifications made, is available at:
+
+https://github.com/hanslhansl/qt-source
+
+A copy of the GNU LGPLv3 license is included in the Qt source repository and in this distribution.
+
+Qt is Copyright The Qt Company Ltd. and other contributors.

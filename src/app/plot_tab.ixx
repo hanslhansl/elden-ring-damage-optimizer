@@ -1771,10 +1771,10 @@ namespace erdo::ui
                 sections::AffinitySection,
                 sections::TypeSection,
                 sections::BaseGameDLCSection,
-
                 sections::UpgradeLevelSection,
                 sections::TwoHandingSection,
                 sections::CharacterLevelSection,
+
                 sections::Stats,
                 sections::Requirements,
                 sections::AttributeScalings
