@@ -4,7 +4,9 @@ This product uses Qt, licensed under the GNU Lesser General Public License versi
 
 The complete corresponding source code for the Qt libraries used to build this product, including any modifications made, is available at:
 
-https://github.com/hanslhansl/qt-source
+https://github.com/hanslhansl/qt-source/releases/tag/qt-6.12.0
+
+Currently, this project references
 
 A copy of the GNU LGPLv3 license is included in the Qt source repository and in this distribution.
 

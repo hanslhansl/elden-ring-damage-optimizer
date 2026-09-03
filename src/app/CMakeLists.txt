@@ -54,7 +54,15 @@ target_link_libraries(erdo PRIVATE
 copy_xml_data(erdo)
 
 install(TARGETS erdo
-    RUNTIME DESTINATION .
+    # RUNTIME DESTINATION .
+)
+
+install(FILES ${CMAKE_SOURCE_DIR}/README.md ${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_SOURCE_DIR}/THIRD-PARTY-NOTICES.txt
+    TYPE BIN
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/LICENSES
+    TYPE BIN
 )
 
 # use qt deploy script to copy dependencies (e.g. DLLs) to the install directory
