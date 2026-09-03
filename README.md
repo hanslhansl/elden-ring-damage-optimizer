@@ -76,7 +76,7 @@ The dependencies are:
 
 The cmake build script automatically downloads *CPM.cmake* which it then uses to download *pugixml* and *Catch2*.
 
-*Qt* needs to be provided seperately. Binaries and source are available on the official website. The Python script [build_qt.py](build_qt.py) may be used to build *Qt* with all required submodules from source.
+*Qt* needs to be provided seperately. A source archive with build script is provided at [qt-source](https://github.com/hanslhansl/qt-source). Binaries and source are also available on the official Qt website.
 
 ### Supported Compilers
 The project is tested and built with [this](https://github.com/mstorsjo/llvm-mingw) LLVM 24 Mingw-w64 toolchain.
