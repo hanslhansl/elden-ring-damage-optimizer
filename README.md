@@ -5,6 +5,7 @@ A tool to calculate, optimize and plot Elden Ring attack rating. It finds the op
 The latest release can be downloaded [here](https://github.com/hanslhansl/elden-ring-damage-optimizer/releases). Windows might flag the application *elden-ring-damage-optimizer.exe* as unrecognized and potentially dangerous. It isn't, of course, but there is no way to convince Windows/Microsoft of the contrary (other than paying for an official certificate). The pop-up can be skipped by pressing *More info* and *Run anyway*. Alternatively, the project can also be [built from source](#Building).
 
 ## Usage
+To select the correct game data version, use *File->Choose Weapon Data*. See [Updating the Weapon Data](#Updating-the-Weapon-Data) if the desired version isn't present. 
 
 ### Calculate
 ![calculate tab image](images/calculate.png)
