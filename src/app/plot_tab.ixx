@@ -1763,15 +1763,15 @@ namespace erdo::ui
         using Row = decltype([](auto){
             static constexpr auto [...apts] = enumerators_of<calculator::AttackPowerType>();
             return BasicRow<
-                sections::ColorSection,
-                sections::NameSection,
-                sections::BaseNameSection,
-                sections::AffinitySection,
-                sections::TypeSection,
-                sections::BaseGameDLCSection,
-                sections::UpgradeLevelSection,
-                sections::TwoHandingSection,
-                sections::CharacterLevelSection,
+                sections::Color,
+                sections::Name,
+                sections::BaseName,
+                sections::Affinity,
+                sections::Type,
+                sections::BaseGameDLC,
+                sections::UpgradeLevel,
+                sections::TwoHanding,
+                sections::CharacterLevel,
 
                 sections::Stats,
                 sections::Requirements,
@@ -1880,7 +1880,7 @@ namespace erdo::ui
                 auto&& weapon = attack_options.weapon.get();
                 calculator::Attack attack{ weapon, attack_options.stats, attack_options };
 
-                auto dataset_color = std::get<sections::ColorSection>(this->weapon_table->model->rows.at(wi))[0].value<QColor>();
+                auto dataset_color = std::get<sections::Color>(this->weapon_table->model->rows.at(wi))[0].value<QColor>();
                 auto pen = this->plotter->pen(i);
                 pen.setColor(dataset_color);
                 this->plotter->setPen(i, pen);
@@ -1890,17 +1890,7 @@ namespace erdo::ui
                     Qt::Horizontal,
                     this->weapon_table->model->rows.at(wi).attack.weapon.get().full_name.data()
                 );
-
-                // this->model->setData(index,
-                //     QString("<table><tr><td>Row</td><td>Column</td>"
-                //     "<td>Value</td></tr>"
-                //     "<tr><th>%1</th><th>%2</th><th>%3</th></tr></table>")
-                //     .arg(0)
-                //     .arg(column)
-                //     .arg(this->model->data(index).toInt()),
-                //     Qt::ToolTipRole
-                // );
-
+                
                 auto&& xs = get_dataset_x_values(variable, weapon);
                 for(auto j = 0; j < xs.size(); ++j)
                 {
@@ -2140,7 +2130,7 @@ namespace erdo::ui
             this->weapon_table->model->add_rows(attacks_options
                 | std::views::transform([](const calculator::FullAttackOptions& attacks_option) {
                     auto row = Row(calculator::FullAttackOptions(attacks_option));
-                    std::get<sections::ColorSection>(row)[0] = get_distinctive_color();
+                    std::get<sections::Color>(row)[0] = get_distinctive_color();
                     return row;
                 })
             );

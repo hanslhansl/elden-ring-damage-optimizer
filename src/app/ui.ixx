@@ -321,14 +321,14 @@ namespace erdo::ui
             static constexpr auto [...apts] = enumerators_of<calculator::AttackPowerType>();
 
             return BasicRow<
-                sections::NameSection,
-                sections::BaseNameSection,
-                sections::AffinitySection,
-                sections::TypeSection,
-                sections::BaseGameDLCSection,
-                sections::UpgradeLevelSection,
-                sections::TwoHandingSection,
-                sections::CharacterLevelSection,
+                sections::Name,
+                sections::BaseName,
+                sections::Affinity,
+                sections::Type,
+                sections::BaseGameDLC,
+                sections::UpgradeLevel,
+                sections::TwoHanding,
+                sections::CharacterLevel,
 
                 sections::AttackPowers,
                 sections::StatusEffects,
@@ -411,8 +411,8 @@ namespace erdo::ui
 
             // weapon table view
             this->weapon_table = new WeaponTable<Row>(false, "No items to display", this);
-            this->weapon_table->set_section_hidden<sections::UpgradeLevelSection>(true);
-            this->weapon_table->set_section_hidden<sections::TwoHandingSection>(true);
+            this->weapon_table->set_section_hidden<sections::UpgradeLevel>(true);
+            this->weapon_table->set_section_hidden<sections::TwoHanding>(true);
 
             this->main_layout->addWidget(this->weapon_table, 1);
         };
@@ -521,7 +521,7 @@ namespace erdo::ui
             });
 
             // weapon table view
-            this->weapon_table->set_section_hidden<sections::CharacterLevelSection>(true);
+            this->weapon_table->set_section_hidden<sections::CharacterLevel>(true);
             this->weapon_table->set_section_hidden<sections::Stats>(true);
         }
 

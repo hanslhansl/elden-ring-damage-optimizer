@@ -72,12 +72,12 @@ namespace erdo::ui
                 return {};
             }
         };
-        export struct BaseNameSection : UnaryTextSection
+        export struct BaseName : UnaryTextSection
         {
             static constexpr std::array column_names { "Base Name" };
 
             using UnaryTextSection::UnaryTextSection;
-            explicit BaseNameSection(const calculator::FullAttackOptions& attack_options)
+            explicit BaseName(const calculator::FullAttackOptions& attack_options)
             {
                 (*this)[0] = QString::fromStdString(attack_options.weapon.get().base_name);
             }
@@ -93,7 +93,7 @@ namespace erdo::ui
                 return this->UnaryTextSection::data(column, role);
             }
         };
-        export struct CharacterLevelSection : AlignedUnaryTextSection
+        export struct CharacterLevel : AlignedUnaryTextSection
         {
             static constexpr bool expand_section = true;
             static constexpr bool draw_section_header_labels_rotated = true;
@@ -101,7 +101,7 @@ namespace erdo::ui
             static constexpr std::array column_names { "Character Level" };
 
             using AlignedUnaryTextSection::AlignedUnaryTextSection;
-            explicit CharacterLevelSection(const calculator::FullAttackOptions& attack_options)
+            explicit CharacterLevel(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
@@ -111,7 +111,7 @@ namespace erdo::ui
                 (*this)[0] = attack_options.stats.character_level();
             }
         };
-        export struct UpgradeLevelSection : AlignedUnaryTextSection
+        export struct UpgradeLevel : AlignedUnaryTextSection
         {
             static constexpr bool expand_section = true;
             static constexpr bool draw_section_header_labels_rotated = true;
@@ -119,7 +119,7 @@ namespace erdo::ui
             static constexpr std::array column_names { "Upgrade Level" };
 
             using AlignedUnaryTextSection::AlignedUnaryTextSection;
-            explicit UpgradeLevelSection(const calculator::FullAttackOptions& attack_options)
+            explicit UpgradeLevel(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
@@ -130,12 +130,12 @@ namespace erdo::ui
             }
         };
 
-        export struct ColorSection : SectionBase<std::array<QVariant, 1>>
+        export struct Color : SectionBase<std::array<QVariant, 1>>
         {
             static constexpr std::array column_names { "Color" };
 
             using SectionBase::SectionBase;
-            explicit ColorSection(const calculator::FullAttackOptions& attack_options)
+            explicit Color(const calculator::FullAttackOptions& attack_options)
             {
                 (*this)[0] = QColor();
             }
@@ -162,12 +162,12 @@ namespace erdo::ui
                 return {};
             }
         };
-        export struct NameSection : BinaryTextSection
+        export struct Name : BinaryTextSection
         {
             static constexpr std::array column_names { "Name" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit NameSection(const calculator::FullAttackOptions& attack_options)
+            explicit Name(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
@@ -180,12 +180,12 @@ namespace erdo::ui
                 (*this)[0][1] = QString::fromStdString(weapon.full_name);
             }
         };
-        export struct AffinitySection : BinaryTextSection
+        export struct Affinity : BinaryTextSection
         {
             static constexpr std::array column_names { "Affinity" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit AffinitySection(const calculator::FullAttackOptions& attack_options)
+            explicit Affinity(const calculator::FullAttackOptions& attack_options)
             {
                 auto&& weapon = attack_options.weapon.get();
 
@@ -193,12 +193,12 @@ namespace erdo::ui
                 (*this)[0][1] = std::to_underlying(weapon.affinity);
             }
         };
-        export struct TypeSection : BinaryTextSection
+        export struct Type : BinaryTextSection
         {
             static constexpr std::array column_names { "Type" };
 
             using BinaryTextSection::BinaryTextSection;
-            explicit TypeSection(const calculator::FullAttackOptions& attack_options)
+            explicit Type(const calculator::FullAttackOptions& attack_options)
             {
                 auto&& weapon = attack_options.weapon.get();
 
@@ -217,12 +217,12 @@ namespace erdo::ui
                 return this->BinaryTextSection::data(column, role);
             }
         };
-        export struct BaseGameDLCSection : AlignedBinaryTextSection
+        export struct BaseGameDLC : AlignedBinaryTextSection
         {
             static constexpr std::array column_names { "Base Game\nDLC" };
 
             using AlignedBinaryTextSection::AlignedBinaryTextSection;
-            explicit BaseGameDLCSection(const calculator::FullAttackOptions& attack_options)
+            explicit BaseGameDLC(const calculator::FullAttackOptions& attack_options)
             {
                 auto&& weapon = attack_options.weapon.get();
 
@@ -230,7 +230,7 @@ namespace erdo::ui
                 (*this)[0][1] = weapon.dlc;
             }
         };
-        export struct TwoHandingSection : AlignedBinaryTextSection
+        export struct TwoHanding : AlignedBinaryTextSection
         {
             static constexpr bool expand_section = true;
             static constexpr bool draw_section_header_labels_rotated = true;
@@ -238,7 +238,7 @@ namespace erdo::ui
             static constexpr std::array column_names { "Two-Handing" };
 
             using AlignedBinaryTextSection::AlignedBinaryTextSection;
-            explicit TwoHandingSection(const calculator::FullAttackOptions& attack_options)
+            explicit TwoHanding(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
@@ -650,16 +650,16 @@ namespace erdo::ui
         }
         bool setData(const QModelIndex &index, const QVariant &value, int role) override
         {
-            if constexpr (requires { tuple_index_v<sections::ColorSection, Row>; })
+            if constexpr (requires { tuple_index_v<sections::Color, Row>; })
             {
-                if (index.column() == Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>) && role == Qt::EditRole)
+                if (index.column() == Row::section_index_offsets.at(tuple_index_v<sections::Color, Row>) && role == Qt::EditRole)
                 {
                     const QColor color = value.value<QColor>();
 
                     if (!color.isValid())
                         return false;
 
-                    std::get<sections::ColorSection>(this->rows[index.row()])[0] = color;
+                    std::get<sections::Color>(this->rows[index.row()])[0] = color;
 
                     emit dataChanged(index, index, { Qt::DecorationRole, Qt::UserRole });
 
@@ -971,10 +971,10 @@ namespace erdo::ui
                 return set.contains(value);
             };
 
-            return check_filter(tuple_index_v<sections::BaseGameDLCSection, Row>, this->base_game_dlc)
-                && check_filter(tuple_index_v<sections::TypeSection, Row>, this->types)
-                && check_filter(tuple_index_v<sections::BaseNameSection, Row>, this->base_names)
-                && check_filter(tuple_index_v<sections::AffinitySection, Row>, this->affinities);
+            return check_filter(tuple_index_v<sections::BaseGameDLC, Row>, this->base_game_dlc)
+                && check_filter(tuple_index_v<sections::Type, Row>, this->types)
+                && check_filter(tuple_index_v<sections::BaseName, Row>, this->base_names)
+                && check_filter(tuple_index_v<sections::Affinity, Row>, this->affinities);
         }
     };
 
@@ -1297,10 +1297,10 @@ namespace erdo::ui
             connect(this, &QTableView::customContextMenuRequested, this, &WeaponTable::show_table_context_menu);
 
             // color delegate
-            if constexpr (requires { tuple_index_v<sections::ColorSection, Row>; })
+            if constexpr (requires { tuple_index_v<sections::Color, Row>; })
             {
                 auto delegate = new ColorDelegate(this);
-                this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>), delegate);
+                this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::Color, Row>), delegate);
                 connect(delegate, &ColorDelegate::row_color_changed, this, [this](QModelIndex index, QColor color){
                     emit row_color_changed(this->proxy_model->mapToSource(index).row(), color);
                 });
@@ -1318,13 +1318,13 @@ namespace erdo::ui
             connect(this->header, &QHeaderView::customContextMenuRequested, this, &WeaponTable::show_header_context_menu);
 
             // sorting
-            auto sort_column = Row::section_index_offsets.at(tuple_index_v<sections::BaseNameSection, Row>);
+            auto sort_column = Row::section_index_offsets.at(tuple_index_v<sections::BaseName, Row>);
             auto sort_order = Qt::SortOrder::AscendingOrder;
             this->proxy_model->sort(sort_column, sort_order);
             this->header->setSortIndicator(sort_column, sort_order);
 
-            this->set_section_hidden<sections::BaseNameSection>(true);
-            this->set_section_hidden<sections::BaseGameDLCSection>(true);
+            this->set_section_hidden<sections::BaseName>(true);
+            this->set_section_hidden<sections::BaseGameDLC>(true);
             [&](auto){
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
