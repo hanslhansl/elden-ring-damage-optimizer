@@ -263,8 +263,6 @@ void test_optimization(std::string_view expected_weapon_full_name, const calcula
     };
     REQUIRE(attacks.size() == expected_values.size());
 
-    std::println("{}", attacks | std::views::transform([&](const calculator::Attack& attack) { return optimizer.projection(attack); }));
-
     for (auto&& [i, values] : std::views::zip(attacks, expected_values) | std::views::enumerate)
     {
         auto&& [attack, expected] = values;
