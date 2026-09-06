@@ -64,46 +64,43 @@ namespace erdo::optimizer
 {
     export std::size_t get_stat_variation_count(const int free_attribute_points, const RelevantAttributeLevels& min_relevant_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
-        const auto A = free_attribute_points;
-        const auto L = min_relevant_stats;
-        const auto U = max_relevant_stats;
-        constexpr auto P = min_relevant_stats.extent;
+        if (free_attribute_points < 0)
+            throw std::invalid_argument("free_attribute_points must be >= 0.");
 
-        if (A < 0)
-            return 0;
+        const auto A = static_cast<std::size_t>(free_attribute_points);
+        constexpr std::size_t P = min_relevant_stats.extent;
 
-        // Restkapazitäten
-        std::array<int, P> capacity{};
-        int totalCapacity = 0;
-        for (int i = 0; i < P; ++i)
+        std::array<std::size_t, P> capacity{};
+        std::size_t totalCapacity = 0;
+
+        for (std::size_t i = 0; i < P; ++i)
         {
-            if (L[i] > U[i])
-                throw std::invalid_argument("L[i] must be less than U[i].");
+            if (min_relevant_stats[i] > max_relevant_stats[i])
+                throw std::invalid_argument("min_relevant_stats[i] must be <= max_relevant_stats[i].");
 
-            capacity[i] = U[i] - L[i];
-            totalCapacity += capacity[i];
+            const auto C = static_cast<std::size_t>(max_relevant_stats[i]) - static_cast<std::size_t>(min_relevant_stats[i]);
+
+            capacity[i] = C;
+            totalCapacity += C;
         }
 
         if (A > totalCapacity)
-            return 0;
+            return 1;
 
-        // dp[a] = Anzahl Möglichkeiten, a Äpfel
-        // auf die bisher betrachteten Personen zu verteilen.
-        std::vector<int> dp(A + 1, 0);
-        std::vector<int> next(A + 1, 0);
+        std::vector<std::uint64_t> dp(A + 1);
+        std::vector<std::uint64_t> next(A + 1);
 
         dp[0] = 1;
 
-        for (int C : capacity)
+        for (const auto C : capacity)
         {
-            int window = 0;
+            std::uint64_t window = 0;
 
-            for (int a = 0; a <= A; ++a)
+            for (std::size_t a = 0; a <= A; ++a)
             {
-                // dp[a] + dp[a-1] + ... + dp[a-C]
                 window += dp[a];
 
-                if (a - C - 1 >= 0)
+                if (a > C)
                     window -= dp[a - C - 1];
 
                 next[a] = window;
@@ -112,17 +109,17 @@ namespace erdo::optimizer
             dp.swap(next);
         }
 
-        return dp[A];
+        return static_cast<std::size_t>(dp[A]);
     }
     export std::vector<AttributeLevels> get_stat_variations(const int free_attribute_points, const AttributeLevels &min_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
-        auto max_attribute_points = free_attribute_points + min_stats.attribute_points();
-        const auto SUM = max_attribute_points - std::ranges::fold_left(min_stats.irrelevant_stats(), 0, std::plus<int>{});
         auto min_relevant_stats = min_stats.relevant_stats();
 
+        const int min_relevant_sum = std::ranges::fold_left(min_relevant_stats, 0, std::plus<int>{});
+        const int max_relevant_sum = std::ranges::fold_left(max_relevant_stats, 0, std::plus<int>{});
+        const int SUM = min_relevant_sum + std::min(free_attribute_points, max_relevant_sum - min_relevant_sum);
+
         auto possible_occurances = get_stat_variation_count(free_attribute_points, min_relevant_stats, max_relevant_stats);
-        if (possible_occurances == 0)
-            return {};
 
         std::vector<AttributeLevels> stat_variations{ possible_occurances };
         auto current_it = stat_variations.begin(); 
@@ -147,7 +144,11 @@ namespace erdo::optimizer
                         std::cmp_less_equal(l, std::min<int>(max_relevant_stats[3], SUM_i_j_k - min_relevant_stats[4]));
                         ++l
                     )
+                    {
+                        m = SUM_i_j_k - l;
+
                         *current_it++ = result;
+                    }
                 }
             }
         }
@@ -334,7 +335,7 @@ namespace erdo::optimizer
             const NonscalingAttributes& nonscaling_attributes
         )
         {
-            auto optimized_max_relevant_stats = V2::get_optimized_max_relevant_stats(
+            auto optimized_max_relevant_stats = get_optimized_max_relevant_stats(
                 free_attribute_points, min_stats.relevant_stats(), max_relevant_stats, nonscaling_attributes
             );
 
