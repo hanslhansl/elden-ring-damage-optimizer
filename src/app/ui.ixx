@@ -248,29 +248,51 @@ namespace erdo::ui
 
             this->adjust_base_name_filter();
         }
+        
         void adjust_base_name_filter()
         {
-            auto visible_base_names = *this->active_weapon_data
-                | std::views::filter([&](const calculator::Weapon& w){
-                    return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
-                            (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type)));
+            auto filterable_base_names = *this->active_weapon_data
+                | std::views::filter([&](const calculator::Weapon& w) {
+                    return (this->base_game_dlc_filter.isEmpty() ||
+                            this->base_game_dlc_filter.contains(w.dlc)) &&
+                        (this->type_filter.isEmpty() ||
+                            this->type_filter.contains(std::to_underlying(w.type)));
                 })
                 | std::views::transform(&calculator::Weapon::base_name)
                 | std::ranges::to<QSet>();
 
             this->base_name_filter.clear();
+
+            const QString query = this->base_name_line_edit->text().trimmed();
+
             for (int i = 0; i < this->base_name_list->count(); ++i)
             {
                 auto item = this->base_name_list->item(i);
                 const QString base_name = item->text();
-                auto visible = visible_base_names.isEmpty() || visible_base_names.contains(base_name.toStdString());
+
+                // Determined by the filters higher in the hierarchy.
+                const bool filter_visible =
+                    filterable_base_names.isEmpty() ||
+                    filterable_base_names.contains(base_name.toStdString());
+
+                // Only affects visual visibility, never the actual filter.
+                const bool search_match =
+                    query.isEmpty() ||
+                    base_name.contains(query, Qt::CaseInsensitive);
+
+                const bool visible =
+                    filter_visible && (search_match || item->isSelected());
+
                 item->setHidden(!visible);
-                if (visible && item->isSelected())
+
+                // Search does NOT affect the filter.
+                if (filter_visible && item->isSelected())
                     this->base_name_filter.insert(base_name);
             }
 
             this->adjust_affinity_list_filter();
         }
+
         void adjust_affinity_list_filter()
         {
             auto visible_affinities = *this->active_weapon_data
@@ -292,6 +314,8 @@ namespace erdo::ui
                 if (visible && item->isSelected())
                     this->affinity_filter.insert(affinity_value);
             }
+
+            emit this->filter_changed();
         }
 
     public:
@@ -384,20 +408,8 @@ namespace erdo::ui
             connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_base_name_filter);
             connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &StatsTabBase::adjust_affinity_list_filter);
 
-            // filter for the weapon base name filter
-            connect(this->base_name_line_edit, &QLineEdit::textChanged, [this](const QString &text)
-            {
-                const QString query = text.trimmed();
-
-                for (int i = 0; i < this->base_name_list->count(); ++i)
-                {
-                    QListWidgetItem *item = this->base_name_list->item(i);
-
-                    const bool match = query.isEmpty() || item->text().contains(query, Qt::CaseInsensitive);
-
-                    item->setHidden(!match);
-                }
-            });
+            // search bar for the weapon base name filter
+            connect(this->base_name_line_edit, &QLineEdit::textChanged, this, &StatsTabBase::adjust_base_name_filter);
 
             // weapon table view
             this->weapon_table = new WeaponTable<Row>(false, "No items to display", this);
@@ -482,6 +494,7 @@ namespace erdo::ui
     
     signals:
         void character_stats_changed(const calculator::AttributeLevels& stats);
+        void filter_changed();
     };
 
     class StatsTab : public StatsTabBase
@@ -499,25 +512,15 @@ namespace erdo::ui
             // two-handing checkbox
             connect(this->two_handing_checkbox, &QCheckBox::checkStateChanged, this, &StatsTab::calculate_weapon_stats);
 
-            // base game / dlc filter
-            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged,
-                [this]() { this->weapon_table->proxy_model->set_selected_base_game_dlc(this->base_game_dlc_filter); }
-            );
-
-            // weapon type filter
-            connect(this->type_list, &QListWidget::itemSelectionChanged,
-                [this]() { this->weapon_table->proxy_model->set_selected_types(this->type_filter); }
-            );
-
-            // weapon base name filter
-            connect(this->base_name_list, &QListWidget::itemSelectionChanged,
-                [this]() { this->weapon_table->proxy_model->set_selected_base_names(this->base_name_filter); }
-            );
-
-            // weapon affinity filter
-            connect(this->affinity_list, &QListWidget::itemSelectionChanged,
-                [this]() { this->weapon_table->proxy_model->set_selected_affinities(this->affinity_filter); }
-            );
+            // filters
+            connect(this, &StatsTabBase::filter_changed,
+                [this]() { this->weapon_table->proxy_model->set_filters(
+                    this->base_game_dlc_filter,
+                    this->type_filter,
+                    this->base_name_filter,
+                    this->affinity_filter
+                );
+            });
 
             // weapon table view
             this->weapon_table->set_section_hidden<sections::CharacterLevelSection>(true);

@@ -339,10 +339,7 @@ namespace erdo::optimizer
                 free_attribute_points, min_stats.relevant_stats(), max_relevant_stats, nonscaling_attributes
             );
 
-            auto optimized_stat_variations = get_stat_variations(free_attribute_points, min_stats, optimized_max_relevant_stats);
-            if (optimized_stat_variations.empty())
-                optimized_stat_variations.emplace_back(min_stats);
-            return optimized_stat_variations;
+            return get_stat_variations(free_attribute_points, min_stats, optimized_max_relevant_stats);
         }
 
         std::map<NonscalingAttributes, std::vector<AttributeLevels>> optimized_stat_variations_map{};
