@@ -179,6 +179,16 @@ export namespace erdo::calculator
         throw std::invalid_argument("Invalid character class name: " + class_name);
     }
 
+    bool is_attribute_distribution_reachable(const AttributeLevels& initial_attribute_levels, const AttributeLevels& target_attribute_levels)
+    {
+        for (auto&& [initial, target] : std::views::zip(initial_attribute_levels, target_attribute_levels))
+        {
+            if (initial > target)
+                return false;
+        }
+        return true;
+    }
+
     using UpgradeLevels = std::array<unsigned int, 3>; // free handed, normal, somber
     constexpr auto max_upgrade_levels = UpgradeLevels{ 0, 25, 10 };
     using ScalingCurve = std::array<double, 149>;

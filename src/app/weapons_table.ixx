@@ -40,7 +40,7 @@ namespace erdo::ui
 {
     auto foreground_color(bool is_ineffective)
     {
-        return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
+        return is_ineffective ? QColor(Qt::black) : QColor(Qt::red);
     }
  
     namespace sections
@@ -245,7 +245,7 @@ namespace erdo::ui
 
             void update(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0][0] = attack_options.two_handing ? "yes" : "no";
+                (*this)[0][0] = attack_options.two_handing ? QStringLiteral("✓") : QStringLiteral("✗"); //"yes" : "no"
                 (*this)[0][1] = attack_options.two_handing;
             }
         };
@@ -254,6 +254,55 @@ namespace erdo::ui
         struct DataSection : SectionBase<std::array<std::array<QVariant, 3>, I>>
         {
             static constexpr bool expand_section = true;
+
+            QVariant data(int column, int role) const
+            {
+                if (role == Qt::DisplayRole)
+                    return this->at(column)[0];
+                
+                if (role == Qt::UserRole)
+                    return this->at(column)[1];
+                
+                if (role == Qt::ForegroundRole)
+                    return this->at(column)[2];
+                
+                if (role == Qt::TextAlignmentRole)
+                    return alignment_center;
+                
+                return {};
+            }
+        };
+        export struct CharacterClasses : DataSection<calculator::character_class_attributes.size()>
+        {
+            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_section_seperators = true;
+
+            static inline const QString section_name = "Character Classes";
+            inline const static std::vector<QString> column_names = calculator::character_class_attributes
+                | std::views::transform(&decltype(calculator::character_class_attributes)::value_type::first)
+                | std::views::transform(QString::fromStdString)
+                | std::ranges::to<std::vector>();
+
+            using DataSection<calculator::character_class_attributes.size()>::DataSection;
+            explicit CharacterClasses(const calculator::FullAttackOptions& attack_options)
+            {
+                this->update(attack_options);
+            }
+
+            void update(const calculator::FullAttackOptions& attack_options)
+            {
+                for (auto&& [class_, arr] : std::views::zip(calculator::character_class_attributes, *this))
+                {
+                    auto&& [_, class_attributes] = class_;
+                    auto reachable = calculator::is_attribute_distribution_reachable(
+                        class_attributes,
+                        attack_options.stats
+                    );
+                    arr[0] = reachable ? QStringLiteral("✓") : QStringLiteral("✗");
+                    arr[1] = reachable;
+                    arr[2] = reachable ? QColor(Qt::green) : QColor(Qt::red);
+                }
+            }
 
             QVariant data(int column, int role) const
             {
@@ -1325,6 +1374,8 @@ namespace erdo::ui
 
             this->set_section_hidden<sections::BaseName>(true);
             this->set_section_hidden<sections::BaseGameDLC>(true);
+            this->set_section_hidden<sections::CharacterClasses>(true);
+            this->set_section_hidden<sections::CharacterClasses>(true);
             [&](auto){
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);

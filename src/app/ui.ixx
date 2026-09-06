@@ -334,6 +334,7 @@ namespace erdo::ui
                 sections::StatusEffects,
                 sections::SpellScaling,
                 sections::Stats,
+                sections::CharacterClasses,
                 sections::Requirements,
                 sections::AttributeScalings,
                 sections::AttackPowerTypeAttributeScalings<apts>...

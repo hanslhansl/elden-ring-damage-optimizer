@@ -1774,6 +1774,7 @@ namespace erdo::ui
                 sections::CharacterLevel,
 
                 sections::Stats,
+                sections::CharacterClasses,
                 sections::Requirements,
                 sections::AttributeScalings
             >{};
