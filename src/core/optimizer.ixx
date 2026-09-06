@@ -65,7 +65,7 @@ namespace erdo::optimizer
     export std::size_t get_stat_variation_count(const int free_attribute_points, const RelevantAttributeLevels& min_relevant_stats, const RelevantAttributeLevels& max_relevant_stats)
     {
         if (free_attribute_points < 0)
-            throw std::invalid_argument("free_attribute_points must be >= 0.");
+            return 0;
 
         const auto A = static_cast<std::size_t>(free_attribute_points);
         constexpr std::size_t P = min_relevant_stats.extent;

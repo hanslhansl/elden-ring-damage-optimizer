@@ -618,10 +618,10 @@ namespace erdo::ui
             auto optimizer_visitor = [&](const auto& optimizer) {
                 if(optimizer.iteration_count == 0)
                 {
-                    QMessageBox::warning(
+                    QMessageBox::critical(
                         this,
-                        "No Valid Stat Variations",
-                        "There are no valid stat variations for the given min character attributes and max character level."
+                        "No Valid Attribute Variations",
+                        "There are no valid attribute variations for the given min character attributes and max character level."
                     );
                     return;
                 }
@@ -984,6 +984,7 @@ public:
                 "Unhandled exception",
                 QString::fromUtf8(e.what())
             );
+            QCoreApplication::exit(EXIT_FAILURE);
         }
         catch (...)
         {
@@ -992,8 +993,9 @@ public:
                 "Unhandled exception",
                 "Unknown exception."
             );
+            QCoreApplication::exit(EXIT_FAILURE);
         }
-
+        
         return false;
     }
 };
