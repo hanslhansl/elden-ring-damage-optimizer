@@ -1335,12 +1335,12 @@ namespace erdo::ui
 
     public:
         explicit SearchableComboBox(QWidget* parent = nullptr)
-            : QComboBox(parent)
-            , m_filterModel(new QSortFilterProxyModel(this))
-            , m_completer(new QCompleter(m_filterModel, this))
-            , m_lastValidIndex(-1)
-            , m_updatePending(false)
-            , m_internalUpdate(false)
+            : QComboBox(parent),
+            m_filterModel(new QSortFilterProxyModel(this)),
+            m_completer(new QCompleter(m_filterModel, this)),
+            m_lastValidIndex(-1),
+            m_updatePending(false),
+            m_internalUpdate(false)
         {
             setFocusPolicy(Qt::ClickFocus);
             setEditable(true);
@@ -1616,9 +1616,7 @@ namespace erdo::ui
             m_completer->setCompletionColumn(column);
         }
 
-        void restoreSearchText(
-            const QString& text,
-            int cursorPosition)
+        void restoreSearchText(const QString& text, int cursorPosition)
         {
             /*
             * Block QLineEdit signals so restoring the search text does not
@@ -2025,7 +2023,7 @@ namespace erdo::ui
             };
 
             // connect to weapon base name
-            connect(base_name_combobox, &QComboBox::currentIndexChanged, [&](int index){
+            connect(base_name_combobox, &QComboBox::currentIndexChanged, &dialog, [&](int index){
                 if (index < 0)
                     throw std::runtime_error("Invalid base name index");
 
@@ -2054,15 +2052,15 @@ namespace erdo::ui
             });
 
             // connect to weapon affinity
-            connect(affinity_combobox, &QComboBox::currentIndexChanged, set_weapon);
+            connect(affinity_combobox, &QComboBox::currentIndexChanged, &dialog, set_weapon);
 
             // connect to upgrade level
-            connect(upgrade_level_spinbox, &QSpinBox::valueChanged, [&attack_options](int value){
+            connect(upgrade_level_spinbox, &QSpinBox::valueChanged, &dialog, [&attack_options](int value){
                 attack_options.upgrade_levels.at(attack_options.weapon.get().upgrade_level_index) = value;
             });
 
             // connect to two-handing
-            connect(two_handing_checkbox, &QCheckBox::toggled, [&attack_options](bool checked){
+            connect(two_handing_checkbox, &QCheckBox::toggled, &dialog, [&attack_options](bool checked){
                 attack_options.two_handing = checked;
             });
 
@@ -2086,7 +2084,7 @@ namespace erdo::ui
 
                 form->addRow(enum_to_display(attribute) + ":", attribute_spinbox);
 
-                connect(attribute_spinbox, &QSpinBox::valueChanged, [&, i](int value) {
+                connect(attribute_spinbox, &QSpinBox::valueChanged, &dialog, [&, i](int value) {
                     attack_options.stats.at(i) = value;
                 });
             }
@@ -2167,7 +2165,9 @@ namespace erdo::ui
             // weapon table (model)
             this->weapon_table = new WeaponTable<Row>(true, "No datasets to display, add with right-click or from other tabs.", this);
             connect(this->weapon_table, &WeaponTable<Row>::remove_selection_from_plot, this, &PlotTab::remove_datasets);
-            connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, [this](int wi, QColor color){ this->update_datasets(wi, 1); });
+            connect(this->weapon_table, &WeaponTable<Row>::row_color_changed, this, [this](int wi, QColor color){
+                this->update_datasets(wi, 1);
+            });
             connect(this->weapon_table, &WeaponTable<Row>::edit_row, this, &PlotTab::edit_dataset_dialog);
             connect(this->weapon_table, &WeaponTable<Row>::add_new_to_plot, this, &PlotTab::add_new_dataset_dialog);
 
@@ -2250,7 +2250,7 @@ namespace erdo::ui
                 }
             };
             set_data_line_width();
-            connect(&settings.plot_data_line_width, settings.plot_data_line_width.changed_member_pointer, set_data_line_width);
+            connect(&settings.plot_data_line_width, settings.plot_data_line_width.changed_member_pointer, this, set_data_line_width);
 
             auto dva = this->plotter->dataValueAttributes();
             auto marker = dva.markerAttributes();
@@ -2279,7 +2279,7 @@ namespace erdo::ui
                 grid.setGridPen(pen);
                 plane->setGlobalGridAttributes(grid);
             };
-            connect(&settings.plot_grid_line_width, settings.plot_grid_line_width.changed_member_pointer, set_grid_line_width);
+            connect(&settings.plot_grid_line_width, settings.plot_grid_line_width.changed_member_pointer, this, set_grid_line_width);
 
             pen = grid.zeroLinePen();
             pen.setCosmetic(true);
@@ -2295,7 +2295,7 @@ namespace erdo::ui
                 grid.setZeroLinePen(pen);
                 plane->setGlobalGridAttributes(grid);
             };
-            connect(&settings.plot_axis_line_width, settings.plot_axis_line_width.changed_member_pointer, set_axis_line_width);
+            connect(&settings.plot_axis_line_width, settings.plot_axis_line_width.changed_member_pointer, this, set_axis_line_width);
 
             this->addWidget(this->weapon_table);
             this->setSizes({600, 400});

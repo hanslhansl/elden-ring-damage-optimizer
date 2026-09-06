@@ -625,7 +625,7 @@ namespace erdo::ui
 
         explicit RowModel(QObject* parent = nullptr) : QAbstractTableModel(parent)
         {
-            connect(&settings.decimal_places, settings.decimal_places.changed_member_pointer, [this](){
+            connect(&settings.decimal_places, settings.decimal_places.changed_member_pointer, this, [this](){
                 for (auto&& row : this->rows)
                     row.update();
                 emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
@@ -1301,7 +1301,7 @@ namespace erdo::ui
             {
                 auto delegate = new ColorDelegate(this);
                 this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::ColorSection, Row>), delegate);
-                connect(delegate, &ColorDelegate::row_color_changed, [this](QModelIndex index, QColor color){
+                connect(delegate, &ColorDelegate::row_color_changed, this, [this](QModelIndex index, QColor color){
                     emit row_color_changed(this->proxy_model->mapToSource(index).row(), color);
                 });
             }

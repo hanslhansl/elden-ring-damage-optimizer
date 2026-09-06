@@ -175,7 +175,7 @@ namespace erdo::ui
 
             QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Reset, this->dialog.get());
             QObject::connect(buttons, &QDialogButtonBox::accepted, this->dialog.get(), &QDialog::accept);
-            QObject::connect(buttons, &QDialogButtonBox::clicked, [this, buttons](QAbstractButton* button) {
+            QObject::connect(buttons, &QDialogButtonBox::clicked, this->dialog.get(), [this, buttons](QAbstractButton* button) {
                 if (buttons->buttonRole(button) == QDialogButtonBox::ResetRole)
                 {
                     this->dialog->reject();
@@ -254,7 +254,7 @@ erdo::ui::SettingMember<T>::SettingMember(U&& member_info)
 
     settings.widgets.push_back({{member_info.section_name, member_info.display_name}, widget});
 
-    connect(widget, U::signal, [this, member_info = std::move(member_info)](T new_value){
+    connect(widget, U::signal, this, [this, member_info = std::move(member_info)](T new_value){
         this->value = new_value;
         settings.qsettings->setValue(member_info.name, new_value);
         settings.qsettings->sync();

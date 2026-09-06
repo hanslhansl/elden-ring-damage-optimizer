@@ -164,12 +164,12 @@ namespace erdo::ui
             updateLabel();
         });
 
-        QObject::connect(&watcher, &QFutureWatcher<T>::progressTextChanged, [&](const QString& text) {
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressTextChanged, &progress, [&](const QString& text) {
             progressText = text;
             updateLabel();
         });
 
-        QObject::connect(&watcher, &QFutureWatcher<T>::progressValueChanged, [&](int value) {
+        QObject::connect(&watcher, &QFutureWatcher<T>::progressValueChanged, &progress, [&](int value) {
             progress.setValue(value);
             updateLabel();
         });
@@ -177,7 +177,7 @@ namespace erdo::ui
         QObject::connect(&watcher, &QFutureWatcher<T>::finished, &progress, &QDialog::accept);
 
         QObject::disconnect(&progress, &QProgressDialog::canceled, nullptr, nullptr);
-        QObject::connect(&progress,  &QProgressDialog::canceled, [&]() {
+        QObject::connect(&progress,  &QProgressDialog::canceled, &progress, [&]() {
             // future.cancel();
             progress.setCancelButton(nullptr);
             progress.setLabelText("Canceling…");
@@ -248,7 +248,6 @@ namespace erdo::ui
 
             this->adjust_base_name_filter();
         }
-        
         void adjust_base_name_filter()
         {
             auto filterable_base_names = *this->active_weapon_data
@@ -292,7 +291,6 @@ namespace erdo::ui
 
             this->adjust_affinity_list_filter();
         }
-
         void adjust_affinity_list_filter()
         {
             auto visible_affinities = *this->active_weapon_data
@@ -352,7 +350,7 @@ namespace erdo::ui
             for (const auto& [class_name, _] : calculator::character_class_stats)
                 this->starting_class_combobox->addItem(QString::fromStdString(class_name));
             this->starting_class_combobox->setCurrentIndex(-1);
-            connect(this->starting_class_combobox, &QComboBox::currentTextChanged, [this](const QString& text) {
+            connect(this->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
                 if (text.isEmpty())
                     return;
 
@@ -378,7 +376,7 @@ namespace erdo::ui
                     enum_to_display(attribute) + ":", attribute_spinbox
                 );
 
-                connect(attribute_spinbox, &QSpinBox::valueChanged, [this]() {
+                connect(attribute_spinbox, &QSpinBox::valueChanged, this, [this]() {
                     auto&& stats = this->get_character_stats();
 
                     QSignalBlocker b { this->starting_class_combobox };
@@ -398,7 +396,7 @@ namespace erdo::ui
 
             // character level label
             this->character_level_label->setText(QString::number(this->get_character_stats().character_level()));
-            connect(this, &StatsTabBase::character_stats_changed, [this](const calculator::AttributeLevels& stats){
+            connect(this, &StatsTabBase::character_stats_changed, this, [this](const calculator::AttributeLevels& stats){
                 this->character_level_label->setText(QString::number(stats.character_level()));
             });
 
@@ -513,7 +511,7 @@ namespace erdo::ui
             connect(this->two_handing_checkbox, &QCheckBox::checkStateChanged, this, &StatsTab::calculate_weapon_stats);
 
             // filters
-            connect(this, &StatsTabBase::filter_changed,
+            connect(this, &StatsTabBase::filter_changed, this,
                 [this]() { this->weapon_table->proxy_model->set_filters(
                     this->base_game_dlc_filter,
                     this->type_filter,
@@ -748,8 +746,8 @@ namespace erdo::ui
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
             // optimize buttons
-            connect(this->start_brute_force_button, &QPushButton::clicked, [this](){ this->optimize(false); });
-            connect(this->start_v2_button, &QPushButton::clicked, [this](){ this->optimize(true); });
+            connect(this->start_brute_force_button, &QPushButton::clicked, this, [this](){ this->optimize(false); });
+            connect(this->start_v2_button, &QPushButton::clicked, this, [this](){ this->optimize(true); });
         }
     
         void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
