@@ -22,9 +22,9 @@ add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>")
 add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
 
 # ASan and UBSan for debug builds
-add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
-add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fno-omit-frame-pointer>)
-add_link_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
+# add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
+# add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fno-omit-frame-pointer>)
+# add_link_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)
 
 
 # add_compile_options(-g -gcodeview)

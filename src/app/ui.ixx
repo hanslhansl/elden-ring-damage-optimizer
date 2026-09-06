@@ -966,9 +966,41 @@ namespace erdo::ui
     };
 }
 
+class Application : public QApplication
+{
+public:
+    using QApplication::QApplication;
+
+    bool notify(QObject *receiver, QEvent *event) override
+    {
+        try
+        {
+            return QApplication::notify(receiver, event);
+        }
+        catch (const std::exception& e)
+        {
+            QMessageBox::critical(
+                nullptr,
+                "Unhandled exception",
+                QString::fromUtf8(e.what())
+            );
+        }
+        catch (...)
+        {
+            QMessageBox::critical(
+                nullptr,
+                "Unhandled exception",
+                "Unknown exception."
+            );
+        }
+
+        return false;
+    }
+};
+
 int erdo::ui::run_ui(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    Application app(argc, argv);
     app.setOrganizationName("hanslhansl");
     app.setApplicationName("elden-ring-damage-optimizer");
     settings.initialize();
