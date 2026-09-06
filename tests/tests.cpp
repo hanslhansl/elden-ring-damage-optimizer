@@ -76,7 +76,7 @@ TEST_CASE("calculation - total attack power 2")
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
-void test_stat_variations(
+auto test_stat_variation_count(
     const int expected_stat_variation_count,
     const calculator::AttributeLevels& min_stats,
     const calculator::RelevantAttributeLevels& max_relevant_stats,
@@ -110,99 +110,99 @@ void test_stat_variations(
         );
     };
     REQUIRE(stat_variations.size() == expected_stat_variation_count);
+    return stat_variations;
 }
-
-TEST_CASE("stat variations 1")
+TEST_CASE("stat variation count 1")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         1365,
         {},
         make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit),
         11
     );
 }
-TEST_CASE("stat variations 2 - lower edge case")
+TEST_CASE("stat variation count 2 - lower edge case")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         1,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         0
     );
 }
-TEST_CASE("stat variations 3 - single point")
+TEST_CASE("stat variation count 3 - single point")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         5,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         1
     );
 }
-TEST_CASE("stat variations 4 - two points")
+TEST_CASE("stat variation count 4 - two points")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         15,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         2
     );
 }
-TEST_CASE("stat variations 5")
+TEST_CASE("stat variation count 5")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         71,
         {0, 0, 0, 0, 0, 0, 0, 0},
         std::array<unsigned int, 5>{1, 2, 3, 4, 5},
         5
     );
 }
-TEST_CASE("stat variations 6 - exactly upper edge case")
+TEST_CASE("stat variation count 6 - exactly upper edge case")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         1,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         50
     );
 }
-TEST_CASE("stat variations 7 - above upper edge case")
+TEST_CASE("stat variation count 7 - above upper edge case")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         1,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         51
     );
 }
-TEST_CASE("stat variations 8")
+TEST_CASE("stat variation count 8")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         15,
         {0, 0, 0, 10, 20, 30, 40, 50},
         std::array<unsigned int, 5>{12, 22, 32, 42, 52},
         2
     );
 }
-TEST_CASE("stat variations 9 - irrelevant attributes")
+TEST_CASE("stat variation count 9 - irrelevant attributes")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         15,
         {100, 200, 300, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         2
     );
 
-    test_stat_variations(
+    test_stat_variation_count(
         15,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         2
     );
 }
-TEST_CASE("stat variations 10")
+TEST_CASE("stat variation count 10")
 {
-    test_stat_variations(
+    test_stat_variation_count(
         1,
         {0, 0, 0, 10, 20, 30, 40, 50},
         std::array<unsigned int, 5>{12, 22, 32, 42, 52},
@@ -210,6 +210,38 @@ TEST_CASE("stat variations 10")
     );
 }
 
+void test_stat_variations(
+    const int expected_stat_variation_count,
+    std::vector<calculator::AttributeLevels> expected_stat_variations,
+    const calculator::AttributeLevels& min_stats,
+    const calculator::RelevantAttributeLevels& max_relevant_stats,
+    const int free_attribute_points
+)
+{
+    auto stat_variations = test_stat_variation_count(
+        expected_stat_variation_count,
+        min_stats,
+        max_relevant_stats,
+        free_attribute_points
+    );
+    REQUIRE(stat_variations == expected_stat_variations);
+}
+TEST_CASE("stat variations - single point")
+{
+    test_stat_variations(
+        5,
+        {
+            {0, 0, 0, 0, 0, 0, 0, 1},
+            {0, 0, 0, 0, 0, 0, 1, 0},
+            {0, 0, 0, 0, 0, 1, 0, 0},
+            {0, 0, 0, 0, 1, 0, 0, 0},
+            {0, 0, 0, 1, 0, 0, 0, 0}
+        },
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        make_filled_array<calculator::RelevantAttributeLevels>(10),
+        1
+    );
+}
 
 template<typename Optimizer>
 void test_optimization(std::string_view expected_weapon_full_name, const calculator::AttributeLevels& expected_stats, const std::vector<double>& expected_values)
@@ -231,9 +263,13 @@ void test_optimization(std::string_view expected_weapon_full_name, const calcula
     };
     REQUIRE(attacks.size() == expected_values.size());
 
-    for (auto&& [attack, expected] : std::views::zip(attacks, expected_values))
+    std::println("{}", attacks | std::views::transform([&](const calculator::Attack& attack) { return optimizer.projection(attack); }));
+
+    for (auto&& [i, values] : std::views::zip(attacks, expected_values) | std::views::enumerate)
     {
+        auto&& [attack, expected] = values;
         auto&& weapon = attack.weapon.get();
+        CAPTURE(i);
         CAPTURE(weapon.full_name);
         CAPTURE(attack.stats);
         CAPTURE(min_stats);
