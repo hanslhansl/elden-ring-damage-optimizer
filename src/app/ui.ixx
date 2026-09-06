@@ -347,14 +347,14 @@ namespace erdo::ui
             this->setupUi(this);
 
             // starting class combobox
-            for (const auto& [class_name, _] : calculator::character_class_stats)
+            for (const auto& [class_name, _] : calculator::character_class_attributes)
                 this->starting_class_combobox->addItem(QString::fromStdString(class_name));
             this->starting_class_combobox->setCurrentIndex(-1);
             connect(this->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
                 if (text.isEmpty())
                     return;
 
-                auto&& stats = calculator::character_class_stats.at(text.toStdString());
+                auto&& stats = calculator::get_character_class_attributes(text.toStdString());
                 for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, stats))
                 {
                     QSignalBlocker b { spinbox };
@@ -381,11 +381,11 @@ namespace erdo::ui
 
                     QSignalBlocker b { this->starting_class_combobox };
                     auto it = std::ranges::find(
-                        calculator::character_class_stats,
+                        calculator::character_class_attributes,
                         stats,
-                        &decltype(calculator::character_class_stats)::value_type::second
+                        &decltype(calculator::character_class_attributes)::value_type::second
                     );
-                    if (it != calculator::character_class_stats.end()) 
+                    if (it != calculator::character_class_attributes.end()) 
                         this->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
                     else
                         this->starting_class_combobox->setCurrentIndex(-1);

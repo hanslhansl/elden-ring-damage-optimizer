@@ -248,7 +248,7 @@ void test_optimization(std::string_view expected_weapon_full_name, const calcula
 {
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    const auto min_stats = calculator::character_class_stats.at("wretch");
+    const auto min_stats = calculator::get_character_class_attributes("Wretch");
     const auto min_relevant_stats = min_stats.relevant_stats();
     const auto free_attribute_points = 11;
     const auto max_stat = 99;
