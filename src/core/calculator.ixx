@@ -158,18 +158,18 @@ export namespace erdo::calculator
         }
     };
     const std::map<std::string, AttributeLevels> character_class_stats{
-        {"hero", {14, 9, 9, 16, 9, 7, 8, 11}},
-        {"bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
-        {"astrologer", {9, 12, 15, 8, 12, 16, 7, 9}},
-        {"warrior", {11, 16, 12, 10, 16, 10, 8, 9}},
-        {"prisoner", {11, 14, 12, 11, 14, 14, 6, 9}},
-        {"confessor", {10, 12, 13, 12, 12, 9, 14, 9}},
-        {"wretch", {10, 10, 10, 10, 10, 10, 10, 10}},
-        {"vagabond", {15, 13, 10, 14, 13, 9, 9, 7}},
-        {"prophet", {10, 10, 14, 11, 10, 7, 16, 10}},
-        {"samurai", {12, 15, 11, 12, 15, 9, 8, 8}},
-        {"heavy knight", {14, 11, 8, 7, 17, 8, 15, 9}},
-        {"idus knight", {10, 15, 12, 8, 11, 11, 13, 6}},
+        {"Hero", {14, 9, 9, 16, 9, 7, 8, 11}},
+        {"Bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
+        {"Astrologer", {9, 12, 15, 8, 12, 16, 7, 9}},
+        {"Warrior", {11, 16, 12, 10, 16, 10, 8, 9}},
+        {"Prisoner", {11, 14, 12, 11, 14, 14, 6, 9}},
+        {"Confessor", {10, 12, 13, 12, 12, 9, 14, 9}},
+        {"Wretch", {10, 10, 10, 10, 10, 10, 10, 10}},
+        {"Vagabond", {15, 13, 10, 14, 13, 9, 9, 7}},
+        {"Prophet", {10, 10, 14, 11, 10, 7, 16, 10}},
+        {"Samurai", {12, 15, 11, 12, 15, 9, 8, 8}},
+        {"Heavy Knight", {14, 11, 8, 7, 17, 8, 15, 9}},
+        {"Idus Knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     };
 
     using UpgradeLevels = std::array<unsigned int, 3>; // free handed, normal, somber
