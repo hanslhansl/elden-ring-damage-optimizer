@@ -76,6 +76,8 @@ namespace erdo::ui
         std::string_view name;
         std::string_view display_name;
 
+        value_type default_value;
+
         void initialize(widget_type* checkbox, value_type value) const
         {
             checkbox->setChecked(value);
@@ -101,6 +103,12 @@ namespace erdo::ui
             .default_value = 3,
             .minimum_value = 0,
             .maximum_value = 10
+        } };
+        SettingMember<bool> show_attack_power_split{ CheckBoxSetting{
+            .section_name = "General",
+            .name = "show_attack_power_split",
+            .display_name = "Show Attack Power Split",
+            .default_value = false
         } };
 
         SettingMember<int> plot_data_line_width{ SpinBoxSetting{
@@ -238,6 +246,22 @@ namespace erdo::ui
         if constexpr (std::integral<T>)
             return QString::number(x);
         return format_float(x);
+    };
+    export template<typename T>
+    auto format_number_pair(T x, T y)
+    {
+        if (y < 0)
+        {
+            if constexpr (std::integral<T>)
+                return QString::number(x) + " - " + QString::number(-y);
+            return format_float(x) + " - " + format_float(-y);
+        }
+        else
+        {
+            if constexpr (std::integral<T>)
+                return QString::number(x) + " + " + QString::number(y);
+            return format_float(x) + " + " + format_float(y);
+        }
     };
 }
 

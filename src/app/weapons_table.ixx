@@ -366,12 +366,19 @@ namespace erdo::ui
                     attack.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    arr[0] = /*format_number(ap[0]) + "/" +*/ format_number(ap[1]);
+                    if (settings.show_attack_power_split)
+                        arr[0] = format_number_pair(ap[0], ap[1] - ap[0]);
+                    else
+                        arr[0] = format_number(ap[1]);
+
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }
 
-                this->back()[0] = format_number(attack.total_attack_power[1]);
+                if (settings.show_attack_power_split)
+                    this->back()[0] = format_number_pair(attack.total_attack_power[0], attack.total_attack_power[1] - attack.total_attack_power[0]);
+                else
+                    this->back()[0] = format_number(attack.total_attack_power[1]);
                 this->back()[1] = attack.total_attack_power[1];
                 this->back()[2] = foreground_color(attack.is_total_attack_power_ineffective());
             }
@@ -406,7 +413,11 @@ namespace erdo::ui
                     attack.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    arr[0] = format_number(ap[1]);
+                    if (settings.show_attack_power_split)
+                        arr[0] = format_number_pair(ap[0], ap[1] - ap[0]);
+                    else
+                        arr[0] = format_number(ap[1]);
+
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }
@@ -677,7 +688,21 @@ namespace erdo::ui
             connect(&settings.decimal_places, settings.decimal_places.changed_member_pointer, this, [this](){
                 for (auto&& row : this->rows)
                     row.update();
-                emit dataChanged(this->index(0, 0), this->index(this->rowCount() - 1, this->columnCount() - 1));
+                emit dataChanged(
+                    this->index(0, 0),
+                    this->index(this->rowCount() - 1, this->columnCount() - 1),
+                    { Qt::DisplayRole }
+                );
+            });
+
+            connect(&settings.show_attack_power_split, settings.show_attack_power_split.changed_member_pointer, this, [this](){
+                for (auto&& row : this->rows)
+                    row.update();
+                emit dataChanged(
+                    this->index(0, 0),
+                    this->index(this->rowCount() - 1, this->columnCount() - 1),
+                    { Qt::DisplayRole }
+                );
             });
         }
 
