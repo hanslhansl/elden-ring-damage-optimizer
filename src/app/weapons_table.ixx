@@ -40,7 +40,7 @@ namespace erdo::ui
 {
     auto foreground_color(bool is_ineffective)
     {
-        return is_ineffective ? QColor(Qt::black) : QColor(Qt::red);
+        return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
     }
  
     namespace sections
