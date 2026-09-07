@@ -25,17 +25,20 @@ const auto& get_weapons()
     return data_reference;
 }
 
-const std::vector<double> excpected_calculation_total_attack_power_1 {
-    #include "excpected_calculation_total_attack_power_1.inc"
+const std::vector<double> expected_calculation_total_attack_power_1 {
+    #include "expected_calculation_total_attack_power_1.inc"
 };
-const std::vector<double> excpected_calculation_total_attack_power_2 {
-    #include "excpected_calculation_total_attack_power_2.inc"
+const std::vector<double> expected_calculation_total_attack_power_2 {
+    #include "expected_calculation_total_attack_power_2.inc"
 };
-const std::vector<double> excpected_optimization_total_attack_power {
-    #include "excpected_optimization_total_attack_power.inc"
+const std::vector<double> expected_optimization_total_attack_power {
+    #include "expected_optimization_total_attack_power.inc"
 };
-const std::vector<double> excpected_optimization_spell_scaling {
-    #include "excpected_optimization_spell_scaling.inc"
+const std::vector<double> expected_optimization_spell_scaling {
+    #include "expected_optimization_spell_scaling.inc"
+};
+const std::vector<calculator::AttributeLevels> expected_stat_variations {
+    #include "expected_stat_variations.inc"
 };
 
 
@@ -51,9 +54,9 @@ TEST_CASE("calculation - total attack power 1")
         | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
-    REQUIRE(total_attack_powers.size() == excpected_calculation_total_attack_power_1.size());
+    REQUIRE(total_attack_powers.size() == expected_calculation_total_attack_power_1.size());
 
-    for (auto [actual, expected] : std::views::zip(total_attack_powers, excpected_calculation_total_attack_power_1))
+    for (auto [actual, expected] : std::views::zip(total_attack_powers, expected_calculation_total_attack_power_1))
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
@@ -70,29 +73,27 @@ TEST_CASE("calculation - total attack power 2")
         | std::views::transform(optimizer::projection<optimizer::Target::TOTAL_ATTACK_POWER>)
         | std::ranges::to<std::vector>();
 
-    REQUIRE(total_attack_powers.size() == excpected_calculation_total_attack_power_2.size());
+    REQUIRE(total_attack_powers.size() == expected_calculation_total_attack_power_2.size());
 
-    for (auto [actual, expected] : std::views::zip(total_attack_powers, excpected_calculation_total_attack_power_2))
+    for (auto [actual, expected] : std::views::zip(total_attack_powers, expected_calculation_total_attack_power_2))
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
 auto test_stat_variation_count(
-    const int expected_stat_variation_count,
+    const int max_attribute_points,
     const calculator::AttributeLevels& min_stats,
     const calculator::RelevantAttributeLevels& max_relevant_stats,
-    const int free_attribute_points
+    const int expected_stat_variation_count
 )
 {
-    const auto min_relevant_stats = min_stats.relevant_stats();
-
     std::size_t stat_variation_count;
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::get_stat_variation_count")
 #endif
     {
         stat_variation_count = optimizer::get_stat_variation_count(
-            free_attribute_points,
-            min_relevant_stats,
+            max_attribute_points,
+            min_stats,
             max_relevant_stats
         );
     };
@@ -104,7 +105,7 @@ auto test_stat_variation_count(
 #endif
     {
         stat_variations = optimizer::get_stat_variations(
-            free_attribute_points,
+            max_attribute_points,
             min_stats,
             max_relevant_stats
         );
@@ -115,120 +116,123 @@ auto test_stat_variation_count(
 TEST_CASE("stat variation count 1")
 {
     test_stat_variation_count(
-        1365,
+        11,
         {},
         make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit),
-        11
+        1365
     );
 }
 TEST_CASE("stat variation count 2 - lower edge case")
 {
     test_stat_variation_count(
-        1,
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        make_filled_array<calculator::RelevantAttributeLevels>(10),
-        0
-    );
-}
-TEST_CASE("stat variation count 3 - single point")
-{
-    test_stat_variation_count(
-        5,
+        0,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
         1
     );
 }
+TEST_CASE("stat variation count 3 - single point")
+{
+    test_stat_variation_count(
+        1,
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        make_filled_array<calculator::RelevantAttributeLevels>(10),
+        5
+    );
+}
 TEST_CASE("stat variation count 4 - two points")
 {
     test_stat_variation_count(
-        15,
+        2,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
-        2
+        15
     );
 }
 TEST_CASE("stat variation count 5")
 {
     test_stat_variation_count(
-        71,
+        5,
         {0, 0, 0, 0, 0, 0, 0, 0},
         std::array<unsigned int, 5>{1, 2, 3, 4, 5},
-        5
+        71
     );
 }
 TEST_CASE("stat variation count 6 - exactly upper edge case")
 {
     test_stat_variation_count(
-        1,
+        50,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
-        50
+        1
     );
 }
 TEST_CASE("stat variation count 7 - above upper edge case")
 {
     test_stat_variation_count(
-        1,
+        51,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
-        51
+        1
     );
 }
 TEST_CASE("stat variation count 8")
 {
     test_stat_variation_count(
-        15,
+        152,
         {0, 0, 0, 10, 20, 30, 40, 50},
         std::array<unsigned int, 5>{12, 22, 32, 42, 52},
-        2
+        15
     );
 }
 TEST_CASE("stat variation count 9 - irrelevant attributes")
 {
     test_stat_variation_count(
-        15,
+        602,
         {100, 200, 300, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
-        2
+        15
     );
 
     test_stat_variation_count(
-        15,
+        2,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::RelevantAttributeLevels>(10),
-        2
+        15
     );
 }
 TEST_CASE("stat variation count 10")
 {
     test_stat_variation_count(
-        1,
+        161,
         {0, 0, 0, 10, 20, 30, 40, 50},
         std::array<unsigned int, 5>{12, 22, 32, 42, 52},
-        11
+        1
     );
 }
 
 void test_stat_variations(
-    const int expected_stat_variation_count,
-    std::vector<calculator::AttributeLevels> expected_stat_variations,
+    const int max_attribute_points,
     const calculator::AttributeLevels& min_stats,
     const calculator::RelevantAttributeLevels& max_relevant_stats,
-    const int free_attribute_points
+    const int expected_stat_variation_count,
+    std::vector<calculator::AttributeLevels> expected_stat_variations
 )
 {
     auto stat_variations = test_stat_variation_count(
-        expected_stat_variation_count,
+        max_attribute_points,
         min_stats,
         max_relevant_stats,
-        free_attribute_points
+        expected_stat_variation_count
     );
     REQUIRE(stat_variations == expected_stat_variations);
 }
-TEST_CASE("stat variations - single point")
+TEST_CASE("stat variations 1 - single point")
 {
     test_stat_variations(
+        1,
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        make_filled_array<calculator::RelevantAttributeLevels>(10),
         5,
         {
             {0, 0, 0, 0, 0, 0, 0, 1},
@@ -236,11 +240,52 @@ TEST_CASE("stat variations - single point")
             {0, 0, 0, 0, 0, 1, 0, 0},
             {0, 0, 0, 0, 1, 0, 0, 0},
             {0, 0, 0, 1, 0, 0, 0, 0}
-        },
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        make_filled_array<calculator::RelevantAttributeLevels>(10),
-        1
+        }
     );
+}
+TEST_CASE("stat variations 2")
+{
+    test_stat_variations(
+        80,
+        {10, 10, 10, 0, 0, 0, 20, 10},
+        make_filled_array<calculator::RelevantAttributeLevels>(99),
+        10626,
+        expected_stat_variations
+    );
+}
+TEST_CASE("stat variations 3 - starting class algorithm")
+{
+    const int max_attribute_points = 80;
+    const std::vector<calculator::AttributeLevels> min_stats = {{10, 10, 10, 0, 0, 0, 20, 10}};
+    const auto max_relevant_stats = make_filled_array<calculator::RelevantAttributeLevels>(99);
+    const int expected_stat_variation_count = 10626;
+
+    std::size_t stat_variation_count;
+#ifdef ENABLE_BENCHMARKS
+    BENCHMARK("optimizer::starting_class::get_stat_variation_count")
+#endif
+    {
+        stat_variation_count = optimizer::starting_class::get_stat_variation_count(
+            max_attribute_points,
+            min_stats,
+            max_relevant_stats
+        );
+    };
+    REQUIRE(stat_variation_count == expected_stat_variation_count);
+    
+    std::vector<calculator::AttributeLevels> stat_variations{};
+#ifdef ENABLE_BENCHMARKS
+    BENCHMARK("optimizer::starting_class::get_stat_variations")
+#endif
+    {
+        stat_variations = optimizer::starting_class::get_stat_variations(
+            max_attribute_points,
+            min_stats,
+            max_relevant_stats
+        );
+    };
+    REQUIRE(stat_variations.size() == expected_stat_variation_count);
+    REQUIRE(stat_variations == expected_stat_variations);
 }
 
 template<typename Optimizer>
@@ -248,13 +293,11 @@ void test_optimization(std::string_view expected_weapon_full_name, const calcula
 {
     auto&& weapons = get_weapons();
     calculator::AttackOptions attack_options{{0, 25, 10}, true};
-    const auto min_stats = calculator::get_character_class_attributes("Wretch");
-    const auto min_relevant_stats = min_stats.relevant_stats();
-    const auto free_attribute_points = 11;
-    const auto max_stat = 99;
+    const auto min_stats = calculator::get_character_starting_class_attributes("Wretch");
+    const auto free_attribute_points = 91;
 
     std::vector<calculator::Attack> attacks{};
-    Optimizer optimizer{weapons, attack_options, free_attribute_points, min_stats, max_stat};
+    Optimizer optimizer{weapons, attack_options, free_attribute_points, min_stats, calculator::attribute_level_limit, false};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer.run_synchronously")
 #endif
@@ -287,7 +330,7 @@ TEST_CASE("optimization - brute force - total attack power")
     test_optimization<optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER>>(
         "Fire Duelist Greataxe",
         { 10, 10, 10, 21, 10, 10, 10, 10 },
-        excpected_optimization_total_attack_power
+        expected_optimization_total_attack_power
     );
 }
 
@@ -296,7 +339,7 @@ TEST_CASE("optimization - brute force - spell scaling")
     test_optimization<optimizer::BruteForce<optimizer::Target::SPELL_SCALING>>(
         "Demi-Human Queen's Staff",
         { 10, 10, 10, 10, 10, 21, 10, 10 },
-        excpected_optimization_spell_scaling
+        expected_optimization_spell_scaling
     );
 }
 
@@ -305,7 +348,7 @@ TEST_CASE("optimization - v2 - total attack power")
     test_optimization<optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER>>(
         "Fire Duelist Greataxe",
         { 10, 10, 10, 21, 10, 10, 10, 10 },
-        excpected_optimization_total_attack_power
+        expected_optimization_total_attack_power
     );
 }
 
@@ -314,6 +357,6 @@ TEST_CASE("optimization - v2 - spell scaling")
     test_optimization<optimizer::V2<optimizer::Target::SPELL_SCALING>>(
         "Demi-Human Queen's Staff",
         { 10, 10, 10, 10, 10, 21, 10, 10 },
-        excpected_optimization_spell_scaling
+        expected_optimization_spell_scaling
     );
 }

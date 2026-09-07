@@ -348,14 +348,14 @@ namespace erdo::ui
             this->setupUi(this);
 
             // starting class combobox
-            for (const auto& [class_name, _] : calculator::character_class_attributes)
+            for (const auto& [class_name, _] : calculator::character_starting_class_attributes)
                 this->starting_class_combobox->addItem(QString::fromStdString(class_name));
             this->starting_class_combobox->setCurrentIndex(-1);
             connect(this->starting_class_combobox, &QComboBox::currentTextChanged, this, [this](const QString& text) {
                 if (text.isEmpty())
                     return;
 
-                auto&& stats = calculator::get_character_class_attributes(text.toStdString());
+                auto&& stats = calculator::get_character_starting_class_attributes(text.toStdString());
                 for (auto&& [spinbox, stat] : std::views::zip(this->attribute_spinboxes, stats))
                 {
                     QSignalBlocker b { spinbox };
@@ -382,11 +382,11 @@ namespace erdo::ui
 
                     QSignalBlocker b { this->starting_class_combobox };
                     auto it = std::ranges::find(
-                        calculator::character_class_attributes,
+                        calculator::character_starting_class_attributes,
                         stats,
-                        &decltype(calculator::character_class_attributes)::value_type::second
+                        &decltype(calculator::character_starting_class_attributes)::value_type::second
                     );
-                    if (it != calculator::character_class_attributes.end()) 
+                    if (it != calculator::character_starting_class_attributes.end()) 
                         this->starting_class_combobox->setCurrentText(QString::fromStdString(it->first));
                     else
                         this->starting_class_combobox->setCurrentIndex(-1);
@@ -577,7 +577,7 @@ namespace erdo::ui
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
 
-        void prepare_optimization()
+        void filter_active_weapon_data()
         {
             this->filtered_active_weapon_data.clear();
             this->filtered_active_weapon_data.reserve(this->active_weapon_data->size());
@@ -591,28 +591,44 @@ namespace erdo::ui
             );
             this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
 
+            this->prepare_optimization();
+        }
+
+        void prepare_optimization()
+        {
             auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
             this->free_attribute_points_label->setText(QString::number(free_attribute_points));
 
+            std::size_t stat_variation_count;
+            if (this->optimize_starting_class_checkbox->isChecked())
+            {
+                stat_variation_count = optimizer::starting_class::get_stat_variation_count(
+                    max_attribute_points,
+                    optimizer::starting_class::get_min_stats(min_stats),
+                    make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
+                );
+            }
+            else
+            {
+                stat_variation_count = optimizer::get_stat_variation_count(
+                    max_attribute_points,
+                    min_stats,
+                    make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
+                );
+            }
 
-            auto stat_variation_count = optimizer::get_stat_variation_count(
-                free_attribute_points,
-                min_stats.relevant_stats(),
-                make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
-            );
             this->brute_force_variations_label->setText(QString::number(stat_variation_count));
             this->brute_force_iterations_label->setText(QString::number(stat_variation_count * this->filtered_active_weapon_data.size()));
         }
-
         void optimize(bool use_v2)
         {
             auto attack_options = this->get_attack_options();
+            auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
             auto min_stats = this->get_character_stats();
-            auto free_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value())
-                - min_stats.attribute_points();
+            auto optimize_starting_class = this->optimize_starting_class_checkbox->isChecked();
 
             auto target = static_cast<optimizer::Target>(this->target_combobox->currentIndex());
 
@@ -652,9 +668,10 @@ namespace erdo::ui
                         auto v2_optimizer = optimizer::V2<integral_constant.value>{
                             filtered_active_weapon_data,
                             attack_options,
-                            free_attribute_points,
+                            max_attribute_points,
                             min_stats,
-                            calculator::attribute_level_limit
+                            calculator::attribute_level_limit, 
+                            optimize_starting_class
                         };
                         this->v2_variations_label->setText(
                             QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
@@ -675,15 +692,20 @@ namespace erdo::ui
                         auto brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
                             filtered_active_weapon_data,
                             attack_options,
-                            free_attribute_points,
+                            max_attribute_points,
                             min_stats,
-                            calculator::attribute_level_limit
+                            calculator::attribute_level_limit, 
+                            optimize_starting_class
                         };
+                        this->brute_force_variations_label->setText(
+                            QString::number(brute_force_optimizer.iteration_count / this->filtered_active_weapon_data.size())
+                        );
+                        this->brute_force_iterations_label->setText(QString::number(brute_force_optimizer.iteration_count));
 
                         optimizer_visitor(brute_force_optimizer);
                     }
                     else
-                        throw std::runtime_error("V2 optimizer not implemented for this target.");
+                        throw std::runtime_error("Brute Force optimizer not implemented for this target.");
                 });
             }
         }
@@ -711,22 +733,22 @@ namespace erdo::ui
 
             // attribute points label
             max_character_stats_layout->addRow("Max Attribute Points:", this->max_attribute_points_label = new QLabel());
-            max_character_stats_layout->addRow("Max Free Attribute Points:", this->free_attribute_points_label = new QLabel());
+            max_character_stats_layout->addRow("Free Attribute Points:", this->free_attribute_points_label = new QLabel());
 
             // character stats spinboxes
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);
 
             // base game / dlc filter
-            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
 
             // weapon type filter
-            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
 
             // weapon base name filter
-            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
 
             // weapon affinity filter
-            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::prepare_optimization);
+            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
 
             // optimize widget
             auto temp_layout = new QVBoxLayout();
@@ -746,6 +768,9 @@ namespace erdo::ui
             }(1);
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
             
+            // optimize starting class checkbox
+            connect(this->optimize_starting_class_checkbox, &QCheckBox::toggled, this, &OptimizeTab::prepare_optimization);
+
             // optimize buttons
             connect(this->start_brute_force_button, &QPushButton::clicked, this, [this](){ this->optimize(false); });
             connect(this->start_v2_button, &QPushButton::clicked, this, [this](){ this->optimize(true); });
@@ -754,7 +779,7 @@ namespace erdo::ui
         void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
         {
             this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
-            this->prepare_optimization();
+            this->filter_active_weapon_data();
             this->weapon_table->model->set_rows({});
         }
     };

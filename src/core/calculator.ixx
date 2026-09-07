@@ -157,7 +157,7 @@ export namespace erdo::calculator
             return attribute_points_to_character_level(this->attribute_points());
         }
     };
-    const std::array<std::pair<std::string, AttributeLevels>, 12> character_class_attributes{{
+    const std::array<std::pair<std::string, AttributeLevels>, 12> character_starting_class_attributes{{
         {"Hero", {14, 9, 9, 16, 9, 7, 8, 11}},
         {"Bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
         {"Astrologer", {9, 12, 15, 8, 12, 16, 7, 9}},
@@ -171,10 +171,10 @@ export namespace erdo::calculator
         {"Heavy Knight", {14, 11, 8, 7, 17, 8, 15, 9}},
         {"Idus Knight", {10, 15, 12, 8, 11, 11, 13, 6}},
     }};
-    const AttributeLevels& get_character_class_attributes(const std::string& class_name)
+    const AttributeLevels& get_character_starting_class_attributes(const std::string& class_name)
     {
-        auto it = std::ranges::find(character_class_attributes, class_name, &decltype(character_class_attributes)::value_type::first);
-        if (it != character_class_attributes.end())
+        auto it = std::ranges::find(character_starting_class_attributes, class_name, &decltype(character_starting_class_attributes)::value_type::first);
+        if (it != character_starting_class_attributes.end())
             return it->second;
         throw std::invalid_argument("Invalid character class name: " + class_name);
     }

@@ -250,7 +250,11 @@ namespace erdo::ui
     export template<typename T>
     auto format_number_pair(T x, T y)
     {
-        if (y < 0)
+        if (x == 0 && y == 0)
+        {
+            return QString("\u2012");
+        }
+        else if (y < 0)
         {
             if constexpr (std::integral<T>)
                 return QString::number(x) + " - " + QString::number(-y);

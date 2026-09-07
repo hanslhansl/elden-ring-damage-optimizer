@@ -272,18 +272,18 @@ namespace erdo::ui
                 return {};
             }
         };
-        export struct CharacterClasses : DataSection<calculator::character_class_attributes.size()>
+        export struct CharacterClasses : DataSection<calculator::character_starting_class_attributes.size()>
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
             static inline const QString section_name = "Character Classes";
-            inline const static std::vector<QString> column_names = calculator::character_class_attributes
-                | std::views::transform(&decltype(calculator::character_class_attributes)::value_type::first)
+            inline const static std::vector<QString> column_names = calculator::character_starting_class_attributes
+                | std::views::transform(&decltype(calculator::character_starting_class_attributes)::value_type::first)
                 | std::views::transform(QString::fromStdString)
                 | std::ranges::to<std::vector>();
 
-            using DataSection<calculator::character_class_attributes.size()>::DataSection;
+            using DataSection<calculator::character_starting_class_attributes.size()>::DataSection;
             explicit CharacterClasses(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
@@ -291,7 +291,7 @@ namespace erdo::ui
 
             void update(const calculator::FullAttackOptions& attack_options)
             {
-                for (auto&& [class_, arr] : std::views::zip(calculator::character_class_attributes, *this))
+                for (auto&& [class_, arr] : std::views::zip(calculator::character_starting_class_attributes, *this))
                 {
                     auto&& [_, class_attributes] = class_;
                     auto reachable = calculator::is_attribute_distribution_reachable(
@@ -653,26 +653,24 @@ namespace erdo::ui
         }
         void update()
         {
-            std::apply(
-                [&](auto&&...args) {
-                    (std::forward<decltype(args)>(args).update(this->attack),...);
-                },
-                *this
-            );
+            template for (auto&& x : *this)
+            {
+                x.update(this->attack);
+            }
         }
 
         QVariant data(int column, int role) const
         {
-            return [&]<std::size_t I = 0>(this auto&& self, std::size_t index)->QVariant {
-                if constexpr (I < std::tuple_size_v<BasicRow>)
-                {
-                    if (index < section_sizes[I])
-                        return std::get<I>(*this).data(index, role);
-                    else
-                        return self.template operator()<I + 1>(index - section_sizes[I]);
-                }
-                throw std::out_of_range("index out of range");
-            }(column);
+            std::size_t i = 0;
+            template for (auto&& x : *this)
+            {
+                if (column < section_sizes[i])
+                    return x.data(column, role);
+
+                column -= section_sizes[i];
+                i++;
+            }
+            throw std::out_of_range("index out of range");
         }
     };
 
@@ -720,7 +718,7 @@ namespace erdo::ui
             if (!index.isValid())
                 return {};
 
-            return this->rows[index.row()].data(index.column(), role);
+            return this->rows.at(index.row()).data(index.column(), role);
         }
         bool setData(const QModelIndex &index, const QVariant &value, int role) override
         {
@@ -865,10 +863,7 @@ namespace erdo::ui
         }
         void set_section_hidden(std::size_t section_index, bool hide)
         {
-            for (auto && index : std::views::iota(
-                Row::section_index_offsets[section_index],
-                Row::cumulative_section_sizes[section_index]
-            ))
+            for (auto && index : std::views::iota(Row::section_index_offsets[section_index], Row::cumulative_section_sizes[section_index]))
                 this->setSectionHidden(static_cast<int>(index), hide);
         }
 
@@ -1362,11 +1357,6 @@ namespace erdo::ui
         explicit WeaponTable(bool is_plot_table, QString placeholder_string, QWidget *parent = nullptr)
             : is_plot_table{is_plot_table}, placeholder_string{placeholder_string}, WeaponTableBase(parent)
         {
-            // view
-            this->setFrameStyle(QFrame::Box);
-            this->setSortingEnabled(true);
-            this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-            this->setSelectionBehavior(QAbstractItemView::SelectRows);
             this->setContextMenuPolicy(Qt::CustomContextMenu);
             connect(this, &QTableView::customContextMenuRequested, this, &WeaponTable::show_table_context_menu);
 
