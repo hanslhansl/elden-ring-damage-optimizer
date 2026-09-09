@@ -222,7 +222,7 @@ namespace erdo::ui
         return s;
     }
 
-    export struct {
+    struct EnumToDisplay{
         template<typename E> requires std::is_enum_v<E>
         static QString operator()(E e)
         {
@@ -236,7 +236,8 @@ namespace erdo::ui
 
             return words.join(' ');
         }
-    } enum_to_display;
+    };
+    export EnumToDisplay enum_to_display{};
 
     export template<typename T>
     auto format_number(T x)

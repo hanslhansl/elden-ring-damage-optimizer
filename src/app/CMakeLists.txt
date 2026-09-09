@@ -20,7 +20,7 @@ CPMAddPackage(
 )
 add_library(KDChart::kdchart ALIAS kdchart)
 
-
+# set up ui library
 add_library(erdo_ui STATIC)
 target_sources(erdo_ui PUBLIC FILE_SET CXX_MODULES FILES
     settings.ixx
@@ -33,7 +33,7 @@ qt_add_ui(erdo_ui SOURCES
     stats_tab.ui
     optimize_widget.ui
 )
-target_link_libraries(erdo_ui PUBLIC#PRIVATE
+target_link_libraries(erdo_ui PRIVATE
     erdo_core
     Qt6::Core
     Qt6::Widgets

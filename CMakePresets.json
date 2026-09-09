@@ -6,32 +6,63 @@
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "installDir": "${sourceDir}/build/${presetName}/install"
+            "installDir": "${sourceDir}/build/${presetName}/install",
+            "cacheVariables": {
+                "QT_USE_ORIGINAL_COMPILER": true
+            }
         },
 
         {
-            "name": "Qt-6.12.0-LLVM24",
+            "name": "clang-24",
             "hidden": true,
             "inherits": "Base",
-            "toolchainFile": "F:/Qt/Qt-6.12.0-LLVM24/lib/cmake/Qt6/qt.toolchain.cmake"
+            "toolchainFile": "${sourceDir}/../qt-source/out/clang-24/lib/cmake/Qt6/qt.toolchain.cmake"
         },
         {
-            "name": "Debug",
-            "inherits": "Qt-6.12.0-LLVM24",
+            "name": "clang-24 Debug",
+            "inherits": "clang-24",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
-            "name": "Release",
-            "inherits": "Qt-6.12.0-LLVM24",
+            "name": "clang-24 Release",
+            "inherits": "clang-24",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
-            "name": "RelWithDebInfo",
-            "inherits": "Qt-6.12.0-LLVM24",
+            "name": "clang-24 RelWithDebInfo",
+            "inherits": "clang-24",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+
+        {
+            "name": "gnu-16",
+            "hidden": true,
+            "inherits": "Base",
+            "toolchainFile": "${sourceDir}/../qt-source/out/gnu-16/lib/cmake/Qt6/qt.toolchain.cmake"
+        },
+        {
+            "name": "gnu-16 Debug",
+            "inherits": "gnu-16",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "gnu-16 Release",
+            "inherits": "gnu-16",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "gnu-16 RelWithDebInfo",
+            "inherits": "gnu-16",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
@@ -40,16 +71,29 @@
     
     "buildPresets": [
         {
-            "name": "Debug",
-            "configurePreset": "Debug"
+            "name": "clang-24 Debug",
+            "configurePreset": "clang-24 Debug"
         },
         {
-            "name": "Release",
-            "configurePreset": "Release"
+            "name": "clang-24 Release",
+            "configurePreset": "clang-24 Release"
         },
         {
-            "name": "RelWithDebInfo",
-            "configurePreset": "RelWithDebInfo"
+            "name": "clang-24 RelWithDebInfo",
+            "configurePreset": "clang-24 RelWithDebInfo"
+        },
+
+        {
+            "name": "gnu-16 Debug",
+            "configurePreset": "gnu-16 Debug"
+        },
+        {
+            "name": "gnu-16 Release",
+            "configurePreset": "gnu-16 Release"
+        },
+        {
+            "name": "gnu-16 RelWithDebInfo",
+            "configurePreset": "gnu-16 RelWithDebInfo"
         }
     ]
 }

@@ -25,13 +25,6 @@ import erdo.ui.weapons_table;
 import erdo.ui.plot_tab;
 
 
-export namespace erdo::ui
-{
-    int run_ui(int argc, char *argv[]);
-}
-
-module : private;
-
 namespace erdo::ui
 {
     void critical_error(QWidget* parent, const QString& message)
@@ -991,53 +984,53 @@ namespace erdo::ui
             settings.endGroup();
         }
     };
-}
 
-class Application : public QApplication
-{
-public:
-    using QApplication::QApplication;
-
-    bool notify(QObject *receiver, QEvent *event) override
+    class Application : public QApplication
     {
-        try
+    public:
+        using QApplication::QApplication;
+
+        bool notify(QObject *receiver, QEvent *event) override
         {
-            return QApplication::notify(receiver, event);
+            try
+            {
+                return QApplication::notify(receiver, event);
+            }
+            catch (const std::exception& e)
+            {
+                QMessageBox::critical(
+                    nullptr,
+                    "Unhandled exception",
+                    QString::fromUtf8(e.what())
+                );
+                QCoreApplication::exit(EXIT_FAILURE);
+            }
+            catch (...)
+            {
+                QMessageBox::critical(
+                    nullptr,
+                    "Unhandled exception",
+                    "Unknown exception."
+                );
+                QCoreApplication::exit(EXIT_FAILURE);
+            }
+            
+            return false;
         }
-        catch (const std::exception& e)
-        {
-            QMessageBox::critical(
-                nullptr,
-                "Unhandled exception",
-                QString::fromUtf8(e.what())
-            );
-            QCoreApplication::exit(EXIT_FAILURE);
-        }
-        catch (...)
-        {
-            QMessageBox::critical(
-                nullptr,
-                "Unhandled exception",
-                "Unknown exception."
-            );
-            QCoreApplication::exit(EXIT_FAILURE);
-        }
-        
-        return false;
+    };
+
+    export int run_ui(int argc, char *argv[])
+    {
+        Application app(argc, argv);
+        app.setOrganizationName("hanslhansl");
+        app.setApplicationName("elden-ring-damage-optimizer");
+        settings.initialize();
+
+        MainWindow window{};
+        window.show();
+
+        return app.exec();
     }
-};
-
-int erdo::ui::run_ui(int argc, char *argv[])
-{
-    Application app(argc, argv);
-    app.setOrganizationName("hanslhansl");
-    app.setApplicationName("elden-ring-damage-optimizer");
-    settings.initialize();
-
-    MainWindow window{};
-    window.show();
-
-    return app.exec();
 }
 
 #include "ui.moc"
