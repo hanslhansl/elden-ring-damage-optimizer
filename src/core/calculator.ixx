@@ -63,60 +63,61 @@ export namespace erdo::calculator
     };
 } // namespace erdo::calculator
 
-using namespace erdo;
-
-template<>
-constexpr std::array<std::pair<calculator::RelevantAttribute, std::string_view>, 5> enum_string_mapping<erdo::calculator::RelevantAttribute> = {
-    std::pair{calculator::RelevantAttribute::STRENGTH, "STRENGTH"},
-    std::pair{calculator::RelevantAttribute::DEXTERITY, "DEXTERITY"},
-    std::pair{calculator::RelevantAttribute::INTELLIGENCE, "INTELLIGENCE"},
-    std::pair{calculator::RelevantAttribute::FAITH, "FAITH"},
-    std::pair{calculator::RelevantAttribute::ARCAINE, "ARCAINE"}
-};
-template<>
-constexpr std::array<std::pair<calculator::Attribute, std::string_view>, 8> enum_string_mapping<calculator::Attribute> = {
-    std::pair{calculator::Attribute::VIGOR, "VIGOR"},
-    std::pair{calculator::Attribute::MIND, "MIND"},
-    std::pair{calculator::Attribute::ENDURANCE, "ENDURANCE"},
-    std::pair{calculator::Attribute::STRENGTH, "STRENGTH"},
-    std::pair{calculator::Attribute::DEXTERITY, "DEXTERITY"},
-    std::pair{calculator::Attribute::INTELLIGENCE, "INTELLIGENCE"},
-    std::pair{calculator::Attribute::FAITH, "FAITH"},
-    std::pair{calculator::Attribute::ARCAINE, "ARCAINE"}
-};
-template<>
-constexpr std::array<std::pair<calculator::AttackPowerType, std::string_view>, 12> enum_string_mapping<calculator::AttackPowerType> = {
-    std::pair{calculator::AttackPowerType::PHYSICAL, "PHYSICAL"},
-    std::pair{calculator::AttackPowerType::MAGIC, "MAGIC"},
-    std::pair{calculator::AttackPowerType::FIRE, "FIRE"},
-    std::pair{calculator::AttackPowerType::LIGHTNING, "LIGHTNING"},
-    std::pair{calculator::AttackPowerType::HOLY, "HOLY"},
-    std::pair{calculator::AttackPowerType::POISON, "POISON"},
-    std::pair{calculator::AttackPowerType::SCARLET_ROT, "SCARLET_ROT"},
-    std::pair{calculator::AttackPowerType::BLEED, "BLEED"},
-    std::pair{calculator::AttackPowerType::FROST, "FROST"},
-    std::pair{calculator::AttackPowerType::SLEEP, "SLEEP"},
-    std::pair{calculator::AttackPowerType::MADNESS, "MADNESS"},
-    std::pair{calculator::AttackPowerType::DEATH_BLIGHT, "DEATH_BLIGHT"}
-};
-template<>
-constexpr std::array<std::pair<calculator::DamageType, std::string_view>, 5> enum_string_mapping<calculator::DamageType> = {
-    std::pair{calculator::DamageType::PHYSICAL, "PHYSICAL"},
-    std::pair{calculator::DamageType::MAGIC, "MAGIC"},
-    std::pair{calculator::DamageType::FIRE, "FIRE"},
-    std::pair{calculator::DamageType::LIGHTNING, "LIGHTNING"},
-    std::pair{calculator::DamageType::HOLY, "HOLY"}
-};
-template<>
-constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 7> enum_string_mapping<calculator::StatusEffectType> = {
-    std::pair{calculator::StatusEffectType::POISON, "POISON"},
-    std::pair{calculator::StatusEffectType::SCARLET_ROT, "SCARLET_ROT"},
-    std::pair{calculator::StatusEffectType::BLEED, "BLEED"},
-    std::pair{calculator::StatusEffectType::FROST, "FROST"},
-    std::pair{calculator::StatusEffectType::SLEEP, "SLEEP"},
-    std::pair{calculator::StatusEffectType::MADNESS, "MADNESS"},
-    std::pair{calculator::StatusEffectType::DEATH_BLIGHT, "DEATH_BLIGHT"}
-};
+namespace erdo
+{
+    template<>
+    constexpr std::array<std::pair<calculator::RelevantAttribute, std::string_view>, 5> enum_string_mapping<calculator::RelevantAttribute> = {
+        std::pair{calculator::RelevantAttribute::STRENGTH, "STRENGTH"},
+        std::pair{calculator::RelevantAttribute::DEXTERITY, "DEXTERITY"},
+        std::pair{calculator::RelevantAttribute::INTELLIGENCE, "INTELLIGENCE"},
+        std::pair{calculator::RelevantAttribute::FAITH, "FAITH"},
+        std::pair{calculator::RelevantAttribute::ARCAINE, "ARCAINE"}
+    };
+    template<>
+    constexpr std::array<std::pair<calculator::Attribute, std::string_view>, 8> enum_string_mapping<calculator::Attribute> = {
+        std::pair{calculator::Attribute::VIGOR, "VIGOR"},
+        std::pair{calculator::Attribute::MIND, "MIND"},
+        std::pair{calculator::Attribute::ENDURANCE, "ENDURANCE"},
+        std::pair{calculator::Attribute::STRENGTH, "STRENGTH"},
+        std::pair{calculator::Attribute::DEXTERITY, "DEXTERITY"},
+        std::pair{calculator::Attribute::INTELLIGENCE, "INTELLIGENCE"},
+        std::pair{calculator::Attribute::FAITH, "FAITH"},
+        std::pair{calculator::Attribute::ARCAINE, "ARCAINE"}
+    };
+    template<>
+    constexpr std::array<std::pair<calculator::AttackPowerType, std::string_view>, 12> enum_string_mapping<calculator::AttackPowerType> = {
+        std::pair{calculator::AttackPowerType::PHYSICAL, "PHYSICAL"},
+        std::pair{calculator::AttackPowerType::MAGIC, "MAGIC"},
+        std::pair{calculator::AttackPowerType::FIRE, "FIRE"},
+        std::pair{calculator::AttackPowerType::LIGHTNING, "LIGHTNING"},
+        std::pair{calculator::AttackPowerType::HOLY, "HOLY"},
+        std::pair{calculator::AttackPowerType::POISON, "POISON"},
+        std::pair{calculator::AttackPowerType::SCARLET_ROT, "SCARLET_ROT"},
+        std::pair{calculator::AttackPowerType::BLEED, "BLEED"},
+        std::pair{calculator::AttackPowerType::FROST, "FROST"},
+        std::pair{calculator::AttackPowerType::SLEEP, "SLEEP"},
+        std::pair{calculator::AttackPowerType::MADNESS, "MADNESS"},
+        std::pair{calculator::AttackPowerType::DEATH_BLIGHT, "DEATH_BLIGHT"}
+    };
+    template<>
+    constexpr std::array<std::pair<calculator::DamageType, std::string_view>, 5> enum_string_mapping<calculator::DamageType> = {
+        std::pair{calculator::DamageType::PHYSICAL, "PHYSICAL"},
+        std::pair{calculator::DamageType::MAGIC, "MAGIC"},
+        std::pair{calculator::DamageType::FIRE, "FIRE"},
+        std::pair{calculator::DamageType::LIGHTNING, "LIGHTNING"},
+        std::pair{calculator::DamageType::HOLY, "HOLY"}
+    };
+    template<>
+    constexpr std::array<std::pair<calculator::StatusEffectType, std::string_view>, 7> enum_string_mapping<calculator::StatusEffectType> = {
+        std::pair{calculator::StatusEffectType::POISON, "POISON"},
+        std::pair{calculator::StatusEffectType::SCARLET_ROT, "SCARLET_ROT"},
+        std::pair{calculator::StatusEffectType::BLEED, "BLEED"},
+        std::pair{calculator::StatusEffectType::FROST, "FROST"},
+        std::pair{calculator::StatusEffectType::SLEEP, "SLEEP"},
+        std::pair{calculator::StatusEffectType::MADNESS, "MADNESS"},
+        std::pair{calculator::StatusEffectType::DEATH_BLIGHT, "DEATH_BLIGHT"}
+    };
+}
 
 export namespace erdo::calculator
 {
@@ -131,32 +132,39 @@ export namespace erdo::calculator
 
     constexpr auto attribute_level_limit = 99;
     constexpr auto irrelevant_attribute_count = enumerators_of<Attribute>().size() - enumerators_of<RelevantAttribute>().size();
+    using AttributeLevels = std::array<unsigned int, enumerators_of<Attribute>().size()>;
     using RelevantAttributeLevelsArray = std::array<unsigned int, enumerators_of<RelevantAttribute>().size()>;
     using RelevantAttributeLevels = std::span<const unsigned int, enumerators_of<RelevantAttribute>().size()>;
     using IrrelevantAttributeLevels = std::span<const unsigned int, irrelevant_attribute_count>;
-    struct AttributeLevels : std::array<unsigned int, enumerators_of<Attribute>().size()>
-    {
-        constexpr RelevantAttributeLevels relevant_stats() const
-        {
-            return RelevantAttributeLevels{ this->begin() + irrelevant_attribute_count, this->end() };
-        }
-        constexpr IrrelevantAttributeLevels irrelevant_stats() const
-        {
-            return IrrelevantAttributeLevels{
-                this->begin(),
-                this->begin() + irrelevant_attribute_count
-            };
-        }
 
-        constexpr int attribute_points() const
-        {
-            return std::ranges::fold_left(*this, 0, std::plus<int>{});
-        }
-        constexpr int character_level() const
-        {
-            return attribute_points_to_character_level(this->attribute_points());
-        }
-    };
+    constexpr auto relevant_attribute_levels(AttributeLevels& attribute_levels)
+    {
+        return std::span<unsigned int, enumerators_of<RelevantAttribute>().size()>{
+            attribute_levels.begin() + irrelevant_attribute_count,
+            attribute_levels.end()
+        };
+    }
+    constexpr RelevantAttributeLevels relevant_attribute_levels(const AttributeLevels& attribute_levels)
+    {
+        return RelevantAttributeLevels{
+            attribute_levels.begin() + irrelevant_attribute_count,
+            attribute_levels.end()
+        };
+    }
+
+    constexpr IrrelevantAttributeLevels irrelevant_attribute_levels(const AttributeLevels& attribute_levels)
+    {
+        return IrrelevantAttributeLevels{ attribute_levels.begin(), attribute_levels.begin() + irrelevant_attribute_count };
+    }
+    constexpr int attribute_points(const AttributeLevels& attribute_levels)
+    {
+        return std::ranges::fold_left(attribute_levels, 0, std::plus<int>{});
+    }
+    constexpr int character_level(const AttributeLevels& attribute_levels)
+    {
+        return attribute_points_to_character_level(attribute_points(attribute_levels));
+    }
+    
     const std::array<std::pair<std::string, AttributeLevels>, 12> character_starting_class_attributes{{
         {"Hero", {14, 9, 9, 16, 9, 7, 8, 11}},
         {"Bandit", {10, 13, 11, 9, 13, 9, 8, 14}},
@@ -420,7 +428,7 @@ export namespace erdo::calculator
         RelevantAttributeLevelsArray adjust_stats_for_two_handing() const
         {
             RelevantAttributeLevelsArray adjusted_relevant_stats{};
-            std::ranges::copy(this->stats.relevant_stats(), adjusted_relevant_stats.begin());
+            std::ranges::copy(relevant_attribute_levels(this->stats), adjusted_relevant_stats.begin());
 
             auto effective_two_handing = this->two_handing;
 
@@ -584,7 +592,7 @@ export namespace erdo::calculator
             auto&& weapon = this->weapon.get();
 
             auto upgrade_level = this->upgrade_level();
-            auto relevant_stats = this->stats.relevant_stats();
+            auto relevant_stats = relevant_attribute_levels(this->stats);
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
 
@@ -614,7 +622,7 @@ export namespace erdo::calculator
             auto&& weapon = this->weapon.get();
 
             auto upgrade_level = this->upgrade_level();
-            auto relevant_stats = this->stats.relevant_stats();
+            auto relevant_stats = relevant_attribute_levels(this->stats);
             auto adjusted_relevant_stats = this->adjust_stats_for_two_handing();
             this->calculate_ineffective_attributes_inplace(adjusted_relevant_stats);
             auto&& attribute_scalings_at_upgrade_level = this->attribute_scalings_at_upgrade_level();
@@ -672,66 +680,70 @@ export namespace erdo::calculator
     };
 } // namespace erdo::calculator
 
-template<>
-constexpr std::array<std::pair<calculator::Weapon::Affinity, std::string_view>, 14> enum_string_mapping<calculator::Weapon::Affinity> = {
-    std::pair{calculator::Weapon::Affinity::STANDARD, "STANDARD"},
-    std::pair{calculator::Weapon::Affinity::HEAVY, "HEAVY"},
-    std::pair{calculator::Weapon::Affinity::KEEN, "KEEN"},
-    std::pair{calculator::Weapon::Affinity::QUALITY, "QUALITY"},
-    std::pair{calculator::Weapon::Affinity::FIRE, "FIRE"},
-    std::pair{calculator::Weapon::Affinity::FLAME_ART, "FLAME_ART"},
-    std::pair{calculator::Weapon::Affinity::LIGHTNING, "LIGHTNING"},
-    std::pair{calculator::Weapon::Affinity::SACRED, "SACRED"},
-    std::pair{calculator::Weapon::Affinity::MAGIC, "MAGIC"},
-    std::pair{calculator::Weapon::Affinity::COLD, "COLD"},
-    std::pair{calculator::Weapon::Affinity::POISON, "POISON"},
-    std::pair{calculator::Weapon::Affinity::BLOOD, "BLOOD"},
-    std::pair{calculator::Weapon::Affinity::OCCULT, "OCCULT"},
-    std::pair{calculator::Weapon::Affinity::UNIQUE, "UNIQUE"}
-};
-template<>
-constexpr std::array<std::pair<calculator::Weapon::Type, std::string_view>, 43> enum_string_mapping<calculator::Weapon::Type> = {
-    std::pair{calculator::Weapon::Type::DAGGER, "DAGGER"},
-    std::pair{calculator::Weapon::Type::STRAIGHT_SWORD, "STRAIGHT_SWORD"},
-    std::pair{calculator::Weapon::Type::GREATSWORD, "GREATSWORD"},
-    std::pair{calculator::Weapon::Type::COLOSSAL_SWORD, "COLOSSAL_SWORD"},
-    std::pair{calculator::Weapon::Type::CURVED_SWORD, "CURVED_SWORD"},
-    std::pair{calculator::Weapon::Type::CURVED_GREATSWORD, "CURVED_GREATSWORD"},
-    std::pair{calculator::Weapon::Type::KATANA, "KATANA"},
-    std::pair{calculator::Weapon::Type::TWINBLADE, "TWINBLADE"},
-    std::pair{calculator::Weapon::Type::THRUSTING_SWORD, "THRUSTING_SWORD"},
-    std::pair{calculator::Weapon::Type::HEAVY_THRUSTING_SWORD, "HEAVY_THRUSTING_SWORD"},
-    std::pair{calculator::Weapon::Type::AXE, "AXE"},
-    std::pair{calculator::Weapon::Type::GREATAXE, "GREATAXE"},
-    std::pair{calculator::Weapon::Type::HAMMER, "HAMMER"},
-    std::pair{calculator::Weapon::Type::GREAT_HAMMER, "GREAT_HAMMER"},
-    std::pair{calculator::Weapon::Type::FLAIL, "FLAIL"},
-    std::pair{calculator::Weapon::Type::SPEAR, "SPEAR"},
-    std::pair{calculator::Weapon::Type::GREAT_SPEAR, "GREAT_SPEAR"},
-    std::pair{calculator::Weapon::Type::HALBERD, "HALBERD"},
-    std::pair{calculator::Weapon::Type::REAPER, "REAPER"},
-    std::pair{calculator::Weapon::Type::FIST, "FIST"},
-    std::pair{calculator::Weapon::Type::CLAW, "CLAW"},
-    std::pair{calculator::Weapon::Type::WHIP, "WHIP"},
-    std::pair{calculator::Weapon::Type::COLOSSAL_WEAPON, "COLOSSAL_WEAPON"},
-    std::pair{calculator::Weapon::Type::LIGHT_BOW, "LIGHT_BOW"},
-    std::pair{calculator::Weapon::Type::BOW, "BOW"},
-    std::pair{calculator::Weapon::Type::GREATBOW, "GREATBOW"},
-    std::pair{calculator::Weapon::Type::CROSSBOW, "CROSSBOW"},
-    std::pair{calculator::Weapon::Type::BALLISTA, "BALLISTA"},
-    std::pair{calculator::Weapon::Type::GLINTSTONE_STAFF, "GLINTSTONE_STAFF"},
-    std::pair{calculator::Weapon::Type::DUAL_CATALYST, "DUAL_CATALYST"},
-    std::pair{calculator::Weapon::Type::SACRED_SEAL, "SACRED_SEAL"},
-    std::pair{calculator::Weapon::Type::SMALL_SHIELD, "SMALL_SHIELD"},
-    std::pair{calculator::Weapon::Type::MEDIUM_SHIELD, "MEDIUM_SHIELD"},
-    std::pair{calculator::Weapon::Type::GREATSHIELD, "GREATSHIELD"},
-    std::pair{calculator::Weapon::Type::TORCH, "TORCH"},
-    std::pair{calculator::Weapon::Type::HAND_TO_HAND, "HAND_TO_HAND"},
-    std::pair{calculator::Weapon::Type::PERFUME_BOTTLE, "PERFUME_BOTTLE"},
-    std::pair{calculator::Weapon::Type::THRUSTING_SHIELD, "THRUSTING_SHIELD"},
-    std::pair{calculator::Weapon::Type::THROWING_BLADE, "THROWING_BLADE"},
-    std::pair{calculator::Weapon::Type::BACKHAND_BLADE, "BACKHAND_BLADE"},
-    std::pair{calculator::Weapon::Type::LIGHT_GREATSWORD, "LIGHT_GREATSWORD"},
-    std::pair{calculator::Weapon::Type::GREAT_KATANA, "GREAT_KATANA"},
-    std::pair{calculator::Weapon::Type::BEAST_CLAW, "BEAST_CLAW"}
-};
+namespace erdo
+{
+    template<>
+    constexpr std::array<std::pair<calculator::Weapon::Affinity, std::string_view>, 14> enum_string_mapping<calculator::Weapon::Affinity> = {
+        std::pair{calculator::Weapon::Affinity::STANDARD, "STANDARD"},
+        std::pair{calculator::Weapon::Affinity::HEAVY, "HEAVY"},
+        std::pair{calculator::Weapon::Affinity::KEEN, "KEEN"},
+        std::pair{calculator::Weapon::Affinity::QUALITY, "QUALITY"},
+        std::pair{calculator::Weapon::Affinity::FIRE, "FIRE"},
+        std::pair{calculator::Weapon::Affinity::FLAME_ART, "FLAME_ART"},
+        std::pair{calculator::Weapon::Affinity::LIGHTNING, "LIGHTNING"},
+        std::pair{calculator::Weapon::Affinity::SACRED, "SACRED"},
+        std::pair{calculator::Weapon::Affinity::MAGIC, "MAGIC"},
+        std::pair{calculator::Weapon::Affinity::COLD, "COLD"},
+        std::pair{calculator::Weapon::Affinity::POISON, "POISON"},
+        std::pair{calculator::Weapon::Affinity::BLOOD, "BLOOD"},
+        std::pair{calculator::Weapon::Affinity::OCCULT, "OCCULT"},
+        std::pair{calculator::Weapon::Affinity::UNIQUE, "UNIQUE"}
+    };
+
+    template<>
+    constexpr std::array<std::pair<calculator::Weapon::Type, std::string_view>, 43> enum_string_mapping<calculator::Weapon::Type> = {
+        std::pair{calculator::Weapon::Type::DAGGER, "DAGGER"},
+        std::pair{calculator::Weapon::Type::STRAIGHT_SWORD, "STRAIGHT_SWORD"},
+        std::pair{calculator::Weapon::Type::GREATSWORD, "GREATSWORD"},
+        std::pair{calculator::Weapon::Type::COLOSSAL_SWORD, "COLOSSAL_SWORD"},
+        std::pair{calculator::Weapon::Type::CURVED_SWORD, "CURVED_SWORD"},
+        std::pair{calculator::Weapon::Type::CURVED_GREATSWORD, "CURVED_GREATSWORD"},
+        std::pair{calculator::Weapon::Type::KATANA, "KATANA"},
+        std::pair{calculator::Weapon::Type::TWINBLADE, "TWINBLADE"},
+        std::pair{calculator::Weapon::Type::THRUSTING_SWORD, "THRUSTING_SWORD"},
+        std::pair{calculator::Weapon::Type::HEAVY_THRUSTING_SWORD, "HEAVY_THRUSTING_SWORD"},
+        std::pair{calculator::Weapon::Type::AXE, "AXE"},
+        std::pair{calculator::Weapon::Type::GREATAXE, "GREATAXE"},
+        std::pair{calculator::Weapon::Type::HAMMER, "HAMMER"},
+        std::pair{calculator::Weapon::Type::GREAT_HAMMER, "GREAT_HAMMER"},
+        std::pair{calculator::Weapon::Type::FLAIL, "FLAIL"},
+        std::pair{calculator::Weapon::Type::SPEAR, "SPEAR"},
+        std::pair{calculator::Weapon::Type::GREAT_SPEAR, "GREAT_SPEAR"},
+        std::pair{calculator::Weapon::Type::HALBERD, "HALBERD"},
+        std::pair{calculator::Weapon::Type::REAPER, "REAPER"},
+        std::pair{calculator::Weapon::Type::FIST, "FIST"},
+        std::pair{calculator::Weapon::Type::CLAW, "CLAW"},
+        std::pair{calculator::Weapon::Type::WHIP, "WHIP"},
+        std::pair{calculator::Weapon::Type::COLOSSAL_WEAPON, "COLOSSAL_WEAPON"},
+        std::pair{calculator::Weapon::Type::LIGHT_BOW, "LIGHT_BOW"},
+        std::pair{calculator::Weapon::Type::BOW, "BOW"},
+        std::pair{calculator::Weapon::Type::GREATBOW, "GREATBOW"},
+        std::pair{calculator::Weapon::Type::CROSSBOW, "CROSSBOW"},
+        std::pair{calculator::Weapon::Type::BALLISTA, "BALLISTA"},
+        std::pair{calculator::Weapon::Type::GLINTSTONE_STAFF, "GLINTSTONE_STAFF"},
+        std::pair{calculator::Weapon::Type::DUAL_CATALYST, "DUAL_CATALYST"},
+        std::pair{calculator::Weapon::Type::SACRED_SEAL, "SACRED_SEAL"},
+        std::pair{calculator::Weapon::Type::SMALL_SHIELD, "SMALL_SHIELD"},
+        std::pair{calculator::Weapon::Type::MEDIUM_SHIELD, "MEDIUM_SHIELD"},
+        std::pair{calculator::Weapon::Type::GREATSHIELD, "GREATSHIELD"},
+        std::pair{calculator::Weapon::Type::TORCH, "TORCH"},
+        std::pair{calculator::Weapon::Type::HAND_TO_HAND, "HAND_TO_HAND"},
+        std::pair{calculator::Weapon::Type::PERFUME_BOTTLE, "PERFUME_BOTTLE"},
+        std::pair{calculator::Weapon::Type::THRUSTING_SHIELD, "THRUSTING_SHIELD"},
+        std::pair{calculator::Weapon::Type::THROWING_BLADE, "THROWING_BLADE"},
+        std::pair{calculator::Weapon::Type::BACKHAND_BLADE, "BACKHAND_BLADE"},
+        std::pair{calculator::Weapon::Type::LIGHT_GREATSWORD, "LIGHT_GREATSWORD"},
+        std::pair{calculator::Weapon::Type::GREAT_KATANA, "GREAT_KATANA"},
+        std::pair{calculator::Weapon::Type::BEAST_CLAW, "BEAST_CLAW"}
+    };
+}

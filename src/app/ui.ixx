@@ -396,9 +396,9 @@ namespace erdo::ui
             }
 
             // character level label
-            this->character_level_label->setText(QString::number(this->get_character_stats().character_level()));
+            this->character_level_label->setText(QString::number(calculator::character_level(this->get_character_stats())));
             connect(this, &StatsTabBase::character_stats_changed, this, [this](const calculator::AttributeLevels& stats){
-                this->character_level_label->setText(QString::number(stats.character_level()));
+                this->character_level_label->setText(QString::number(calculator::character_level(stats)));
             });
 
             // filters
@@ -598,7 +598,7 @@ namespace erdo::ui
         {
             auto min_stats = this->get_character_stats();
             auto max_attribute_points = calculator::character_level_to_attribute_points(this->max_character_level_spinbox->value());
-            auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
+            auto free_attribute_points = max_attribute_points - calculator::attribute_points(min_stats);
             this->max_attribute_points_label->setText(QString::number(max_attribute_points));
             this->free_attribute_points_label->setText(QString::number(free_attribute_points));
 
@@ -616,7 +616,8 @@ namespace erdo::ui
                 stat_variation_count = optimizer::get_stat_variation_count(
                     max_attribute_points,
                     min_stats,
-                    make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
+                    make_filled_array<calculator::AttributeLevels>(calculator::attribute_level_limit),
+                    optimizer::default_varied_attributes
                 );
             }
 
@@ -728,7 +729,7 @@ namespace erdo::ui
             this->max_character_level_spinbox->setMinimum(1);
             calculator::AttributeLevels max_stats{};
             max_stats.fill(99);
-            this->max_character_level_spinbox->setMaximum(max_stats.character_level());
+            this->max_character_level_spinbox->setMaximum(calculator::character_level(max_stats));
             connect(this->max_character_level_spinbox, &QSpinBox::valueChanged, this, &OptimizeTab::prepare_optimization);
 
             // attribute points label
