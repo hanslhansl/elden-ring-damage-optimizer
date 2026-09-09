@@ -11,7 +11,9 @@ module;
 #include <QPushButton>
 #include <QTabWidget>
 #include <QDialogButtonBox>
+#include <QtWidgets/qformlayout.h>
 export module erdo.ui.settings;
+
 
 import std;
 import erdo;

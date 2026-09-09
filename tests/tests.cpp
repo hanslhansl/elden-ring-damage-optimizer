@@ -79,50 +79,103 @@ TEST_CASE("calculation - total attack power 2")
         CHECK_THAT(actual, Catch::Matchers::WithinAbs(expected, 1e-12) || Catch::Matchers::WithinRel(expected, 1e-9));
 }
 
-auto test_stat_variation_count(
+
+auto test_stat_variation_count_starting_class(
     const int max_attribute_points,
-    const calculator::AttributeLevels& min_stats,
-    const calculator::AttributeLevels& max_stats,
-    const int expected_stat_variation_count
+    const std::vector<calculator::AttributeLevels>& min_attr_lvls,
+    const calculator::AttributeLevels& max_attr_lvls,
+    const optimizer::VariedAttributes& varied_attributes,
+    const int expected_attribute_variation_count
 )
 {
-    optimizer::VariedAttributes varied_attributes{ false, false, false, true, true, true, true, true };
+    std::size_t attribute_variation_count;
+#ifdef ENABLE_BENCHMARKS
+    BENCHMARK("optimizer::starting_class::get_stat_variation_count")
+#endif
+    {
+        attribute_variation_count = optimizer::starting_class::get_stat_variation_count(
+            max_attribute_points,
+            min_attr_lvls,
+            max_attr_lvls,
+            varied_attributes
+        );
+    };
+    REQUIRE(attribute_variation_count == expected_attribute_variation_count);
+    
+    std::vector<calculator::AttributeLevels> attribute_variations{};
+#ifdef ENABLE_BENCHMARKS
+    BENCHMARK("optimizer::starting_class::get_stat_variations")
+#endif
+    {
+        attribute_variations = optimizer::starting_class::get_stat_variations(
+            max_attribute_points,
+            min_attr_lvls,
+            max_attr_lvls,
+            varied_attributes
+        );
+    };
+    REQUIRE(attribute_variations.size() == expected_attribute_variation_count);
+    std::ranges::sort(attribute_variations);
+    return attribute_variations;
+}
 
-    std::size_t stat_variation_count;
+auto test_stat_variation_count(
+    const int max_attribute_points,
+    const calculator::AttributeLevels& min_attr_lvls,
+    const calculator::AttributeLevels& max_attr_lvls,
+    const optimizer::VariedAttributes& varied_attributes,
+    const int expected_attribute_variation_count
+)
+{
+    std::size_t attribute_variation_count;
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::get_stat_variation_count")
 #endif
     {
-        stat_variation_count = optimizer::get_stat_variation_count(
+        attribute_variation_count = optimizer::get_stat_variation_count(
             max_attribute_points,
-            min_stats,
-            max_stats,
+            min_attr_lvls,
+            max_attr_lvls,
             varied_attributes
         );
     };
-    REQUIRE(stat_variation_count == expected_stat_variation_count);
+    REQUIRE(attribute_variation_count == expected_attribute_variation_count);
     
-    std::vector<calculator::AttributeLevels> stat_variations{};
+    std::vector<calculator::AttributeLevels> attribute_variations{};
 #ifdef ENABLE_BENCHMARKS
     BENCHMARK("optimizer::get_stat_variations")
 #endif
     {
-        stat_variations = optimizer::get_stat_variations(
+        attribute_variations = optimizer::get_stat_variations(
             max_attribute_points,
-            min_stats,
-            max_stats,
+            min_attr_lvls,
+            max_attr_lvls,
             varied_attributes
         );
     };
-    REQUIRE(stat_variations.size() == expected_stat_variation_count);
-    return stat_variations;
+    REQUIRE(attribute_variations.size() == expected_attribute_variation_count);
+    std::ranges::sort(attribute_variations);
+
+    auto attribute_variations_starting_class = test_stat_variation_count_starting_class(
+        max_attribute_points,
+        { min_attr_lvls },
+        max_attr_lvls,
+        optimizer::default_varied_attributes,
+        expected_attribute_variation_count
+    );
+
+    REQUIRE(attribute_variations == attribute_variations_starting_class);
+
+    return attribute_variations;
 }
+
 TEST_CASE("stat variation count 1")
 {
     test_stat_variation_count(
         11,
         {},
         make_filled_array<calculator::AttributeLevels>(calculator::attribute_level_limit),
+        optimizer::default_varied_attributes,
         1365
     );
 }
@@ -132,6 +185,7 @@ TEST_CASE("stat variation count 2 - lower edge case")
         0,
         {},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         1
     );
 }
@@ -141,6 +195,7 @@ TEST_CASE("stat variation count 3 - single point")
         1,
         {},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         5
     );
 }
@@ -150,6 +205,7 @@ TEST_CASE("stat variation count 4 - two points")
         2,
         {},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         15
     );
 }
@@ -159,6 +215,7 @@ TEST_CASE("stat variation count 5")
         5,
         {},
         {0, 0, 0, 1, 2, 3, 4, 5},
+        optimizer::default_varied_attributes,
         71
     );
 }
@@ -168,6 +225,7 @@ TEST_CASE("stat variation count 6 - exactly upper edge case")
         50,
         {},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         1
     );
 }
@@ -177,6 +235,7 @@ TEST_CASE("stat variation count 7 - above upper edge case")
         51,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         1
     );
 }
@@ -186,6 +245,7 @@ TEST_CASE("stat variation count 8")
         152,
         {0, 0, 0, 10, 20, 30, 40, 50},
         {0, 0, 0, 12, 22, 32, 42, 52},
+        optimizer::default_varied_attributes,
         15
     );
 }
@@ -195,6 +255,7 @@ TEST_CASE("stat variation count 9 - irrelevant attributes")
         602,
         {100, 200, 300, 0, 0, 0, 0, 0},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         15
     );
 
@@ -202,6 +263,7 @@ TEST_CASE("stat variation count 9 - irrelevant attributes")
         2,
         {0, 0, 0, 0, 0, 0, 0, 0},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         15
     );
 }
@@ -211,14 +273,37 @@ TEST_CASE("stat variation count 10")
         161,
         {0, 0, 0, 10, 20, 30, 40, 50},
         {0, 0, 0, 12, 22, 32, 42, 52},
+        optimizer::default_varied_attributes,
         1
     );
+}
+
+
+void test_stat_variations_starting_class(
+    const int max_attribute_points,
+    const std::vector<calculator::AttributeLevels>& min_stats,
+    const calculator::AttributeLevels& max_stats,
+    const optimizer::VariedAttributes& varied_attributes,
+    const int expected_stat_variation_count,
+    std::vector<calculator::AttributeLevels> expected_stat_variations
+)
+{
+    auto stat_variations = test_stat_variation_count_starting_class(
+        max_attribute_points,
+        min_stats,
+        max_stats,
+        varied_attributes,
+        expected_stat_variation_count
+    );
+    std::ranges::sort(expected_stat_variations);
+    REQUIRE(stat_variations == expected_stat_variations);
 }
 
 void test_stat_variations(
     const int max_attribute_points,
     const calculator::AttributeLevels& min_stats,
     const calculator::AttributeLevels& max_stats,
+    const optimizer::VariedAttributes& varied_attributes,
     const int expected_stat_variation_count,
     std::vector<calculator::AttributeLevels> expected_stat_variations
 )
@@ -227,16 +312,20 @@ void test_stat_variations(
         max_attribute_points,
         min_stats,
         max_stats,
+        varied_attributes,
         expected_stat_variation_count
     );
+    std::ranges::sort(expected_stat_variations);
     REQUIRE(stat_variations == expected_stat_variations);
 }
+
 TEST_CASE("stat variations 1 - single point")
 {
     test_stat_variations(
         1,
         {},
         make_filled_array<calculator::AttributeLevels>(10),
+        optimizer::default_varied_attributes,
         5,
         {
             {0, 0, 0, 0, 0, 0, 0, 1},
@@ -253,44 +342,146 @@ TEST_CASE("stat variations 2")
         80,
         {10, 10, 10, 0, 0, 0, 20, 10},
         make_filled_array<calculator::AttributeLevels>(99),
+        optimizer::default_varied_attributes,
         10626,
         expected_stat_variations
     );
 }
-TEST_CASE("stat variations 3 - starting class algorithm")
+TEST_CASE("stat variations 3")
 {
     const int max_attribute_points = 80;
-    const std::vector<calculator::AttributeLevels> min_stats = {{10, 10, 10, 0, 0, 0, 20, 10}};
-    const auto max_stats = make_filled_array<calculator::RelevantAttributeLevels>(99);
+    const calculator::AttributeLevels min_attr_lvls = {10, 10, 10, 0, 0, 0, 20, 10};
+    const auto max_attr_lvls = make_filled_array<calculator::AttributeLevels>(99);
     const int expected_stat_variation_count = 10626;
 
-    std::size_t stat_variation_count;
-#ifdef ENABLE_BENCHMARKS
-    BENCHMARK("optimizer::starting_class::get_stat_variation_count")
-#endif
-    {
-        stat_variation_count = optimizer::starting_class::get_stat_variation_count(
-            max_attribute_points,
-            min_stats,
-            max_stats
-        );
-    };
-    REQUIRE(stat_variation_count == expected_stat_variation_count);
-    
-    std::vector<calculator::AttributeLevels> stat_variations{};
-#ifdef ENABLE_BENCHMARKS
-    BENCHMARK("optimizer::starting_class::get_stat_variations")
-#endif
-    {
-        stat_variations = optimizer::starting_class::get_stat_variations(
-            max_attribute_points,
-            min_stats,
-            max_stats
-        );
-    };
-    REQUIRE(stat_variations.size() == expected_stat_variation_count);
-    REQUIRE(stat_variations == expected_stat_variations);
+    test_stat_variations(
+        max_attribute_points,
+        min_attr_lvls,
+        max_attr_lvls,
+        optimizer::default_varied_attributes,
+        expected_stat_variation_count,
+        expected_stat_variations
+    );
 }
+
+TEST_CASE("stat variations 4 - starting class")
+{
+    constexpr int max_attribute_points = 4;
+
+    const std::vector<calculator::AttributeLevels> min_attr_lvls{
+        {1, 0, 0, 0, 0, 0, 0, 0},
+        {0, 2, 0, 0, 0, 0, 0, 0},
+    };
+
+    constexpr calculator::AttributeLevels max_attr_lvls{ 4, 4, 0, 0, 0, 0, 0, 0 };
+
+    constexpr optimizer::VariedAttributes varied_attributes{ true, true, false, false, false, false, false, false };
+
+    const std::vector<calculator::AttributeLevels> expected{
+        {0, 4, 0, 0, 0, 0, 0, 0},
+        {1, 3, 0, 0, 0, 0, 0, 0},
+        {2, 2, 0, 0, 0, 0, 0, 0},
+        {3, 1, 0, 0, 0, 0, 0, 0},
+        {4, 0, 0, 0, 0, 0, 0, 0},
+    };
+
+    test_stat_variations_starting_class(
+        max_attribute_points,
+        min_attr_lvls,
+        max_attr_lvls,
+        varied_attributes,
+        expected.size(),
+        expected
+    );
+}
+TEST_CASE("stat variations 4 - starting class - lower edge case")
+{
+    constexpr int max_attribute_points = 3;
+
+    const std::vector<calculator::AttributeLevels> min_attr_lvls{
+        {2, 2, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0},
+    };
+
+    constexpr calculator::AttributeLevels max_attr_lvls{ 3, 3, 0, 0, 0, 0, 0, 0 };
+
+    constexpr optimizer::VariedAttributes varied_attributes{ true, true, false, false, false, false, false, false };
+
+    const std::vector<calculator::AttributeLevels> expected{
+        {1, 2, 0, 0, 0, 0, 0, 0},
+        {2, 1, 0, 0, 0, 0, 0, 0},
+        {3, 0, 0, 0, 0, 0, 0, 0},
+    };
+
+    test_stat_variations_starting_class(
+        max_attribute_points,
+        min_attr_lvls,
+        max_attr_lvls,
+        varied_attributes,
+        expected.size(),
+        expected
+    );
+}
+TEST_CASE("stat variations 5 - starting class - upper edge case 1")
+{
+    constexpr int max_attribute_points = 5;
+
+    const std::vector<calculator::AttributeLevels> min_attr_lvls{
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {2, 0, 0, 0, 0, 0, 0, 0},
+    };
+
+    constexpr optimizer::VariedAttributes varied_attributes{
+        true, true, false, false,
+        false, false, false, false
+    };
+
+    constexpr calculator::AttributeLevels max_attr_lvls{3, 3, 0, 0, 0, 0, 0, 0};
+
+    const std::vector<calculator::AttributeLevels> expected{
+        {2, 3, 0, 0, 0, 0, 0, 0},
+        {3, 2, 0, 0, 0, 0, 0, 0},
+    };
+
+    test_stat_variations_starting_class(
+        max_attribute_points,
+        min_attr_lvls,
+        max_attr_lvls,
+        varied_attributes,
+        expected.size(),
+        expected
+    );
+}
+TEST_CASE("stat variations 6 - starting class - upper edge case 2")
+{
+    constexpr int max_attribute_points = 5;
+
+    const std::vector<calculator::AttributeLevels> min_attr_lvls{
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {2, 2, 0, 0, 0, 0, 0, 0},
+    };
+
+    constexpr optimizer::VariedAttributes varied_attributes{
+        true, true, false, false,
+        false, false, false, false
+    };
+
+    constexpr calculator::AttributeLevels max_attr_lvls{2, 2, 0, 0, 0, 0, 0, 0};
+
+    const std::vector<calculator::AttributeLevels> expected{
+        {2, 2, 0, 0, 0, 0, 0, 0},
+    };
+
+    test_stat_variations_starting_class(
+        max_attribute_points,
+        min_attr_lvls,
+        max_attr_lvls,
+        varied_attributes,
+        expected.size(),
+        expected
+    );
+}
+
 
 template<typename Optimizer>
 void test_optimization(std::string_view expected_weapon_full_name, const calculator::AttributeLevels& expected_stats, const std::vector<double>& expected_values)

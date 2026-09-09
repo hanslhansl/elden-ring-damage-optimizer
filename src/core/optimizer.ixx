@@ -8,6 +8,9 @@ using namespace erdo::calculator;
 
 namespace erdo::optimizer
 {
+    export using VariedAttributes = std::array<bool, std::tuple_size_v<AttributeLevels>>;
+    export constexpr VariedAttributes default_varied_attributes = { false, false, false, true, true, true, true, true };
+
     export enum class Target
     {
         TOTAL_ATTACK_POWER,
@@ -61,7 +64,7 @@ namespace erdo
     };
 }
 
-export namespace erdo::optimizer::starting_class
+export namespace erdo::optimizer::starting_class_old
 {
     using RelevantBounds = std::array<unsigned int, 5>;
 
@@ -718,11 +721,519 @@ export namespace erdo::optimizer::starting_class
     }
 }
 
+namespace erdo::optimizer::starting_class
+{
+    namespace detail
+    {
+        constexpr std::size_t P = std::tuple_size_v<AttributeLevels>;
+
+        // Deliberately fixed-width. See validate_min_count() below.
+        using MinMask = std::uint64_t;
+
+        constexpr std::size_t MIN_MASK_BITS =
+            std::numeric_limits<MinMask>::digits;
+
+        void validate_min_count(std::size_t count)
+        {
+            if (count > MIN_MASK_BITS)
+            {
+                throw std::invalid_argument(std::format(
+                    "Too many min_attr_lvls ({}) for the variation "
+                    "deduplication bitmask (maximum {}).",
+                    count,
+                    MIN_MASK_BITS));
+            }
+        }
+
+        struct Bounds
+        {
+            AttributeLevels adjusted_max{};
+            int free_attribute_points{};
+            unsigned int min_relevant_sum{};
+            unsigned int max_relevant_sum{};
+        };
+
+        Bounds make_bounds(
+            const int max_attribute_points,
+            const AttributeLevels& min_attr_lvls,
+            const AttributeLevels& max_attr_lvls,
+            const VariedAttributes& varied_attributes)
+        {
+            Bounds result;
+            result.free_attribute_points =
+                max_attribute_points - attribute_points(min_attr_lvls);
+
+            for (std::size_t i = 0; i < P; ++i)
+            {
+                if (varied_attributes[i])
+                {
+                    if (min_attr_lvls[i] > max_attr_lvls[i])
+                    {
+                        throw std::invalid_argument(
+                            "min_attr_lvls[i] must be <= max_attr_lvls[i].");
+                    }
+
+                    result.min_relevant_sum += min_attr_lvls[i];
+                    result.max_relevant_sum += max_attr_lvls[i];
+                    result.adjusted_max[i] = max_attr_lvls[i];
+                }
+                else
+                {
+                    result.adjusted_max[i] = min_attr_lvls[i];
+                }
+            }
+
+            return result;
+        }
+
+        /*
+        * Removes previous minima that can no longer contain the candidate.
+        *
+        * At this point candidate[i] has been assigned.
+        *
+        * For a varied attribute:
+        *
+        *     candidate[i] >= previous_min[i]
+        *
+        * is sufficient because candidate[i] is already constrained to
+        * max_attr_lvls[i] by the enumeration.
+        *
+        * For a non-varied attribute:
+        *
+        *     candidate[i] == previous_min[i]
+        */
+        template <std::size_t I>
+        MinMask filter_mask(
+            const MinMask mask,
+            const unsigned int value,
+            const std::span<const AttributeLevels> mins,
+            const VariedAttributes& varied_attributes)
+        {
+            MinMask result = mask;
+
+            for (std::size_t j = 0; j < mins.size(); ++j)
+            {
+                const MinMask bit =
+                    static_cast<MinMask>(MinMask{1} << j);
+
+                if (!(result & bit))
+                    continue;
+
+                if (varied_attributes[I])
+                {
+                    if (value < mins[j][I])
+                        result &= static_cast<MinMask>(~bit);
+                }
+                else
+                {
+                    if (value != mins[j][I])
+                        result &= static_cast<MinMask>(~bit);
+                }
+            }
+
+            return result;
+        }
+
+        /*
+        * The same operation without the template parameter is useful for
+        * the final p value.
+        */
+        MinMask filter_mask(
+            const MinMask mask,
+            const std::size_t attribute,
+            const unsigned int value,
+            const std::span<const AttributeLevels> mins,
+            const VariedAttributes& varied_attributes)
+        {
+            MinMask result = mask;
+
+            for (std::size_t j = 0; j < mins.size(); ++j)
+            {
+                const MinMask bit =
+                    static_cast<MinMask>(MinMask{1} << j);
+
+                if (!(result & bit))
+                    continue;
+
+                if (varied_attributes[attribute])
+                {
+                    if (value < mins[j][attribute])
+                        result &= static_cast<MinMask>(~bit);
+                }
+                else
+                {
+                    if (value != mins[j][attribute])
+                        result &= static_cast<MinMask>(~bit);
+                }
+            }
+
+            return result;
+        }
+
+        /*
+        * Enumerates the UNION.
+        *
+        * The current minimum is responsible for generating a candidate.
+        * previous_mask contains the earlier minimums that could also contain
+        * the candidate.
+        *
+        * Therefore:
+        *
+        *     previous_mask == 0
+        *
+        * means that this candidate belongs to the current minimum and to no
+        * earlier minimum, so it is emitted exactly once.
+        */
+        template <typename Emit>
+        void enumerate_variations(
+            const int max_attribute_points,
+            const std::vector<AttributeLevels>& min_attr_lvls,
+            const AttributeLevels& max_attr_lvls,
+            const VariedAttributes& varied_attributes,
+            Emit&& emit)
+        {
+            validate_min_count(min_attr_lvls.size());
+
+            if (min_attr_lvls.empty())
+                return;
+
+            const std::span<const AttributeLevels> all_mins{min_attr_lvls};
+
+            for (std::size_t min_index = 0;
+                min_index < min_attr_lvls.size();
+                ++min_index)
+            {
+                const auto& min = min_attr_lvls[min_index];
+
+                const auto bounds = make_bounds(
+                    max_attribute_points,
+                    min,
+                    max_attr_lvls,
+                    varied_attributes);
+
+                /*
+                * Preserve the original behavior:
+                *
+                *     free_attribute_points < 0
+                *
+                * means this minimum produces no variations.
+                */
+                if (bounds.free_attribute_points < 0)
+                    continue;
+
+                /*
+                * Mask containing all EARLIER minima.
+                *
+                * The current minimum itself is deliberately not included.
+                */
+                const MinMask previous_mask =
+                    min_index == 0
+                        ? MinMask{0}
+                        : static_cast<MinMask>(
+                            (MinMask{1} << min_index) - MinMask{1});
+
+                /*
+                * Preserve the original behavior:
+                *
+                *     free_attribute_points >
+                *         max_relevant_sum - min_relevant_sum
+                *
+                * means there is exactly one result:
+                *
+                *     all varied attributes at max
+                *     all non-varied attributes at min
+                */
+                if (bounds.free_attribute_points >
+                    static_cast<int>(
+                        bounds.max_relevant_sum -
+                        bounds.min_relevant_sum))
+                {
+                    const auto candidate = bounds.adjusted_max;
+
+                    const auto remaining_mask = [&]
+                    {
+                        MinMask mask = previous_mask;
+
+                        for (std::size_t i = 0; i < P; ++i)
+                        {
+                            mask = filter_mask(
+                                mask,
+                                i,
+                                candidate[i],
+                                all_mins.first(min_index),
+                                varied_attributes);
+
+                            if (mask == 0)
+                                break;
+                        }
+
+                        return mask;
+                    }();
+
+                    if (remaining_mask == 0)
+                        emit(candidate);
+
+                    continue;
+                }
+
+                const int SUM = max_attribute_points;
+
+                auto result = min;
+                auto&& [i, j, k, l, m, n, o, p] = result;
+
+                for (i = min[0];
+                    std::cmp_less_equal(
+                        i,
+                        std::min<int>(bounds.adjusted_max[0], SUM));
+                    ++i)
+                {
+                    auto mask_i = filter_mask<0>(
+                        previous_mask,
+                        i,
+                        all_mins.first(min_index),
+                        varied_attributes);
+
+                    if (mask_i == 0)
+                    {
+                        /*
+                        * No earlier minimum can contain anything below this
+                        * branch, so normal generation can proceed without
+                        * carrying a mask.
+                        *
+                        * We still use the same loops below; the compiler
+                        * should make the zero-mask path very cheap.
+                        */
+                    }
+
+                    const auto sum_i = SUM - static_cast<int>(i);
+
+                    for (j = min[1];
+                        std::cmp_less_equal(
+                            j,
+                            std::min<int>(
+                                bounds.adjusted_max[1],
+                                sum_i));
+                        ++j)
+                    {
+                        const auto mask_j = filter_mask<1>(
+                            mask_i,
+                            j,
+                            all_mins.first(min_index),
+                            varied_attributes);
+
+                        const auto sum_ij =
+                            sum_i - static_cast<int>(j);
+
+                        for (k = min[2];
+                            std::cmp_less_equal(
+                                k,
+                                std::min<int>(
+                                    bounds.adjusted_max[2],
+                                    sum_ij));
+                            ++k)
+                        {
+                            const auto mask_k = filter_mask<2>(
+                                mask_j,
+                                k,
+                                all_mins.first(min_index),
+                                varied_attributes);
+
+                            const auto sum_ijk =
+                                sum_ij - static_cast<int>(k);
+
+                            const auto l_min = std::max<int>(
+                                min[3],
+                                sum_ijk
+                                    - static_cast<int>(bounds.adjusted_max[4])
+                                    - static_cast<int>(bounds.adjusted_max[5])
+                                    - static_cast<int>(bounds.adjusted_max[6])
+                                    - static_cast<int>(bounds.adjusted_max[7]));
+
+                            const auto l_max = std::min<int>(
+                                bounds.adjusted_max[3],
+                                sum_ijk
+                                    - static_cast<int>(min[4])
+                                    - static_cast<int>(min[5])
+                                    - static_cast<int>(min[6])
+                                    - static_cast<int>(min[7]));
+
+                            for (l = l_min;
+                                std::cmp_less_equal(l, l_max);
+                                ++l)
+                            {
+                                const auto mask_l = filter_mask<3>(
+                                    mask_k,
+                                    l,
+                                    all_mins.first(min_index),
+                                    varied_attributes);
+
+                                const auto sum_ijkl =
+                                    sum_ijk - static_cast<int>(l);
+
+                                const auto m_min = std::max<int>(
+                                    min[4],
+                                    sum_ijkl
+                                        - static_cast<int>(bounds.adjusted_max[5])
+                                        - static_cast<int>(bounds.adjusted_max[6])
+                                        - static_cast<int>(bounds.adjusted_max[7]));
+
+                                const auto m_max = std::min<int>(
+                                    bounds.adjusted_max[4],
+                                    sum_ijkl
+                                        - static_cast<int>(min[5])
+                                        - static_cast<int>(min[6])
+                                        - static_cast<int>(min[7]));
+
+                                for (m = m_min;
+                                    std::cmp_less_equal(m, m_max);
+                                    ++m)
+                                {
+                                    const auto mask_m = filter_mask<4>(
+                                        mask_l,
+                                        m,
+                                        all_mins.first(min_index),
+                                        varied_attributes);
+
+                                    const auto sum_ijklm =
+                                        sum_ijkl - static_cast<int>(m);
+
+                                    const auto n_min = std::max<int>(
+                                        min[5],
+                                        sum_ijklm
+                                            - static_cast<int>(bounds.adjusted_max[6])
+                                            - static_cast<int>(bounds.adjusted_max[7]));
+
+                                    const auto n_max = std::min<int>(
+                                        bounds.adjusted_max[5],
+                                        sum_ijklm
+                                            - static_cast<int>(min[6])
+                                            - static_cast<int>(min[7]));
+
+                                    for (n = n_min;
+                                        std::cmp_less_equal(n, n_max);
+                                        ++n)
+                                    {
+                                        const auto mask_n = filter_mask<5>(
+                                            mask_m,
+                                            n,
+                                            all_mins.first(min_index),
+                                            varied_attributes);
+
+                                        const auto remaining =
+                                            sum_ijklm - static_cast<int>(n);
+
+                                        const auto o_min = std::max<int>(
+                                            min[6],
+                                            remaining
+                                                - static_cast<int>(bounds.adjusted_max[7]));
+
+                                        const auto o_max = std::min<int>(
+                                            bounds.adjusted_max[6],
+                                            remaining
+                                                - static_cast<int>(min[7]));
+
+                                        for (o = o_min;
+                                            std::cmp_less_equal(o, o_max);
+                                            ++o)
+                                        {
+                                            const auto mask_o = filter_mask<6>(
+                                                mask_n,
+                                                o,
+                                                all_mins.first(min_index),
+                                                varied_attributes);
+
+                                            /*
+                                            * p is uniquely determined.
+                                            */
+                                            p = remaining - static_cast<int>(o);
+
+                                            /*
+                                            * p is the final opportunity for an
+                                            * earlier minimum to contain this
+                                            * candidate.
+                                            */
+                                            const auto mask_p = filter_mask(
+                                                mask_o,
+                                                7,
+                                                p,
+                                                all_mins.first(min_index),
+                                                varied_attributes);
+
+                                            if (mask_p == 0)
+                                                emit(result);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    export std::size_t get_stat_variation_count(
+        const int max_attribute_points,
+        const std::vector<AttributeLevels>& min_attr_lvls,
+        const AttributeLevels& max_attr_lvls,
+        const VariedAttributes& varied_attributes)
+    {
+        std::size_t count = 0;
+
+        detail::enumerate_variations(
+            max_attribute_points,
+            min_attr_lvls,
+            max_attr_lvls,
+            varied_attributes,
+            [&](const AttributeLevels&)
+            {
+                ++count;
+            });
+
+        return count;
+    }
+
+    export std::vector<AttributeLevels> get_stat_variations(
+        const int max_attribute_points,
+        const std::vector<AttributeLevels>& min_attr_lvls,
+        const AttributeLevels& max_attr_lvls,
+        const VariedAttributes& varied_attributes)
+    {
+        std::vector<AttributeLevels> result;
+
+        detail::enumerate_variations(
+            max_attribute_points,
+            min_attr_lvls,
+            max_attr_lvls,
+            varied_attributes,
+            [&](const AttributeLevels& variation)
+            {
+                result.push_back(variation);
+            });
+
+        return result;
+    }
+
+    export std::vector<AttributeLevels> get_min_stats(const AttributeLevels& min_stats)
+    {
+        std::vector<AttributeLevels> result{character_starting_class_attributes.size()};
+        result.reserve(character_starting_class_attributes.size());
+
+        for (auto&& [starting_class, result_elem] : std::views::zip(character_starting_class_attributes, result))
+        {
+            auto&& [_, stats] = starting_class;
+            for (auto&& [min_stat, stat, result_elem_elem] : std::views::zip(min_stats, stats, result_elem))
+            {
+                result_elem_elem = std::max(min_stat, stat);
+            }
+        }
+
+        return result;
+    }
+}
+
 namespace erdo::optimizer
 {
-    export using VariedAttributes = std::array<bool, enumerators_of<Attribute>().size()>;
-    export constexpr VariedAttributes default_varied_attributes = { false, false, false, true, true, true, true, true };
-
     export std::size_t get_stat_variation_count(
         const int max_attribute_points,
         const AttributeLevels& min_attr_lvls,
@@ -1082,7 +1593,8 @@ namespace erdo::optimizer
                 this->stat_variations = starting_class::get_stat_variations(
                     max_attribute_points,
                     starting_class::get_min_stats(min_attr_lvls),
-                    relevant_attribute_levels(max_attr_lvls)
+                    max_attr_lvls,
+                    default_varied_attributes
                 );
             }
             else
@@ -1155,7 +1667,8 @@ namespace erdo::optimizer
                         optimized_stat_variations = starting_class::get_stat_variations(
                             max_attribute_points,
                             starting_class::get_min_stats(min_attr_lvls),
-                            relevant_attribute_levels(get_optimized_max_attr_lvls(min_attr_lvls, max_attr_lvls, nonscaling_attributes))
+                            get_optimized_max_attr_lvls(min_attr_lvls, max_attr_lvls, nonscaling_attributes),
+                            default_varied_attributes
                         );
                         // static_assert(false, "get_optimized_max_attr_lvls needs to be adjusted for optimize_starting_class");
                     }

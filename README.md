@@ -80,7 +80,7 @@ The cmake build script automatically downloads *CPM.cmake* which it then uses to
 *Qt* needs to be provided seperately. A source archive with build script is provided at [qt-source](https://github.com/hanslhansl/qt-source). The Python build script can be invoked like this:
 
 ```
-py .\build_qt.py --additional-path "<path-to-compiler>\bin" --qt-namespace "qt"
+py .\build_qt.py --additional-path "<path-to-compiler>\bin"
 ```
 
 *Qt* binaries and source are also available on the official Qt website.
