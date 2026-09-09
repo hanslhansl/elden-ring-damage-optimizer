@@ -184,19 +184,15 @@ export namespace erdo
         return arr;
     }
     template<typename T>
-        requires std::same_as<T, std::array<typename T::value_type, std::declval<T>().size()>>
+        requires std::same_as<T, std::array<typename T::value_type, std::tuple_size<T>::value>>
     constexpr T make_filled_array(const typename T::value_type& value)
     {
-        T arr{};
-        arr.fill(value);
-        return arr;
+        return make_filled_array<std::tuple_size<T>::value, typename T::value_type>(value);
     }
     template<typename T>
-        requires std::same_as<T, std::span<typename T::element_type, T::extent>>
+        requires requires { T::extent; typename T::value_type; }
     constexpr std::array<typename T::value_type, T::extent> make_filled_array(const typename T::value_type& value)
     {
-        std::array<typename T::value_type, T::extent> arr{};
-        arr.fill(value);
-        return arr;
+        return make_filled_array<T::extent, typename T::value_type>(value);
     }
 }

@@ -108,7 +108,7 @@ namespace erdo::ui
 
             void update(const calculator::FullAttackOptions& attack_options)
             {
-                (*this)[0] = attack_options.stats.character_level();
+                (*this)[0] = calculator::character_level(attack_options.stats);
             }
         };
         export struct UpgradeLevel : AlignedUnaryTextSection
@@ -530,7 +530,7 @@ namespace erdo::ui
             void update(const calculator::Attack& attack)
             {
                 for (auto&& [stat, is_ineffective, arr] : std::views::zip(
-                    attack.stats.relevant_stats(),
+                    calculator::relevant_attribute_levels(attack.stats),
                     attack.ineffective_attributes,
                     *this))
                 {
@@ -542,7 +542,7 @@ namespace erdo::ui
             void update(const calculator::FullAttackOptions& attack_options)
             {
                 for (auto&& [stat, arr] : std::views::zip(
-                    attack_options.stats.relevant_stats(),
+                    calculator::relevant_attribute_levels(attack_options.stats),
                     *this))
                 {
                     arr[0] = stat;

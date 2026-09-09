@@ -35,34 +35,34 @@ namespace erdo::optimizer
         ARCAINE_SCALING,
     };
 }
-using namespace erdo;
-template<>
-constexpr std::array<std::pair<optimizer::Target, std::string_view>, 19> enum_string_mapping<optimizer::Target> = {
-    std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
-    std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
-    std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
-    std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
-    std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
-    std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
-    std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
-    std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
-    std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
-    std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
-    std::pair{optimizer::Target::STRENGTH_SCALING, "STRENGTH_SCALING"},
-    std::pair{optimizer::Target::DEXTERITY_SCALING, "DEXTERITY_SCALING"},
-    std::pair{optimizer::Target::INTELLIGENCE_SCALING, "INTELLIGENCE_SCALING"},
-    std::pair{optimizer::Target::FAITH_SCALING, "FAITH_SCALING"},
-    std::pair{optimizer::Target::ARCAINE_SCALING, "ARCAINE_SCALING"}
-};
-
+namespace erdo
+{
+    template<>
+    constexpr std::array<std::pair<optimizer::Target, std::string_view>, 19> enum_string_mapping<optimizer::Target> = {
+        std::pair{optimizer::Target::TOTAL_ATTACK_POWER, "TOTAL_ATTACK_POWER"},
+        std::pair{optimizer::Target::PHYSICAL_ATTACK_POWER, "PHYSICAL_ATTACK_POWER"},
+        std::pair{optimizer::Target::MAGIC_ATTACK_POWER, "MAGIC_ATTACK_POWER"},
+        std::pair{optimizer::Target::FIRE_ATTACK_POWER, "FIRE_ATTACK_POWER"},
+        std::pair{optimizer::Target::LIGHTNING_ATTACK_POWER, "LIGHTNING_ATTACK_POWER"},
+        std::pair{optimizer::Target::HOLY_ATTACK_POWER, "HOLY_ATTACK_POWER"},
+        std::pair{optimizer::Target::POISON_STATUS_EFFECT, "POISON_STATUS_EFFECT"},
+        std::pair{optimizer::Target::SCARLET_ROT_STATUS_EFFECT, "SCARLET_ROT_STATUS_EFFECT"},
+        std::pair{optimizer::Target::BLEED_STATUS_EFFECT, "BLEED_STATUS_EFFECT"},
+        std::pair{optimizer::Target::FROST_STATUS_EFFECT, "FROST_STATUS_EFFECT"},
+        std::pair{optimizer::Target::SLEEP_STATUS_EFFECT, "SLEEP_STATUS_EFFECT"},
+        std::pair{optimizer::Target::MADNESS_STATUS_EFFECT, "MADNESS_STATUS_EFFECT"},
+        std::pair{optimizer::Target::DEATH_BLIGHT_STATUS_EFFECT, "DEATH_BLIGHT_STATUS_EFFECT"},
+        std::pair{optimizer::Target::SPELL_SCALING, "SPELL_SCALING"},
+        std::pair{optimizer::Target::STRENGTH_SCALING, "STRENGTH_SCALING"},
+        std::pair{optimizer::Target::DEXTERITY_SCALING, "DEXTERITY_SCALING"},
+        std::pair{optimizer::Target::INTELLIGENCE_SCALING, "INTELLIGENCE_SCALING"},
+        std::pair{optimizer::Target::FAITH_SCALING, "FAITH_SCALING"},
+        std::pair{optimizer::Target::ARCAINE_SCALING, "ARCAINE_SCALING"}
+    };
+}
 
 export namespace erdo::optimizer::starting_class
 {
-
     using RelevantBounds = std::array<unsigned int, 5>;
 
     struct StatOrthant
@@ -303,8 +303,7 @@ export namespace erdo::optimizer::starting_class
         const AttributeLevels& min_stats,
         const RelevantAttributeLevels& global_max)
     {
-        const auto min_relevant =
-            min_stats.relevant_stats();
+        const auto min_relevant = relevant_attribute_levels(min_stats);
 
         int min_relevant_sum = 0;
         int max_relevant_sum = 0;
@@ -326,7 +325,7 @@ export namespace erdo::optimizer::starting_class
 
         const int free_attribute_points =
             max_attribute_points -
-            min_stats.attribute_points();
+            attribute_points(min_stats);
 
         if (free_attribute_points < 0)
             return std::nullopt;
@@ -721,26 +720,36 @@ export namespace erdo::optimizer::starting_class
 
 namespace erdo::optimizer
 {
-    export std::size_t get_stat_variation_count(const int max_attribute_points, const AttributeLevels& min_stats, const RelevantAttributeLevels& max_relevant_stats)
-    {
-        auto min_relevant_stats = min_stats.relevant_stats();
-        auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
+    export using VariedAttributes = std::array<bool, enumerators_of<Attribute>().size()>;
+    export constexpr VariedAttributes default_varied_attributes = { false, false, false, true, true, true, true, true };
 
+    export std::size_t get_stat_variation_count(
+        const int max_attribute_points,
+        const AttributeLevels& min_attr_lvls,
+        const AttributeLevels& max_attr_lvls,
+        const VariedAttributes& varied_attributes
+    )
+    {
+        auto free_attribute_points = max_attribute_points - attribute_points(min_attr_lvls);
         if (free_attribute_points < 0)
             return 0;
 
         const auto A = static_cast<std::size_t>(free_attribute_points);
-        constexpr std::size_t P = min_relevant_stats.extent;
+
+        constexpr std::size_t P = std::tuple_size_v<AttributeLevels>;
 
         std::array<std::size_t, P> capacity{};
         std::size_t totalCapacity = 0;
 
         for (std::size_t i = 0; i < P; ++i)
         {
-            if (min_relevant_stats[i] > max_relevant_stats[i])
-                throw std::invalid_argument("min_relevant_stats[i] must be <= max_relevant_stats[i].");
+            if (!varied_attributes[i])
+                continue;
 
-            const auto C = static_cast<std::size_t>(max_relevant_stats[i]) - static_cast<std::size_t>(min_relevant_stats[i]);
+            if (min_attr_lvls[i] > max_attr_lvls[i])
+                throw std::invalid_argument("min_attr_lvls[i] must be <= max_attr_lvls[i].");
+
+            const auto C = static_cast<std::size_t>(max_attr_lvls[i]) - static_cast<std::size_t>(min_attr_lvls[i]);
 
             capacity[i] = C;
             totalCapacity += C;
@@ -773,60 +782,156 @@ namespace erdo::optimizer
 
         return static_cast<std::size_t>(dp[A]);
     }
-    export std::vector<AttributeLevels> get_stat_variations(const int max_attribute_points, const AttributeLevels &min_stats, const RelevantAttributeLevels& max_relevant_stats)
+    export std::vector<AttributeLevels> get_stat_variations(
+        const int max_attribute_points,
+        const AttributeLevels &min_attr_lvls,
+        const AttributeLevels& max_attr_lvls,
+        const VariedAttributes& varied_attributes
+    )
     {
-        auto min_relevant_stats = min_stats.relevant_stats();
-        auto free_attribute_points = max_attribute_points - min_stats.attribute_points();
+        const auto free_attribute_points = max_attribute_points - attribute_points(min_attr_lvls);
+        if (free_attribute_points < 0)
+            return {};
 
-        const int min_relevant_sum = std::ranges::fold_left(min_relevant_stats, 0, std::plus<int>{});
-        const int max_relevant_sum = std::ranges::fold_left(max_relevant_stats, 0, std::plus<int>{});
-        const int SUM = min_relevant_sum + std::min(free_attribute_points, max_relevant_sum - min_relevant_sum);
+        unsigned int min_relevant_sum = 0;
+        unsigned int max_relevant_sum = 0;
+        AttributeLevels adjusted_max_attr_lvls{};
+        for(auto&& [min_attr_lvl, max_attr_lvl, adjusted_max_attr_lvl, varied_attribute] : std::views::zip(
+            min_attr_lvls,
+            max_attr_lvls,
+            adjusted_max_attr_lvls,
+            varied_attributes
+        ))
+        {
+            if(varied_attribute)
+            {
+                min_relevant_sum += min_attr_lvl;
+                max_relevant_sum += max_attr_lvl;
+                adjusted_max_attr_lvl = max_attr_lvl;
+            }
+            else
+            {
+                adjusted_max_attr_lvl = min_attr_lvl;
+            }
+        }
 
-        auto possible_occurances = get_stat_variation_count(max_attribute_points, min_stats, max_relevant_stats);
+        if (free_attribute_points > max_relevant_sum - min_relevant_sum)
+            return { adjusted_max_attr_lvls };
+
+        const int SUM = max_attribute_points;
+
+        const auto possible_occurances = get_stat_variation_count(max_attribute_points, min_attr_lvls, max_attr_lvls, varied_attributes);
 
         std::vector<AttributeLevels> stat_variations{ possible_occurances };
         auto current_it = stat_variations.begin(); 
 
-        auto result = min_stats;
-        auto& i = result[irrelevant_attribute_count];
-        auto& j = result[irrelevant_attribute_count + 1];
-        auto& k = result[irrelevant_attribute_count + 2];
-        auto& l = result[irrelevant_attribute_count + 3];
-        auto& m = result[irrelevant_attribute_count + 4];
+        auto result = min_attr_lvls;
+        auto&& [i, j, k, l, m, n, o, p] = result;
 
-        for (i = min_relevant_stats[0]; std::cmp_less_equal(i, std::min<int>(max_relevant_stats[0], SUM)); ++i)
+        for (i = min_attr_lvls[0]; std::cmp_less_equal(i, std::min<int>(adjusted_max_attr_lvls[0], SUM)); ++i)
         {
-            auto SUM_i = SUM - (int)i;
-            for (j = min_relevant_stats[1]; std::cmp_less_equal(j, std::min<int>(max_relevant_stats[1], SUM_i)); ++j)
-            {
-                auto SUM_i_j = SUM_i - (int)j;
-                for (k = min_relevant_stats[2]; std::cmp_less_equal(k, std::min<int>(max_relevant_stats[2], SUM_i_j)); ++k)
-                {
-                    auto SUM_i_j_k = SUM_i_j - (int)k;
-                    for (l = std::max<int>(min_relevant_stats[3], SUM_i_j_k - max_relevant_stats[4]);
-                        std::cmp_less_equal(l, std::min<int>(max_relevant_stats[3], SUM_i_j_k - min_relevant_stats[4]));
-                        ++l
-                    )
-                    {
-                        m = SUM_i_j_k - l;
+            const auto sum_i = SUM - (int)i;
 
-                        *current_it++ = result;
+            for (j = min_attr_lvls[1]; std::cmp_less_equal(j, std::min<int>(adjusted_max_attr_lvls[1], sum_i)); ++j)
+            {
+                const auto sum_ij = sum_i - (int)j;
+
+                for (k = min_attr_lvls[2]; std::cmp_less_equal(k, std::min<int>(adjusted_max_attr_lvls[2], sum_ij)); ++k)
+                {
+                    const auto sum_ijk = sum_ij - (int)k;
+
+                    // l must leave enough room for stages 4..7.
+                    const auto l_min = std::max<int>(
+                        min_attr_lvls[3],
+                        sum_ijk - adjusted_max_attr_lvls[4] - adjusted_max_attr_lvls[5] - adjusted_max_attr_lvls[6] - adjusted_max_attr_lvls[7]
+                    );
+
+                    const auto l_max = std::min<int>(
+                        adjusted_max_attr_lvls[3],
+                        sum_ijk - min_attr_lvls[4] - min_attr_lvls[5] - min_attr_lvls[6] - min_attr_lvls[7]
+                    );
+
+                    for (l = l_min; std::cmp_less_equal(l, l_max); ++l)
+                    {
+                        const auto sum_ijkl = sum_ijk - (int)l;
+
+                        // m must leave enough room for stages 5..7.
+                        const auto m_min = std::max<int>(
+                            min_attr_lvls[4],
+                            sum_ijkl - adjusted_max_attr_lvls[5] - adjusted_max_attr_lvls[6] - adjusted_max_attr_lvls[7]
+                        );
+
+                        const auto m_max = std::min<int>(
+                            adjusted_max_attr_lvls[4],
+                            sum_ijkl - min_attr_lvls[5] - min_attr_lvls[6] - min_attr_lvls[7]
+                        );
+
+                        for (m = m_min; std::cmp_less_equal(m, m_max); ++m)
+                        {
+                            const auto sum_ijklm = sum_ijkl - (int)m;
+
+                            // n must leave enough room for o and p.
+                            const auto n_min = std::max<int>(
+                                min_attr_lvls[5], sum_ijklm - adjusted_max_attr_lvls[6] - adjusted_max_attr_lvls[7]
+                            );
+
+                            const auto n_max = std::min<int>(
+                                adjusted_max_attr_lvls[5],
+                                sum_ijklm - min_attr_lvls[6] - min_attr_lvls[7]
+                            );
+
+                            for (n = n_min; std::cmp_less_equal(n, n_max); ++n)
+                            {
+                                const auto remaining = sum_ijklm - (int)n;
+
+                                // Instead of looping over o AND p:
+                                //   o + p == remaining
+                                // o is constrained by both its own range and the range available to p.
+                                const auto o_min = std::max<int>(
+                                    min_attr_lvls[6],
+                                    remaining - adjusted_max_attr_lvls[7]
+                                );
+
+                                const auto o_max = std::min<int>(
+                                    adjusted_max_attr_lvls[6],
+                                    remaining - min_attr_lvls[7]
+                                );
+
+                                for (o = o_min; std::cmp_less_equal(o, o_max); ++o)
+                                {
+                                    // p is uniquely determined.
+                                    p = remaining - (int)o;
+
+                                    *current_it++ = result;
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
+
         if (current_it != stat_variations.end())
             throw std::runtime_error(std::format(
-                "Mismatch in expected ({}) and actual ({}) number of stat variations generated.\nmin_stats: {}, max_attribute_points: {}",
+                "Mismatch in expected ({}) and actual ({}) number of stat variations generated.\n"
+                    "free_attribute_points: {}\n"
+                    "min_attr_lvls: {}\n"
+                    "max_attr_lvls: {}\n"
+                    "adjusted_max_attr_lvls: {}\n"
+                    "varied_attributes: {}",
                 possible_occurances,
                 std::distance(stat_variations.begin(), current_it),
-                min_stats,
-                max_attribute_points
+                free_attribute_points,
+                min_attr_lvls,
+                max_attr_lvls,
+                adjusted_max_attr_lvls,
+                varied_attributes
             ));
 
         return stat_variations;
     }
+
 
     export template<Target target>
     struct Projection;
@@ -931,7 +1036,7 @@ namespace erdo::optimizer
 
                 auto new_value = projection(attack);
                 if (best_value < new_value ||
-                    (best_stats && best_value == new_value && best_stats->character_level() > attack.stats.character_level()))
+                    (best_stats && best_value == new_value && character_level(*best_stats) > character_level(attack.stats)))
                 {
                     best_stats = &stats;
                     best_value = new_value;
@@ -964,26 +1069,29 @@ namespace erdo::optimizer
             std::ranges::sized_range auto&& weapons,
             const AttackOptions& attack_options,
             int max_attribute_points,
-            const AttributeLevels &min_stats,
-            int max_stat,
+            const AttributeLevels &min_attr_lvls,
+            int max_attr_lvl,
             bool optimize_starting_class
         ) : attack_options{ attack_options }
         {
+            auto max_attr_lvls = make_filled_array<AttributeLevels>(max_attr_lvl);
+
             if (optimize_starting_class)
             {
-                std::println("{}", starting_class::get_min_stats(min_stats));
+                std::println("{}", starting_class::get_min_stats(min_attr_lvls));
                 this->stat_variations = starting_class::get_stat_variations(
                     max_attribute_points,
-                    starting_class::get_min_stats(min_stats),
-                    make_filled_array<RelevantAttributeLevels>(max_stat)
+                    starting_class::get_min_stats(min_attr_lvls),
+                    relevant_attribute_levels(max_attr_lvls)
                 );
             }
             else
             {
                 this->stat_variations = get_stat_variations(
                     max_attribute_points,
-                    min_stats,
-                    make_filled_array<RelevantAttributeLevels>(max_stat)
+                    min_attr_lvls,
+                    max_attr_lvls,
+                    default_varied_attributes
                 );
             }
             
@@ -999,18 +1107,26 @@ namespace erdo::optimizer
     export template<Target target> requires valid_optimizer_target<target>
     struct V2 : OptimizerBase<target>
     {
-        static RelevantAttributeLevelsArray get_optimized_max_relevant_stats(
-            const RelevantAttributeLevels &min_relevant_stats,
-            const RelevantAttributeLevels& max_relevant_stats,
+        static AttributeLevels get_optimized_max_attr_lvls(
+            const AttributeLevels &min_attr_lvls,
+            const AttributeLevels& max_attr_lvls,
             const NonscalingAttributes& nonscaling_attributes
         )
         {
-            RelevantAttributeLevelsArray optimized_max_relevant_stats{};
-            for (auto&& [min_relevant_stat, max_relevant_stat, nonscaling_attribute, optimized_max_relevant_stat] :
-                std::views::zip(min_relevant_stats, max_relevant_stats, nonscaling_attributes, optimized_max_relevant_stats)
-            )
-                optimized_max_relevant_stat = nonscaling_attribute ? min_relevant_stat : max_relevant_stat;
-            return optimized_max_relevant_stats;
+            AttributeLevels optimized_max_attr_lvls{};
+            for (auto&& [
+                min_attr_lvl,
+                max_attr_lvl,
+                nonscaling_attribute,
+                optimized_max_attr_lvl
+            ] : std::views::zip(
+                relevant_attribute_levels(min_attr_lvls),
+                relevant_attribute_levels(max_attr_lvls),
+                nonscaling_attributes,
+                relevant_attribute_levels(optimized_max_attr_lvls)
+            ))
+                optimized_max_attr_lvl = nonscaling_attribute ? min_attr_lvl : max_attr_lvl;
+            return optimized_max_attr_lvls;
         }
 
         std::map<NonscalingAttributes, std::vector<AttributeLevels>> optimized_stat_variations_map{};
@@ -1020,13 +1136,12 @@ namespace erdo::optimizer
             std::ranges::sized_range auto&& weapons,
             const AttackOptions& attack_options,
             int max_attribute_points,
-            const AttributeLevels &min_stats,
-            int max_stat,
+            const AttributeLevels &min_attr_lvls,
+            int max_attr_lvl,
             bool optimize_starting_class
         ) : attack_options{ attack_options }
         {
-            auto min_relevant_stats = min_stats.relevant_stats();
-            auto max_relevant_stats = make_filled_array<RelevantAttributeLevels>(max_stat);
+            auto max_attr_lvls = make_filled_array<AttributeLevels>(max_attr_lvl);
 
             for (auto&& weapon : weapons)
             {
@@ -1039,17 +1154,18 @@ namespace erdo::optimizer
                     {
                         optimized_stat_variations = starting_class::get_stat_variations(
                             max_attribute_points,
-                            starting_class::get_min_stats(min_stats),
-                            get_optimized_max_relevant_stats(min_relevant_stats, max_relevant_stats, nonscaling_attributes)
+                            starting_class::get_min_stats(min_attr_lvls),
+                            relevant_attribute_levels(get_optimized_max_attr_lvls(min_attr_lvls, max_attr_lvls, nonscaling_attributes))
                         );
-                        static_assert(false, "get_optimized_max_relevant_stats needs to be adjusted for optimize_starting_class");
+                        // static_assert(false, "get_optimized_max_attr_lvls needs to be adjusted for optimize_starting_class");
                     }
                     else
                     {
                         optimized_stat_variations = get_stat_variations(
                             max_attribute_points,
-                            min_stats,
-                            get_optimized_max_relevant_stats(min_relevant_stats, max_relevant_stats, nonscaling_attributes)
+                            min_attr_lvls,
+                            get_optimized_max_attr_lvls(min_attr_lvls, max_attr_lvls, nonscaling_attributes),
+                            default_varied_attributes
                         );
                     }
                     
