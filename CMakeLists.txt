@@ -19,7 +19,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-pthread>")
 add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-fexperimental-library>")
 
 # enable g++ module support
-add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
+# add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-fmodules>")
 
 # ASan and UBSan for debug builds
 # add_compile_options($<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-fsanitize=address,undefined>)

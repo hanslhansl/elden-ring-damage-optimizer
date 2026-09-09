@@ -267,7 +267,7 @@ namespace erdo::ui
                 return QString::number(x) + " + " + QString::number(y);
             return format_float(x) + " + " + format_float(y);
         }
-    };
+    }
 }
 
 template<typename T>
