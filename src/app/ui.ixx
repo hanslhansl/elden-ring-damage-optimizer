@@ -601,7 +601,8 @@ namespace erdo::ui
                 stat_variation_count = optimizer::starting_class::get_stat_variation_count(
                     max_attribute_points,
                     optimizer::starting_class::get_min_stats(min_stats),
-                    make_filled_array<calculator::RelevantAttributeLevels>(calculator::attribute_level_limit)
+                    make_filled_array<calculator::AttributeLevels>(calculator::attribute_level_limit),
+                    optimizer::default_varied_attributes
                 );
             }
             else
