@@ -19,18 +19,19 @@ The result is displayed in the lower half. The table can be sorted by clicking o
 ![optimize tab image](images/optimize.png)
 This tab finds the optimal character attribute distribution for given constraints.
 
-The constraints (i.e. minimum character attributes, maximum character level, attack options) can be adjusted in the upper half. Again, there are also filters to filter the result.
+The constraints (i.e. minimum character attributes, maximum character level, attack options) can be adjusted in the upper half. There are filters to filter which weapons to consider during optimization, narrowing down the weapon pool can greatly reduce computing time.
 
 The optimization is controlled in the top right section:
 - The stat to optimize for is chosen with the *Target* dropdown.
-- The *Brute Force* algorithm is pretty simple: It tries every attribute variation (satisfying the provided constraints) with every weapon (according to the filter options) and displays the best result.
-- The *V2* algorithm takes only the scaling attributes of each weapon into account. This reduces the number of attribute variations and therefor computing time by orders of magnitude.
+- If the *Optimize Starting Class* checkbox is enabled the optimized character attributes are guaranteed to be 'realizable' with at least one starting class. This makes it easy to choose the optimal starting class for provided constraints. The optimizer implements this by 'merging' the provided minimum character attributes with each starting class attributes and then running the optimization for each of these merged/adjusted minimum character attributes in one go.
+- The *Brute Force* algorithm is pretty simple: It tries every attribute variation (satisfying the provided constraints) with every weapon (according to the filter options) and displays the best results. *V2* has made this algorithm more or less obsolete, it is kept for testing and result verification.
+- The *V2* algorithm considers only the scaling attributes of each weapon. This reduces the number of attribute variations and therefor computing time by orders of magnitude.
 - The *Attribute Variations* fields show how many attack ratings per weapon the algorithm has to calculate.
 - The *Iterations* fields are a good indicator for how computationally expensive the optimization will be. It displays the total number of attack ratings the algorithm has to calculate.
 
 Note: For *Brute Force* a *Max Character Level* of $168$ and all *Min Character Attributes* equal to $0$ results in $59.896.875$ attribute variations and $192.628.350.000$ iterations (the highest possible). For *V2* the same setup results in only ~$354.168$ attribute variations and $1.139.007.301$ iterations.
 
-The result is displayed in a table in the lower half. It is functionally identical to the *Calculate* result table.
+The results are displayed in the table in the lower half. It is functionally identical to the *Calculate* result table.
 
 ### Plot
 ![plot tab image](images/plot.png)
