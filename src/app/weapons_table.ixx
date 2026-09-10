@@ -18,7 +18,6 @@ import std;
 import erdo;
 import erdo.ui.settings;
 
-using namespace std::literals;
 
 namespace erdo::ui
 {
@@ -38,6 +37,56 @@ struct std::tuple_element<I, T> : std::tuple_element<I, typename T::tuple_base> 
 
 namespace erdo::ui
 {
+    auto format_attack_power(const calculator::AttackPower& ap)
+    {
+        auto&& [a, c] = ap;
+        auto b = c - a;
+
+        if (settings.show_attack_power_split == Qt::Unchecked)
+        {
+            if (c == 0)
+            {
+                return QString("\u2012");
+            }
+            else
+            {
+                return format_float_round_to_zero(c);
+            }
+        }
+        else if (settings.show_attack_power_split == Qt::PartiallyChecked)
+        {
+            if (a == 0 && c == 0)
+            {
+                return QString("\u2012");
+            }
+            else if (b < 0)
+            {
+                return format_float_round_to_zero(a) + " - " + format_float_round_to_zero(-b);
+            }
+            else
+            {
+                return format_float_round_to_zero(a) + " + " + format_float_round_to_zero(b);
+            }
+        }
+        else if (settings.show_attack_power_split == Qt::Checked)
+        {
+            if (a == 0 && c == 0)
+            {
+                return QString("\u2012");
+            }
+            else if (b < 0)
+            {
+                return format_float_round_to_zero(a) + " - " + format_float_round_to_zero(-b) + " = " + format_float_round_to_zero(c);
+            }
+            else
+            {
+                return format_float_round_to_zero(a) + " + " + format_float_round_to_zero(b) + " = " + format_float_round_to_zero(c);
+            }
+        }
+
+        throw std::runtime_error("Invalid value for show_attack_power_split setting.");
+    }
+
     auto foreground_color(bool is_ineffective)
     {
         return is_ineffective ? QColor(Qt::red) : QColor(Qt::black);
@@ -335,7 +384,7 @@ namespace erdo::ui
 
             void update(const calculator::Attack& attack)
             {
-                (*this)[0][0] = format_number(attack.spell_scaling * 100);
+                (*this)[0][0] = format_number_round_to_zero(attack.spell_scaling * 100);
                 (*this)[0][1] = attack.spell_scaling * 100;
                 (*this)[0][2] = foreground_color(attack.is_spell_scaling_ineffective());
             }
@@ -366,19 +415,12 @@ namespace erdo::ui
                     attack.ineffective_attack_power_types | std::views::take(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    if (settings.show_attack_power_split)
-                        arr[0] = format_number_pair(ap[0], ap[1] - ap[0]);
-                    else
-                        arr[0] = format_number(ap[1]);
-
+                    arr[0] = format_attack_power(ap);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }
 
-                if (settings.show_attack_power_split)
-                    this->back()[0] = format_number_pair(attack.total_attack_power[0], attack.total_attack_power[1] - attack.total_attack_power[0]);
-                else
-                    this->back()[0] = format_number(attack.total_attack_power[1]);
+                this->back()[0] = format_attack_power(attack.total_attack_power);
                 this->back()[1] = attack.total_attack_power[1];
                 this->back()[2] = foreground_color(attack.is_total_attack_power_ineffective());
             }
@@ -413,11 +455,7 @@ namespace erdo::ui
                     attack.ineffective_attack_power_types | std::views::drop(enumerators_of<calculator::DamageType>().size()),
                     *this))
                 {
-                    if (settings.show_attack_power_split)
-                        arr[0] = format_number_pair(ap[0], ap[1] - ap[0]);
-                    else
-                        arr[0] = format_number(ap[1]);
-
+                    arr[0] = format_attack_power(ap);
                     arr[1] = ap[1];
                     arr[2] = foreground_color(is_ineffective);
                 }

@@ -824,16 +824,8 @@ namespace erdo::ui
 
                 row.dataset = dataset.name;
 
-                // row.x = QString::number(
-                //     point.x,
-                //     'g',
-                //     8);
-                // row.y = QString::number(
-                //     point.y,
-                //     'g',
-                //     8);
-                row.x = format_number(point.x);
-                row.y = format_number(point.y);
+                row.x = format_float(point.x);
+                row.y = format_float_round_to_zero(point.y);
 
                 rows.append(row); //format_number
             }
@@ -845,13 +837,11 @@ namespace erdo::ui
             * -------------------------------------------------------------
             */
 
-            const QFont normalFont =
-                painter.font();
+            const QFont normalFont = painter.font();
 
-            QFont headerFont =
-                normalFont;
+            QFont headerFont = normalFont;
 
-            headerFont.setBold(true);
+            // headerFont.setBold(true);
 
 
             /*

@@ -85,6 +85,24 @@ namespace erdo::ui
             checkbox->setChecked(value);
         }
     };
+    struct TristateCheckBoxSetting
+    {
+        using value_type = Qt::CheckState;
+        using widget_type = QCheckBox;
+        inline static const auto signal = &QCheckBox::checkStateChanged;
+
+        std::string_view section_name;
+        std::string_view name;
+        std::string_view display_name;
+
+        value_type default_value;
+
+        void initialize(widget_type* checkbox, value_type value) const
+        {
+            checkbox->setTristate(true);
+            checkbox->setCheckState(value);
+        }
+    };
 
     class Settings
     {
@@ -106,11 +124,11 @@ namespace erdo::ui
             .minimum_value = 0,
             .maximum_value = 10
         } };
-        SettingMember<bool> show_attack_power_split{ CheckBoxSetting{
+        SettingMember<Qt::CheckState> show_attack_power_split{ TristateCheckBoxSetting{
             .section_name = "General",
             .name = "show_attack_power_split",
             .display_name = "Show Attack Power Split",
-            .default_value = false
+            .default_value = Qt::Unchecked
         } };
 
         SettingMember<int> plot_data_line_width{ SpinBoxSetting{
@@ -208,22 +226,6 @@ namespace erdo::ui
     };
     export Settings settings { 1 };
 
-    export QString format_float(double x)
-    {
-        auto s = QString::number(x, 'f', settings.decimal_places.value);
-
-        // Remove trailing zeros
-        if (s.contains('.'))
-            while (s.endsWith('0'))
-                s.chop(1);
-
-        // Remove trailing decimal point
-        if (s.endsWith('.'))
-            s.chop(1);
-
-        return s;
-    }
-
     struct EnumToDisplay{
         template<typename E> requires std::is_enum_v<E>
         static QString operator()(E e)
@@ -241,35 +243,54 @@ namespace erdo::ui
     };
     export EnumToDisplay enum_to_display{};
 
+    export QString format_float(double x)
+    {
+        auto s = QString::number(x, 'f', settings.decimal_places.value);
+
+        // Remove trailing zeros
+        if (s.contains('.'))
+            while (s.endsWith('0'))
+                s.chop(1);
+
+        // Remove trailing decimal point
+        if (s.endsWith('.'))
+            s.chop(1);
+
+        return s;
+    }
+    export QString format_float_round_to_zero(double x)
+    {
+        auto s = QString::number(x, 'f', settings.decimal_places.value + 1);
+        s.chop(1);
+
+        // Remove trailing zeros
+        if (s.contains('.'))
+            while (s.endsWith('0'))
+                s.chop(1);
+
+        // Remove trailing decimal point
+        if (s.endsWith('.'))
+            s.chop(1);
+
+        return s;
+    }
+
     export template<typename T>
     auto format_number(T x)
     {
-        if (x == 0)
+        if (x == T(0))
             return QString("\u2012");
         if constexpr (std::integral<T>)
             return QString::number(x);
         return format_float(x);
     };
-    export template<typename T>
-    auto format_number_pair(T x, T y)
+    export template<typename T> requires (!std::integral<T>)
+    auto format_number_round_to_zero(T x)
     {
-        if (x == 0 && y == 0)
-        {
+        if (x == T(0))
             return QString("\u2012");
-        }
-        else if (y < 0)
-        {
-            if constexpr (std::integral<T>)
-                return QString::number(x) + " - " + QString::number(-y);
-            return format_float(x) + " - " + format_float(-y);
-        }
-        else
-        {
-            if constexpr (std::integral<T>)
-                return QString::number(x) + " + " + QString::number(y);
-            return format_float(x) + " + " + format_float(y);
-        }
-    }
+        return format_float_round_to_zero(x);
+    };
 }
 
 template<typename T>
