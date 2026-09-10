@@ -277,7 +277,7 @@ namespace erdo::ui
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
-            static inline const QString section_name = "Character Classes";
+            static inline const QString section_name = "Character Starting Classes";
             inline const static std::vector<QString> column_names = calculator::character_starting_class_attributes
                 | std::views::transform(&decltype(calculator::character_starting_class_attributes)::value_type::first)
                 | std::views::transform(QString::fromStdString)
@@ -1229,19 +1229,14 @@ namespace erdo::ui
         {
             QMenu menu;
 
-            menu.addAction(
-                QString::fromStdString("Adjust Column Widths to Contents"),
-                [&](){ this->resize_columns_to_contents(); }
-            );
-            menu.addSeparator();
-
+            QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
             for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
                 auto name = Row::section_name(section_index);
                 if (name.isEmpty())
                     name = Row::column_name(Row::section_index_offsets[section_index]);
 
-                QAction *action = menu.addAction(name);
+                QAction *action = sections_menu->addAction(name);
                 action->setCheckable(true);
                 action->setChecked(!this->header->is_section_hidden(section_index));
 
@@ -1249,6 +1244,10 @@ namespace erdo::ui
                     this->header->set_section_hidden(section_index, !visible);
                 });
             }
+            menu.addAction(
+                QString::fromStdString("Adjust Column Widths to Contents"),
+                [&](){ this->resize_columns_to_contents(); }
+            );
 
             menu.exec(this->mapToGlobal(pos));
         }
@@ -1325,6 +1324,21 @@ namespace erdo::ui
             }
 
             menu.addSeparator();
+            QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
+            for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
+            {
+                auto name = Row::section_name(section_index);
+                if (name.isEmpty())
+                    name = Row::column_name(Row::section_index_offsets[section_index]);
+
+                QAction *action = sections_menu->addAction(name);
+                action->setCheckable(true);
+                action->setChecked(!this->header->is_section_hidden(section_index));
+
+                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                    this->header->set_section_hidden(section_index, !visible);
+                });
+            }
             menu.addAction(
                 QString::fromStdString("Adjust Column Widths to Contents"),
                 [&](){ this->resize_columns_to_contents(); }

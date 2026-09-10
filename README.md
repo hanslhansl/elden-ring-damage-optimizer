@@ -13,7 +13,7 @@ This tab simply calculates the attack rating of all weapons.
 
 The character attributes as well as other attack options (upgrade level, two-handing) can be adjusted in the upper half. The filters allow to filter the result for *weapon type*, *base name* etc.
 
-The result is displayed in the lower half. The table can be sorted by clicking on the respective column header. Columns can be disabled/enabled by right-clicking the table header and choosing from the context menu. Right-clicking the table content opens a context menu with several helpful options.
+The result is displayed in the lower half. The table can be sorted by clicking on the respective column header. Right-clicking the table opens a context menu with several helpful options like showing/hiding columns/sections.
 
 ### Optimize
 ![optimize tab image](images/optimize.png)
@@ -23,7 +23,7 @@ The constraints (i.e. minimum character attributes, maximum character level, att
 
 The optimization is controlled in the top right section:
 - The stat to optimize for is chosen with the *Target* dropdown.
-- If the *Optimize Starting Class* checkbox is enabled the optimized character attributes are guaranteed to be 'realizable' with at least one starting class. This makes it easy to choose the optimal starting class for provided constraints. The optimizer implements this by 'merging' the provided minimum character attributes with each starting class attributes and then running the optimization for each of these merged/adjusted minimum character attributes in one go.
+- If the *Optimize Starting Class* checkbox is enabled the optimized character attributes are guaranteed to be 'realizable' with at least one starting class. Together with the *Character Starting Classes* table section (show by right-clicking the table) this makes it easy to choose the optimal starting class for provided constraints. The optimizer implements this feature by 'merging' the provided minimum character attributes with each starting class attributes and then running the optimization for each of these merged/adjusted minimum character attributes in one go.
 - The *Brute Force* algorithm is pretty simple: It tries every attribute variation (satisfying the provided constraints) with every weapon (according to the filter options) and displays the best results. *V2* has made this algorithm more or less obsolete, it is kept for testing and result verification.
 - The *V2* algorithm considers only the scaling attributes of each weapon. This reduces the number of attribute variations and therefor computing time by orders of magnitude.
 - The *Attribute Variations* fields show how many attack ratings per weapon the algorithm has to calculate.
