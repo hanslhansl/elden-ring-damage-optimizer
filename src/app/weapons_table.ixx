@@ -1357,6 +1357,11 @@ namespace erdo::ui
         explicit WeaponTable(bool is_plot_table, QString placeholder_string, QWidget *parent = nullptr)
             : is_plot_table{is_plot_table}, placeholder_string{placeholder_string}, WeaponTableBase(parent)
         {
+            // view
+            this->setFrameStyle(QFrame::Box);
+            this->setSortingEnabled(true);
+            this->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+            this->setSelectionBehavior(QAbstractItemView::SelectRows);
             this->setContextMenuPolicy(Qt::CustomContextMenu);
             connect(this, &QTableView::customContextMenuRequested, this, &WeaponTable::show_table_context_menu);
 
