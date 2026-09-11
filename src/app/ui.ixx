@@ -327,7 +327,7 @@ namespace erdo::ui
                 sections::StatusEffects,
                 sections::SpellScaling,
                 sections::Stats,
-                sections::CharacterClasses,
+                sections::StartingClasses,
                 sections::Requirements,
                 sections::AttributeScalings,
                 sections::AttackPowerTypeAttributeScalings<apts>...
@@ -523,14 +523,12 @@ namespace erdo::ui
         {
             this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
 
-            // get character stats
-            auto stats = this->get_character_stats();
-
-            // get attack options
-            auto attack_options = this->get_attack_options();
-
             // temporary attack object to avoid copying the weapon data multiple times
-            calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
+            calculator::Attack attack{
+                calculator::Weapon::dummy,
+                this->get_character_stats(),
+                this->get_attack_options()
+            };
 
             this->weapon_table->model->set_rows(*this->active_weapon_data
                 | std::views::transform([&](const calculator::Weapon& w) {
@@ -947,7 +945,7 @@ namespace erdo::ui
             {
                 auto action = this->add_weapon_data(dir);
                 if (action == nullptr)
-                    std::terminate();
+                    throw std::runtime_error(std::format("Failed to add weapon data directory: {}", dir.string()));
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }

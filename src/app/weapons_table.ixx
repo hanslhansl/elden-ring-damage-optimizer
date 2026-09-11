@@ -321,19 +321,19 @@ namespace erdo::ui
                 return {};
             }
         };
-        export struct CharacterClasses : DataSection<calculator::character_starting_class_attributes.size()>
+        export struct StartingClasses : DataSection<calculator::character_starting_class_attributes.size()>
         {
             static constexpr bool draw_section_header_labels_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
-            static inline const QString section_name = "Character Starting Classes";
+            static inline const QString section_name = "Starting Classes";
             inline const static std::vector<QString> column_names = calculator::character_starting_class_attributes
                 | std::views::transform(&decltype(calculator::character_starting_class_attributes)::value_type::first)
                 | std::views::transform(QString::fromStdString)
                 | std::ranges::to<std::vector>();
 
             using DataSection<calculator::character_starting_class_attributes.size()>::DataSection;
-            explicit CharacterClasses(const calculator::FullAttackOptions& attack_options)
+            explicit StartingClasses(const calculator::FullAttackOptions& attack_options)
             {
                 this->update(attack_options);
             }
@@ -553,7 +553,7 @@ namespace erdo::ui
         };
         export struct Stats : EnumDataSection<calculator::RelevantAttribute>
         {
-            static inline const QString section_name = "Character Attributes";
+            static inline const QString section_name = "Attribute Levels";
 
             using EnumDataSection::EnumDataSection;
             explicit Stats(const calculator::Attack& attack)
@@ -1446,8 +1446,7 @@ namespace erdo::ui
 
             this->set_section_hidden<sections::BaseName>(true);
             this->set_section_hidden<sections::BaseGameDLC>(true);
-            this->set_section_hidden<sections::CharacterClasses>(true);
-            this->set_section_hidden<sections::CharacterClasses>(true);
+            this->set_section_hidden<sections::StartingClasses>(true);
             [&](auto){
                 static constexpr auto [...apt] = enumerators_of<calculator::AttackPowerType>();
                 (this->set_section_hidden<sections::AttackPowerTypeAttributeScalings<apt>>(true), ...);
