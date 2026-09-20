@@ -1763,8 +1763,8 @@ namespace erdo::ui
                 sections::TwoHanding,
                 sections::CharacterLevel,
 
-                sections::Stats,
                 sections::StartingClasses,
+                sections::Stats,
                 sections::Requirements,
                 sections::AttributeScalings
             >{};

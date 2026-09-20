@@ -101,7 +101,7 @@ namespace erdo::ui
         {
             using _tuple_base<T>::_tuple_base;
 
-            static constexpr bool draw_section_header_labels_rotated = false;
+            static constexpr bool draw_column_header_rotated = false;
             static constexpr bool draw_section_seperators = false;
             static constexpr bool expand_section = false;
             static inline const QString section_name = "";
@@ -145,7 +145,7 @@ namespace erdo::ui
         export struct CharacterLevel : AlignedUnaryTextSection
         {
             static constexpr bool expand_section = true;
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
 
             static constexpr std::array column_names { "Character Level" };
 
@@ -163,7 +163,7 @@ namespace erdo::ui
         export struct UpgradeLevel : AlignedUnaryTextSection
         {
             static constexpr bool expand_section = true;
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
             
             static constexpr std::array column_names { "Upgrade Level" };
 
@@ -282,7 +282,7 @@ namespace erdo::ui
         export struct TwoHanding : AlignedBinaryTextSection
         {
             static constexpr bool expand_section = true;
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
 
             static constexpr std::array column_names { "Two-Handing" };
 
@@ -323,7 +323,7 @@ namespace erdo::ui
         };
         export struct StartingClasses : DataSection<calculator::character_starting_class_attributes.size()>
         {
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
             static constexpr bool draw_section_seperators = true;
 
             static inline const QString section_name = "Starting Classes";
@@ -372,7 +372,7 @@ namespace erdo::ui
         };
         export struct SpellScaling : DataSection<1>
         {
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
             static constexpr bool draw_section_seperators = true;
             static constexpr std::array column_names = { "Spell Scaling" };
 
@@ -391,7 +391,7 @@ namespace erdo::ui
         };
         export struct AttackPowers : DataSection<enumerators_of<calculator::DamageType>().size() + 1>
         {
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
             static constexpr bool draw_section_seperators = true;
             static inline const QString section_name = "Attack Power";
             inline const static std::vector<QString> column_names = [](){
@@ -431,7 +431,7 @@ namespace erdo::ui
         {
             using enum_type = E;
 
-            static constexpr bool draw_section_header_labels_rotated = true;
+            static constexpr bool draw_column_header_rotated = true;
             static constexpr bool draw_section_seperators = true;
             
             inline const static std::vector<QString> column_names = enumerators_of<enum_type>()
@@ -625,51 +625,61 @@ namespace erdo::ui
 
         std::conditional_t<sparse, calculator::FullAttackOptions, calculator::Attack> attack { calculator::Weapon::dummy, {}, {} };
 
+        // number of columns per section
         static constexpr std::array section_sizes = { std::tuple_size_v<Args>... };
-        static constexpr std::array cumulative_section_sizes = []() {
+        // column index of the one-past-last column of each section
+        static constexpr std::array section_column_end_indices = []() {
             std::array<std::size_t, sizeof...(Args)> result{};
             std::partial_sum(section_sizes.begin(), section_sizes.end(), result.begin());
             return result;
         }();
-        static constexpr std::array section_index_offsets = []() {
+        // column index of the first column of each section
+        static constexpr std::array section_column_begin_indices = []() {
             std::array<std::size_t, sizeof...(Args)> result{};
-            std::ranges::copy(cumulative_section_sizes | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
+            std::ranges::copy(section_column_end_indices | std::views::take(sizeof...(Args) - 1), result.begin() + 1);
             return result;
         }();
+        // total number of columns
         static constexpr std::size_t total_size = std::ranges::fold_left(section_sizes, 0, std::plus{});
+        // maps a column index to its section index
         static constexpr std::array column_index_to_section_index = []() {
             std::array<std::size_t, total_size> result{};
             for (std::size_t section_index = 0; section_index < sizeof...(Args); ++section_index)
-                std::ranges::fill(result | std::views::drop(section_index_offsets[section_index]) | std::views::take(section_sizes[section_index]), section_index);
+                std::ranges::fill(result | std::views::drop(section_column_begin_indices[section_index]) | std::views::take(section_sizes[section_index]), section_index);
             return result;
         }();
 
+        // whether to draw each sections' seperators
         static constexpr std::array draw_section_seperators = { Args::draw_section_seperators... };
+        // whether to draw each sections' column headers rotated
         static constexpr std::array draw_column_header_label_rotated = [](){
             std::array<bool, total_size> result{};
             for (auto [draw_rotated, section_index_offset, section_size] : std::views::zip(
-                std::array{ Args::draw_section_header_labels_rotated... },
-                section_index_offsets,
+                std::array{ Args::draw_column_header_rotated... },
+                section_column_begin_indices,
                 section_sizes
             ))
                 if (draw_rotated)
                     std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
             return result;
         }();
+        // whether to expand each column to fill the available space
         static constexpr std::array expand_column = [](){
             std::array<bool, total_size> result{};
             std::array expand_section = { Args::expand_section... };
-            for (auto [expand, section_index_offset, section_size] : std::views::zip(expand_section, section_index_offsets, section_sizes))
+            for (auto [expand, section_index_offset, section_size] : std::views::zip(expand_section, section_column_begin_indices, section_sizes))
                 if (expand)
                     std::ranges::fill(result | std::views::drop(section_index_offset) | std::views::take(section_size), true);
             return result;
         }();
 
-        static const QString& section_name(int column)
+        // returns the name of a section, empty if the section has no name
+        static const QString& section_name(int section_index)
         {
             const static std::vector<QString> section_names{ Args::section_name... };
-            return section_names.at(column);
+            return section_names.at(section_index);
         }
+        // returns the name of a column
         static const QString& column_name(int column)
         {
             const static std::vector<QString> column_names = [](){
@@ -762,7 +772,7 @@ namespace erdo::ui
         {
             if constexpr (requires { tuple_index_v<sections::Color, Row>; })
             {
-                if (index.column() == Row::section_index_offsets.at(tuple_index_v<sections::Color, Row>) && role == Qt::EditRole)
+                if (index.column() == Row::section_column_begin_indices.at(tuple_index_v<sections::Color, Row>) && role == Qt::EditRole)
                 {
                     const QColor color = value.value<QColor>();
 
@@ -859,8 +869,8 @@ namespace erdo::ui
         {
             if (Row::draw_section_seperators[i])
             {
-                auto first_column = Row::section_index_offsets[i];
-                auto last_column = Row::cumulative_section_sizes[i] - 1;
+                auto first_column = Row::section_column_begin_indices[i];
+                auto last_column = Row::section_column_end_indices[i] - 1;
 
                 if (!header->isSectionHidden(first_column))
                 {
@@ -897,11 +907,11 @@ namespace erdo::ui
 
         bool is_section_hidden(std::size_t section_index) const
         {
-            return this->isSectionHidden(Row::section_index_offsets[section_index]);
+            return this->isSectionHidden(Row::section_column_begin_indices[section_index]);
         }
         void set_section_hidden(std::size_t section_index, bool hide)
         {
-            for (auto && index : std::views::iota(Row::section_index_offsets[section_index], Row::cumulative_section_sizes[section_index]))
+            for (auto && index : std::views::iota(Row::section_column_begin_indices[section_index], Row::section_column_end_indices[section_index]))
                 this->setSectionHidden(static_cast<int>(index), hide);
         }
 
@@ -994,8 +1004,8 @@ namespace erdo::ui
                 auto section_name = Row::section_name(section_index);
                 if (!section_name.isEmpty())
                 {
-                    auto first_column = Row::section_index_offsets[section_index];
-                    auto last_column = Row::cumulative_section_sizes[section_index] - 1;
+                    auto first_column = Row::section_column_begin_indices[section_index];
+                    auto last_column = Row::section_column_end_indices[section_index] - 1;
 
                     auto left  = this->sectionViewportPosition(first_column);
                     auto right = this->sectionViewportPosition(last_column) + this->sectionSize(last_column);
@@ -1063,7 +1073,7 @@ namespace erdo::ui
 
                 auto index = source_model->index(
                     sourceRow,
-                    Row::section_index_offsets[column],
+                    Row::section_column_begin_indices[column],
                     sourceParent
                 );
 
@@ -1263,111 +1273,105 @@ namespace erdo::ui
             }
         }
 
-        void show_header_context_menu(const QPoint &pos)
+        void show_context_menu(const QPoint &pos, bool header_context_menu)
         {
-            QMenu menu;
-
-            QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
-            for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
-            {
-                auto name = Row::section_name(section_index);
-                if (name.isEmpty())
-                    name = Row::column_name(Row::section_index_offsets[section_index]);
-
-                QAction *action = sections_menu->addAction(name);
-                action->setCheckable(true);
-                action->setChecked(!this->header->is_section_hidden(section_index));
-
-                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
-                    this->header->set_section_hidden(section_index, !visible);
-                });
-            }
-            menu.addAction(
-                QString::fromStdString("Adjust Column Widths to Contents"),
-                [&](){ this->resize_columns_to_contents(); }
-            );
-
-            menu.exec(this->mapToGlobal(pos));
-        }
-        void show_table_context_menu(const QPoint &pos)
-        {
-            auto row_indices = this->selectionModel()->selectedRows()
-                | std::views::transform([this](const QModelIndex& index){
-                    return this->proxy_model->mapToSource(index).row();
-                })
-                | std::ranges::to<std::vector>();
-
-            auto selection_name = row_indices.size() == 1
-                ? this->model->rows.at(row_indices.front()).attack.weapon.get().full_name
-                : std::format("Selection ({})", row_indices.size());
-
             QMenu menu(this);
 
-            if (is_plot_table)
+            if (!header_context_menu)
             {
-                menu.addAction("Add New Dataset", [&](){
-                    emit this->add_new_to_plot();
-                });
-            }
+                auto row_indices = this->selectionModel()->selectedRows()
+                    | std::views::transform([this](const QModelIndex& index){
+                        return this->proxy_model->mapToSource(index).row();
+                    })
+                    | std::ranges::to<std::vector>();
 
-            if(row_indices.size() > 0)
-            {
-                menu.addSeparator();
+                auto selection_name = row_indices.size() == 1
+                    ? this->model->rows.at(row_indices.front()).attack.weapon.get().full_name
+                    : std::format("Selection ({})", row_indices.size());
 
                 if (is_plot_table)
                 {
-                    if (row_indices.size() == 1)
+                    menu.addAction("Add New Dataset", [&](){
+                        emit this->add_new_to_plot();
+                    });
+                }
+
+                if(row_indices.size() > 0)
+                {
+                    menu.addSeparator();
+
+                    if (is_plot_table)
                     {
+                        if (row_indices.size() == 1)
+                        {
+                            menu.addAction(
+                                QString::fromStdString(std::format("Edit {}", selection_name)),
+                                [&](){ emit this->edit_row(row_indices.front()); }
+                            );
+                        }
+
                         menu.addAction(
-                            QString::fromStdString(std::format("Edit {}", selection_name)),
-                            [&](){ emit this->edit_row(row_indices.front()); }
+                            QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
+                            [&](){ emit this->remove_selection_from_plot(row_indices); }
                         );
                     }
-
+                    else
+                    {
+                        menu.addAction(
+                            QString::fromStdString(std::format("Add {} to Plot", selection_name)),
+                            [&](){
+                                emit this->add_selection_to_plot(row_indices
+                                    | std::views::transform([this](auto row_index){
+                                        return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
+                                    })
+                                    | std::ranges::to<std::vector>()
+                                );
+                            }
+                        );
+                    }
+                    
+                    menu.addSeparator();
                     menu.addAction(
-                        QString::fromStdString(std::format("Remove {} from Plot", selection_name)),
-                        [&](){ emit this->remove_selection_from_plot(row_indices); }
-                    );
-                }
-                else
-                {
-                    menu.addAction(
-                        QString::fromStdString(std::format("Add {} to Plot", selection_name)),
+                        QString::fromStdString(std::format("Show {} on Fandom", selection_name)),
                         [&](){
-                            emit this->add_selection_to_plot(row_indices
-                                | std::views::transform([this](auto row_index){
-                                    return std::cref<calculator::FullAttackOptions>(this->model->rows.at(row_index).attack);
-                                })
-                                | std::ranges::to<std::vector>()
-                            );
+                            for (auto row_index : row_indices)
+                                QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fandom_url())));
+                        }
+                    );
+                    menu.addAction(
+                        QString::fromStdString(std::format("Show {} on Fextralife", selection_name)),
+                        [&](){
+                            for (auto row_index : row_indices)
+                                QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
                         }
                     );
                 }
-                
+                    
                 menu.addSeparator();
-                menu.addAction(
-                    QString::fromStdString(std::format("Show {} on Fandom", selection_name)),
-                    [&](){
-                        for (auto row_index : row_indices)
-                            QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fandom_url())));
-                    }
-                );
-                menu.addAction(
-                    QString::fromStdString(std::format("Show {} on Fextralife", selection_name)),
-                    [&](){
-                        for (auto row_index : row_indices)
-                            QDesktopServices::openUrl(QUrl(QString::fromStdString(this->model->rows.at(row_index).attack.weapon.get().fextralife_url())));
-                    }
-                );
             }
 
-            menu.addSeparator();
+            auto index = this->indexAt(pos);
+            if (index.isValid())
+            {
+                auto section_index = Row::column_index_to_section_index.at(index.column());
+                auto name = Row::section_name(section_index);
+                if (name.isEmpty())
+                    name = Row::column_name(Row::section_column_begin_indices[section_index]);
+
+                QAction *action = menu.addAction("Show " + name);
+                action->setCheckable(true);
+                action->setChecked(!this->header->is_section_hidden(section_index));
+
+                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                    this->header->set_section_hidden(section_index, !visible);
+                });
+            }
             QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
             for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
                 auto name = Row::section_name(section_index);
                 if (name.isEmpty())
-                    name = Row::column_name(Row::section_index_offsets[section_index]);
+                    name = Row::column_name(Row::section_column_begin_indices[section_index]);
 
                 QAction *action = sections_menu->addAction(name);
                 action->setCheckable(true);
@@ -1377,12 +1381,26 @@ namespace erdo::ui
                     this->header->set_section_hidden(section_index, !visible);
                 });
             }
+
+            menu.addSeparator();
             menu.addAction(
                 QString::fromStdString("Adjust Column Widths to Contents"),
                 [&](){ this->resize_columns_to_contents(); }
             );
 
-            menu.exec(this->viewport()->mapToGlobal(pos));
+            if (header_context_menu)
+                menu.exec(this->mapToGlobal(pos));
+            else
+                menu.exec(this->viewport()->mapToGlobal(pos));
+        }
+
+        void show_header_context_menu(const QPoint &pos)
+        {
+            this->show_context_menu(pos, true);
+        }
+        void show_table_context_menu(const QPoint &pos)
+        {
+            this->show_context_menu(pos, false);
         }
 
     protected:
@@ -1421,7 +1439,7 @@ namespace erdo::ui
             if constexpr (requires { tuple_index_v<sections::Color, Row>; })
             {
                 auto delegate = new ColorDelegate(this);
-                this->setItemDelegateForColumn(Row::section_index_offsets.at(tuple_index_v<sections::Color, Row>), delegate);
+                this->setItemDelegateForColumn(Row::section_column_begin_indices.at(tuple_index_v<sections::Color, Row>), delegate);
                 connect(delegate, &ColorDelegate::row_color_changed, this, [this](QModelIndex index, QColor color){
                     emit row_color_changed(this->proxy_model->mapToSource(index).row(), color);
                 });
@@ -1439,7 +1457,7 @@ namespace erdo::ui
             connect(this->header, &QHeaderView::customContextMenuRequested, this, &WeaponTable::show_header_context_menu);
 
             // sorting
-            auto sort_column = Row::section_index_offsets.at(tuple_index_v<sections::BaseName, Row>);
+            auto sort_column = Row::section_column_begin_indices.at(tuple_index_v<sections::BaseName, Row>);
             auto sort_order = Qt::SortOrder::AscendingOrder;
             this->proxy_model->sort(sort_column, sort_order);
             this->header->setSortIndicator(sort_column, sort_order);

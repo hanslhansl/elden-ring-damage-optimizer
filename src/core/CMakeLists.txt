@@ -52,8 +52,7 @@ function(copy_xml_data target)
             ${CMAKE_SOURCE_DIR}/xml_data
             $<TARGET_FILE_DIR:${target}>/xml_data
         COMMENT "Copying XML runtime data for ${target}"
-    )
-    
+    )  
 endfunction()
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/xml_data
