@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # create project
-project(erdo LANGUAGES CXX)
+project(erdo LANGUAGES C CXX)
 
 
 # necessary for Qt

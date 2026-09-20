@@ -800,6 +800,8 @@ namespace erdo::ui
             execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
             this->active_weapon_data = std::make_shared<const std::vector<calculator::Weapon>>(future.takeResult());
 
+            // auto json_string = rfl::json::write(*this->active_weapon_data);
+
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
             this->plot->set_active_weapon_data(this->active_weapon_data);
@@ -1116,7 +1118,7 @@ namespace erdo::ui
             if (weapon_data_directories.empty())
                 critical_error(this, "No weapon data directories found in xml_data directory.");
 
-            // weapon data menu
+            // file menu
             this->menu_choose_weapon_data = this->menu_file->addMenu("Choose Weapon Data");
             this->menu_weapon_data_group->setExclusive(true);
             for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
@@ -1132,6 +1134,7 @@ namespace erdo::ui
             this->menu_file->addSeparator();
             this->menu_file->addAction("Settings", [](){ settings.show(); });
 
+            // help menu
             auto* check_updates_action = this->menu_help->addAction("Check for updates");
             connect(check_updates_action, &QAction::triggered, this, [this, check_updates_action]() {
                 this->check_for_updates(check_updates_action);

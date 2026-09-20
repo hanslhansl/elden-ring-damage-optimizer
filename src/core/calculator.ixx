@@ -200,10 +200,9 @@ export namespace erdo::calculator
     using UpgradeLevels = std::array<unsigned int, 3>; // free handed, normal, somber
     constexpr auto max_upgrade_levels = UpgradeLevels{ 0, 25, 10 };
     using ScalingCurve = std::array<double, 149>;
-    using ScalingCurves = std::array<ScalingCurve, enumerators_of<AttackPowerType>().size()>;
+    using ScalingCurves = std::array<std::shared_ptr<ScalingCurve>, enumerators_of<AttackPowerType>().size()>;
     using AttributeScalings = std::array<double, enumerators_of<RelevantAttribute>().size()>;
     using AttackElementCorrects = std::array<AttributeScalings, enumerators_of<AttackPowerType>().size()>;
-    using AttackElementCorrectsById = std::map<int, AttackElementCorrects>;
     using IneffectiveAttackPowerTypes = std::array<bool, enumerators_of<AttackPowerType>().size()>;
     using IneffectiveAttributes = std::array<bool, enumerators_of<RelevantAttribute>().size()>;
     using BaseAttackPowers = std::array<double, enumerators_of<AttackPowerType>().size()>;
@@ -310,11 +309,11 @@ export namespace erdo::calculator
         // base attack power at each upgrade level for each attack power type
         BaseAttackPowersAtUpgradeLevels base_attack_powers_at_upgrade_levels;
         // each attack power type's scaling with each character attribute
-        AttackElementCorrects attack_power_types_attribute_scalings;
+        std::shared_ptr<AttackElementCorrects> attack_power_types_attribute_scalings;
         // each attack power type's scaling curve
         ScalingCurves attack_power_scaling_curves;
         // thresholds and labels for each scaling grade (S, A, B, etc.) for this weapon. This isn't hardcoded for all weapons because it can be changed by mods.
-        ScalingTiers scaling_tiers;
+        std::shared_ptr<ScalingTiers> scaling_tiers;
 
         // the index of the upgrade level for this weapon
         int upgrade_level_index = [&]() {
@@ -332,7 +331,7 @@ export namespace erdo::calculator
             for (auto attribute : enumerator_integrals_of<calculator::RelevantAttribute>())
             {
                 result[attribute] = std::ranges::all_of(enumerator_integrals_of<calculator::AttackPowerType>(), [&](int apt){
-                    auto&& attribute_correct = this->attack_power_types_attribute_scalings[apt][attribute];
+                    auto&& attribute_correct = (*this->attack_power_types_attribute_scalings)[apt][attribute];
 
                     // If attribute_correct is 0, this attribute is ignored for both scaling and penalty for this apt
                     if (attribute_correct == 0.)
@@ -406,7 +405,7 @@ export namespace erdo::calculator
 
         static const Weapon dummy;
     };
-    const Weapon Weapon::dummy { .upgrade_level_index = 0 };
+    const Weapon Weapon::dummy { .upgrade_level_index = 0, .nonscaling_attributes{} };
 
 
     struct AttackOptions
@@ -464,7 +463,7 @@ export namespace erdo::calculator
     
         const AttributeScalings& attack_power_type_attribute_scalings(AttackPowerType apt) const
         {
-            return this->weapon.get().attack_power_types_attribute_scalings.at(std::to_underlying(apt));
+            return this->weapon.get().attack_power_types_attribute_scalings->at(std::to_underlying(apt));
         }
 
         std::vector<std::string> calculate_scaling_tiers() const
@@ -473,7 +472,7 @@ export namespace erdo::calculator
             std::vector<std::string> scaling_tiers{ attribute_scalings_at_upgrade_level.size() };
             for (auto&& [scaling, scaling_tier] : std::views::zip(attribute_scalings_at_upgrade_level, scaling_tiers))
             {
-                for (auto&& [threshold, tier] : this->weapon.get().scaling_tiers)
+                for (auto&& [threshold, tier] : *this->weapon.get().scaling_tiers)
                     if (scaling >= threshold)
                         scaling_tier = tier;
             }
@@ -577,7 +576,7 @@ export namespace erdo::calculator
                 is_damage_type ? adjusted_relevant_stats : relevant_stats,
                 scaling_attributes,
                 attribute_scalings_at_upgrade_level,
-                scaling_curve
+                *scaling_curve
             );
 
             this->attack_powers[attack_power_type_integral] = {

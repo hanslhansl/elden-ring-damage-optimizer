@@ -2,8 +2,16 @@
 CPMAddPackage(
     NAME pugixml
     GITHUB_REPOSITORY zeux/pugixml
-    VERSION 1.15
+    GIT_TAG v1.15
 )
+
+# add reflect-cpp
+# CPMAddPackage(
+#     NAME reflect-cpp
+#     GITHUB_REPOSITORY getml/reflect-cpp
+#     # GIT_TAG v0.25.0 # broken for clang 24
+#     GIT_TAG main
+# )
 
 include(CheckIPOSupported)
 
@@ -24,8 +32,9 @@ function(configure_erdo_core_library target)
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/erdo.ixx
         )
 
-    target_link_libraries(${target} PUBLIC
+    target_link_libraries(${target} PRIVATE
         pugixml::pugixml
+        reflectcpp
     )
 
     if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
