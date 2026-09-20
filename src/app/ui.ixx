@@ -855,55 +855,163 @@ namespace erdo::ui
 
         void generate_weapon_data_from_game_data()
         {
-            QString file_name = QFileDialog::getOpenFileName(
-                this,
+            QDialog dialog(this);
+            dialog.setWindowTitle("Generate Weapon Data");
+            dialog.setMinimumWidth(600);
+
+            auto* layout = new QFormLayout(&dialog);
+
+            auto make_file_picker = [&](const QString& initial, const QString& caption, const QString& filter) {
+                auto* widget = new QWidget(&dialog);
+                auto* row = new QHBoxLayout(widget);
+                row->setContentsMargins(0, 0, 0, 0);
+
+                auto* edit = new QLineEdit(initial, widget);
+                auto* browse = new QPushButton("Browse...", widget);
+
+                row->addWidget(edit, 1);
+                row->addWidget(browse);
+
+                connect(browse, &QPushButton::clicked, &dialog, [&, edit, caption, filter]() {
+                        QString path = QFileDialog::getOpenFileName(&dialog, caption, edit->text(), filter);
+
+                        if (!path.isEmpty())
+                            edit->setText(path);
+                });
+
+                return std::pair{widget, edit};
+            };
+
+            auto make_directory_picker = [&](const QString& initial) {
+                auto* widget = new QWidget(&dialog);
+                auto* row = new QHBoxLayout(widget);
+                row->setContentsMargins(0, 0, 0, 0);
+
+                auto* edit = new QLineEdit(initial, widget);
+                auto* browse = new QPushButton("Browse...", widget);
+
+                row->addWidget(edit, 1);
+                row->addWidget(browse);
+
+                connect(browse, &QPushButton::clicked, &dialog, [&, edit]() {
+                        QString path = QFileDialog::getExistingDirectory(
+                            &dialog,
+                            "Select a Save Directory",
+                            edit->text(),
+                            QFileDialog::ShowDirsOnly |
+                            QFileDialog::DontResolveSymlinks
+                        );
+
+                        if (!path.isEmpty())
+                            edit->setText(path);
+                    });
+
+                return std::pair{widget, edit};
+            };
+
+            const auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
+
+            auto [elden_ring_widget, elden_ring_edit] = make_file_picker(
+                {},
                 "Select eldenring.exe",
-                QDir::homePath(),
-                "Elden Ring Executable (eldenring.exe);;All Executables (*.exe);;All Files (*)"
+                "Elden Ring Executable (eldenring.exe);;"
+                "All Executables (*.exe);;"
+                "All Files (*)"
             );
-            if (file_name.isEmpty())
-                return;
-            auto elden_ring_executable = std::filesystem::path(file_name.toStdString());
 
-            file_name = QFileDialog::getOpenFileName(
-                this,
+            auto [witchy_widget, witchy_edit] = make_file_picker(
+                {},
                 "Select WitchyBND.exe",
-                QDir::homePath(),
-                "WitchyBND executable (WitchyBND.exe);;All Executables (*.exe);;All Files (*)"
+                "WitchyBND Executable (WitchyBND.exe);;"
+                "All Executables (*.exe);;"
+                "All Files (*)"
             );
-            if (file_name.isEmpty())
-                return;
-            auto witchybdn_executable = std::filesystem::path(file_name.toStdString());
 
-            auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
-            QString directory = QFileDialog::getExistingDirectory(
-                this,
-                "Select a Save Directory",
-                xml_data_directory.string().c_str(),
-                QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
-            );
-            if (directory.isEmpty())
+            auto [save_widget, save_edit] = make_directory_picker(QString::fromStdString(xml_data_directory.string()));
+
+            layout->addRow("Elden Ring executable:", elden_ring_widget);
+            layout->addRow("WitchyBND executable:", witchy_widget);
+            layout->addRow("Save directory:", save_widget);
+
+            auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+
+            layout->addRow(buttons);
+
+            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+            if (dialog.exec() != QDialog::Accepted)
                 return;
-            auto save_directory = std::filesystem::path(directory.toStdString());
-            if (!std::filesystem::is_directory(save_directory))
+
+            const auto elden_ring_executable = std::filesystem::path(elden_ring_edit->text().toStdString());
+
+            const auto witchybnd_executable = std::filesystem::path(witchy_edit->text().toStdString());
+
+            const auto save_directory = std::filesystem::path(save_edit->text().toStdString());
+
+            // Validate everything after the user presses OK.
+            if (!std::filesystem::is_regular_file(elden_ring_executable))
             {
-                QMessageBox::critical(this, "Invalid Directory", std::format("Not a Directory: {}", save_directory).c_str());
+                QMessageBox::critical(
+                    this,
+                    "Invalid Elden Ring Executable",
+                    "The selected eldenring.exe does not exist."
+                );
                 return;
             }
 
-            auto future = QtConcurrent::run([&](){
-                return witchy::run_witchy(
-                    elden_ring_executable.parent_path(),
-                    witchybdn_executable,
-                    save_directory
+            if (!std::filesystem::is_regular_file(witchybnd_executable))
+            {
+                QMessageBox::critical(
+                    this,
+                    "Invalid WitchyBND Executable",
+                    "The selected WitchyBND.exe does not exist."
                 );
+                return;
+            }
+
+            if (!std::filesystem::is_directory(save_directory))
+            {
+                QMessageBox::critical(
+                    this,
+                    "Invalid Directory",
+                    QString("Not a directory: %1").arg(save_edit->text())
+                );
+                return;
+            }
+
+            auto future = QtConcurrent::run([elden_ring_executable, witchybnd_executable, save_directory]() {
+                    return witchy::run_witchy(
+                        elden_ring_executable.parent_path(),
+                        witchybnd_executable,
+                        save_directory
+                    );
             });
-            execute_future_with_blocking_progress_bar<false>(future, this, "Generating Weapon Data...");
+
+            execute_future_with_blocking_progress_bar<false>(
+                future,
+                this,
+                "Generating Weapon Data..."
+            );
+
             auto expected = future.takeResult();
+
             if (expected)
-                QMessageBox::information(this, "Success", QString::fromStdString(expected.value()));
+            {
+                QMessageBox::information(
+                    this,
+                    "Success",
+                    QString::fromStdString(expected.value())
+                );
+            }
             else
-                QMessageBox::critical(this, "Error", QString::fromStdString(expected.error()));
+            {
+                QMessageBox::critical(
+                    this,
+                    "Error",
+                    QString::fromStdString(expected.error())
+                );
+            }
         }
 
         void closeEvent(QCloseEvent *event) override
