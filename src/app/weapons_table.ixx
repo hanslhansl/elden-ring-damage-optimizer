@@ -105,6 +105,7 @@ namespace erdo::ui
             static constexpr bool draw_section_seperators = false;
             static constexpr bool expand_section = false;
             static inline const QString section_name = "";
+            static inline const QString group_name = "";
 
             explicit SectionBase(const calculator::FullAttackOptions& attack_options) { }
 
@@ -594,6 +595,7 @@ namespace erdo::ui
         {
             static constexpr auto attack_power_type = apt;
             static inline const auto section_name = enum_to_display(attack_power_type) + " Scaling";
+            static inline const QString group_name = "Attack Power Scalings";
 
             using EnumDataSection::EnumDataSection;
             explicit AttackPowerTypeAttributeScalings(const calculator::FullAttackOptions& attack_options)
@@ -678,6 +680,12 @@ namespace erdo::ui
         {
             const static std::vector<QString> section_names{ Args::section_name... };
             return section_names.at(section_index);
+        }
+        // returns the name of a section's group, empty if the section has no group
+        static const QString& group_name(int section_index)
+        {
+            const static std::vector<QString> group_names{ Args::group_name... };
+            return group_names.at(section_index);
         }
         // returns the name of a column
         static const QString& column_name(int column)
@@ -1367,13 +1375,27 @@ namespace erdo::ui
                 });
             }
             QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
+            std::map<QString, QMenu*> section_group_menus{};
             for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
             {
                 auto name = Row::section_name(section_index);
                 if (name.isEmpty())
                     name = Row::column_name(Row::section_column_begin_indices[section_index]);
 
-                QAction *action = sections_menu->addAction(name);
+                auto group_name = Row::group_name(section_index);
+                QAction *action;
+
+                if (group_name.isEmpty())
+                {
+                    action = sections_menu->addAction(name);
+                }
+                else
+                {
+                    if (!section_group_menus.contains(group_name))
+                        section_group_menus[group_name] = sections_menu->addMenu(group_name);
+                    action = section_group_menus[group_name]->addAction(name);
+                }
+
                 action->setCheckable(true);
                 action->setChecked(!this->header->is_section_hidden(section_index));
 
