@@ -1,5 +1,5 @@
 ﻿# add Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent PrintSupport)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent PrintSupport Network)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -40,6 +40,7 @@ target_link_libraries(erdo_ui PRIVATE
     Qt6::Gui
     Qt6::Concurrent
     Qt6::PrintSupport
+    Qt6::Network
     KDChart::kdchart
 )
 
@@ -125,4 +126,5 @@ install(CODE [[
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "elden-ring-damage-optimizer")
 set(CPACK_PACKAGE_VERSION "4.2.2")
+target_compile_definitions(erdo_ui PRIVATE ERDO_VERSION="${CPACK_PACKAGE_VERSION}")
 include(CPack)

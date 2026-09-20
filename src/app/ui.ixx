@@ -11,6 +11,13 @@
 #include <QProgressBar>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QTimer>
+#include <QVersionNumber>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -798,6 +805,69 @@ namespace erdo::ui
             this->plot->set_active_weapon_data(this->active_weapon_data);
         }
 
+        void check_for_updates(QAction* action)
+        {
+            action->setEnabled(false);
+            action->setText("Checking for updates...");
+
+            auto* manager = new QNetworkAccessManager(this);
+            QNetworkRequest request(QUrl("https://api.github.com/repos/hanslhansl/elden-ring-damage-optimizer/releases/latest"));
+            request.setRawHeader("Accept", "application/vnd.github+json");
+            request.setRawHeader("User-Agent", "elden-ring-damage-optimizer/" ERDO_VERSION);
+            auto* reply = manager->get(request);
+            auto* timeout = new QTimer(reply);
+            timeout->setSingleShot(true);
+            connect(timeout, &QTimer::timeout, reply, &QNetworkReply::abort);
+            timeout->start(15000);
+
+            connect(reply, &QNetworkReply::finished, this, [this, action, manager, reply, timeout]() {
+                const bool timed_out = !timeout->isActive();
+                timeout->stop();
+                manager->deleteLater();
+                action->setText("Check for updates");
+                action->setEnabled(true);
+
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    QMessageBox::warning(this, "Check for updates",
+                        timed_out ? QString("The update check timed out. Please try again.")
+                                  : QString("Could not check for updates:\n%1").arg(reply->errorString()));
+                    return;
+                }
+
+                const auto document = QJsonDocument::fromJson(reply->readAll());
+                auto tag = document.object().value("tag_name").toString();
+                if (tag.startsWith('v', Qt::CaseInsensitive))
+                    tag.remove(0, 1);
+
+                qsizetype suffix_index = 0;
+                const auto latest_version = QVersionNumber::fromString(tag, &suffix_index).normalized();
+                const auto current_version = QVersionNumber::fromString(QCoreApplication::applicationVersion()).normalized();
+                if (!document.isObject() || latest_version.isNull() || suffix_index != tag.size())
+                {
+                    QMessageBox::warning(this, "Check for updates",
+                        "GitHub returned an unrecognized release version. Please check the releases page manually.");
+                    return;
+                }
+
+                if (latest_version > current_version)
+                {
+                    const auto choice = QMessageBox::question(this, "Update available",
+                        QString("Version %1 is available. You are using version %2.\n\nOpen the GitHub release page?")
+                            .arg(tag, QCoreApplication::applicationVersion()),
+                        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+                    if (choice == QMessageBox::Yes)
+                        QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer/releases/latest"));
+                }
+                else
+                {
+                    QMessageBox::information(this, "Check for updates",
+                        QString("You are up to date.\nInstalled version: %1\nLatest release: %2")
+                            .arg(QCoreApplication::applicationVersion(), tag));
+                }
+            });
+        }
+
         QAction* add_weapon_data(std::filesystem::path dir)
         {
             dir = std::filesystem::canonical(dir).make_preferred();
@@ -1062,6 +1132,11 @@ namespace erdo::ui
             this->menu_file->addSeparator();
             this->menu_file->addAction("Settings", [](){ settings.show(); });
 
+            auto* check_updates_action = this->menu_help->addAction("Check for updates");
+            connect(check_updates_action, &QAction::triggered, this, [this, check_updates_action]() {
+                this->check_for_updates(check_updates_action);
+            });
+            this->menu_help->addSeparator();
             this->menu_help->addAction("About elden-ring-damage-optimizer", [](){
                 QDesktopServices::openUrl(QUrl("https://github.com/hanslhansl/elden-ring-damage-optimizer"));
             });
@@ -1131,6 +1206,7 @@ namespace erdo::ui
         Application app(argc, argv);
         app.setOrganizationName("hanslhansl");
         app.setApplicationName("elden-ring-damage-optimizer");
+        app.setApplicationVersion(ERDO_VERSION);
         settings.initialize();
 
         MainWindow window{};
