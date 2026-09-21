@@ -12,7 +12,7 @@ const auto& get_weapons()
 {
     static auto data = [] {
         auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
-        auto data = parser::load_weapons(xml_data_directory);
+        auto data = witchy::load_weapons(xml_data_directory);
         std::ranges::sort(data, {}, &calculator::Weapon::full_name);
 
         auto json_string = erdo::json::write(data);

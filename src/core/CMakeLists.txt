@@ -26,8 +26,6 @@ function(configure_erdo_core_library target)
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/json.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/meta.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/witchy.ixx
-            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/xml.ixx
-            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/parser.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/calculator.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/optimizer.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/erdo.ixx

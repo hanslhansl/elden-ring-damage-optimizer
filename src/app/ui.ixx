@@ -796,7 +796,7 @@ namespace erdo::ui
 
         void set_active_weapon_data(const std::filesystem::path& dir)
         {
-            auto future = QtConcurrent::run([&](){ return parser::load_weapons(dir); });
+            auto future = QtConcurrent::run([&](){ return witchy::load_weapons(dir); });
             execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
             this->active_weapon_data = std::make_shared<const std::vector<calculator::Weapon>>(future.takeResult());
 
