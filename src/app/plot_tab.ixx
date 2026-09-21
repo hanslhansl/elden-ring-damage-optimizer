@@ -1771,7 +1771,7 @@ namespace erdo::ui
         }(0));
         static_assert(Row::sparse);
 
-        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
+        std::shared_ptr<const calculator::GameData> active_game_data{};
 
         QStandardItemModel *model;
         TrackingChart* chart;
@@ -2013,7 +2013,7 @@ namespace erdo::ui
                 auto first_invocation = possible_weapons.empty();
                 possible_weapons.clear();
                 possible_weapons.insert_range(
-                    *this->active_weapon_data | std::views::filter([&](const calculator::Weapon& w) { return w.base_name.data() == text; })
+                    this->active_game_data->weapons | std::views::filter([&](const calculator::Weapon& w) { return w.base_name.data() == text; })
                 );
                 if (possible_weapons.empty())
                     throw std::runtime_error(std::format("No weapons found for base name: {}", text.toStdString()));
@@ -2074,7 +2074,7 @@ namespace erdo::ui
 
             // populate weapon base name
             auto blocker = QSignalBlocker(base_name_combobox);
-            for (auto&& base_name : *this->active_weapon_data
+            for (auto&& base_name : this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::base_name)
                 | std::ranges::to<std::set>()
             )
@@ -2103,7 +2103,7 @@ namespace erdo::ui
         }
         void add_new_dataset_dialog()
         {
-            calculator::FullAttackOptions attack_options{ this->active_weapon_data->front(), {}, {} };
+            calculator::FullAttackOptions attack_options{ this->active_game_data->weapons.front(), {}, {} };
 
             auto dialog_was_accepted = this->edit_dataset_dialog_impl(attack_options, "Add New Dataset to Plot");
 
@@ -2132,9 +2132,9 @@ namespace erdo::ui
             this->update_datasets(current_dataset_count, attacks_options.size());
         }
 
-        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
+        void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            this->active_weapon_data = std::move(active_weapon_data);
+            this->active_game_data = std::move(active_game_data);
         }
 
         explicit PlotTab(QWidget *parent = nullptr) : QSplitter(Qt::Orientation::Vertical, parent)

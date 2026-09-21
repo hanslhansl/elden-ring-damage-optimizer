@@ -406,6 +406,13 @@ export namespace erdo::calculator
     };
     const Weapon Weapon::dummy { .upgrade_level_index = 0, .nonscaling_attributes{} };
 
+    struct GameData
+    {
+        std::string erdo_version;
+        long long game_version;
+        std::vector<Weapon> weapons{};
+    };
+
 
     struct AttackOptions
     {

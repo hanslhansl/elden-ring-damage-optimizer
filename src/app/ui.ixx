@@ -200,7 +200,7 @@ namespace erdo::ui
         Q_OBJECT
 
     protected:
-        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
+        std::shared_ptr<const calculator::GameData> active_game_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
 
         QSet<bool> base_game_dlc_filter{};
@@ -210,7 +210,7 @@ namespace erdo::ui
 
         void adjust_base_game_dlc_filter()
         {
-            auto visible_base_game_dlc = *this->active_weapon_data
+            auto visible_base_game_dlc = this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::dlc)
                 | std::ranges::to<QSet>();
 
@@ -228,7 +228,7 @@ namespace erdo::ui
         }
         void adjust_type_filter()
         {
-            auto visible_types = *this->active_weapon_data
+            auto visible_types = this->active_game_data->weapons
                 | std::views::filter([&](const calculator::Weapon& w){
                     return this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc);
                 })
@@ -250,7 +250,7 @@ namespace erdo::ui
         }
         void adjust_base_name_filter()
         {
-            auto filterable_base_names = *this->active_weapon_data
+            auto filterable_base_names = this->active_game_data->weapons
                 | std::views::filter([&](const calculator::Weapon& w) {
                     return (this->base_game_dlc_filter.isEmpty() ||
                             this->base_game_dlc_filter.contains(w.dlc)) &&
@@ -293,7 +293,7 @@ namespace erdo::ui
         }
         void adjust_affinity_list_filter()
         {
-            auto visible_affinities = *this->active_weapon_data
+            auto visible_affinities = this->active_game_data->weapons
                 | std::views::filter([&](const calculator::Weapon& w){
                     return  (this->base_game_dlc_filter.isEmpty() || this->base_game_dlc_filter.contains(w.dlc)) &&
                             (this->type_filter.isEmpty() || this->type_filter.contains(std::to_underlying(w.type))) &&
@@ -437,14 +437,14 @@ namespace erdo::ui
             };
         }
 
-        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
+        void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            this->active_weapon_data = std::move(active_weapon_data);
+            this->active_game_data = std::move(active_game_data);
 
             // base game / dlc
             this->base_game_dlc_filter.clear();
             this->base_game_dlc_list->clear();
-            for (auto&& dlc : *this->active_weapon_data
+            for (auto&& dlc : this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::dlc)
                 | std::ranges::to<std::set>()
             )
@@ -456,7 +456,7 @@ namespace erdo::ui
             // type list widget
             this->type_filter.clear();
             this->type_list->clear();
-            for (auto&& type : *this->active_weapon_data
+            for (auto&& type : this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::type)
                 | std::ranges::to<std::set>()
             )
@@ -468,7 +468,7 @@ namespace erdo::ui
             // base name list widget
             this->base_name_filter.clear();
             this->base_name_list->clear();
-            for (auto&& base_name : *this->active_weapon_data
+            for (auto&& base_name : this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::base_name)
                 | std::ranges::to<std::set>()
             )
@@ -479,7 +479,7 @@ namespace erdo::ui
             // affinity list widget
             this->affinity_filter.clear();
             this->affinity_list->clear();
-            for (auto&& affinity : *this->active_weapon_data
+            for (auto&& affinity : this->active_game_data->weapons
                 | std::views::transform(&calculator::Weapon::affinity)
                 | std::ranges::to<std::set>()
             )
@@ -526,9 +526,9 @@ namespace erdo::ui
             this->weapon_table->set_section_hidden<sections::Stats>(true);
         }
 
-        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
+        void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
+            this->StatsTabBase::set_active_game_data(std::move(active_game_data));
 
             // temporary attack object to avoid copying the weapon data multiple times
             calculator::Attack attack{
@@ -537,7 +537,7 @@ namespace erdo::ui
                 this->get_attack_options()
             };
 
-            this->weapon_table->model->set_rows(*this->active_weapon_data
+            this->weapon_table->model->set_rows(this->active_game_data->weapons
                 | std::views::transform([&](const calculator::Weapon& w) {
                     attack.weapon = w;
                     attack.calculate_inplace();
@@ -558,7 +558,7 @@ namespace erdo::ui
             calculator::Attack attack{ calculator::Weapon::dummy, stats, attack_options };
 
             this->weapon_table->model->update_rows(
-                *this->active_weapon_data | std::views::transform([&](const calculator::Weapon& w)->calculator::Attack&& {
+                this->active_game_data->weapons | std::views::transform([&](const calculator::Weapon& w)->calculator::Attack&& {
                     attack.weapon = w;
                     attack.calculate_inplace();
                     return std::move(attack);
@@ -569,17 +569,17 @@ namespace erdo::ui
 
     class OptimizeTab : public StatsTabBase, public Ui::OptimizeWidget
     {
-        std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_weapon_data{};
+        std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_game_data{};
 
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
 
-        void filter_active_weapon_data()
+        void filter_active_game_data()
         {
-            this->filtered_active_weapon_data.clear();
-            this->filtered_active_weapon_data.reserve(this->active_weapon_data->size());
-            this->filtered_active_weapon_data.append_range(*this->active_weapon_data
+            this->filtered_active_game_data.clear();
+            this->filtered_active_game_data.reserve(this->active_game_data->weapons.size());
+            this->filtered_active_game_data.append_range(this->active_game_data->weapons
                 | std::views::filter([&](const calculator::Weapon& w) {
                     return (this->base_game_dlc_filter.empty() || this->base_game_dlc_filter.contains(w.dlc))
                         && (this->type_filter.empty() || this->type_filter.contains(std::to_underlying(w.type)))
@@ -587,7 +587,7 @@ namespace erdo::ui
                         && (this->affinity_filter.empty() || this->affinity_filter.contains(std::to_underlying(w.affinity)));
                 })
             );
-            this->weapons_label->setText(QString::number(this->filtered_active_weapon_data.size()));
+            this->weapons_label->setText(QString::number(this->filtered_active_game_data.size()));
 
             this->prepare_optimization();
         }
@@ -621,7 +621,7 @@ namespace erdo::ui
             }
 
             this->brute_force_variations_label->setText(QString::number(stat_variation_count));
-            this->brute_force_iterations_label->setText(QString::number(stat_variation_count * this->filtered_active_weapon_data.size()));
+            this->brute_force_iterations_label->setText(QString::number(stat_variation_count * this->filtered_active_game_data.size()));
         }
         void optimize(bool use_v2)
         {
@@ -644,14 +644,14 @@ namespace erdo::ui
                 }
 
                 auto future = QtConcurrent::mapped(
-                    this->filtered_active_weapon_data,
+                    this->filtered_active_game_data,
                     [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
                 );
 
                 std::vector<Row> rows{};
                 if (execute_future_with_blocking_progress_bar<true>(future, this, "Optimizing..."))
                 {
-                    rows.reserve(this->filtered_active_weapon_data.size());
+                    rows.reserve(this->filtered_active_game_data.size());
                     rows.append_range(
                         future
                         | std::views::as_rvalue
@@ -666,7 +666,7 @@ namespace erdo::ui
                     if constexpr (optimizer::valid_optimizer_target<integral_constant.value>)
                     {
                         auto v2_optimizer = optimizer::V2<integral_constant.value>{
-                            filtered_active_weapon_data,
+                            filtered_active_game_data,
                             attack_options,
                             max_attribute_points,
                             min_stats,
@@ -674,7 +674,7 @@ namespace erdo::ui
                             optimize_starting_class
                         };
                         this->v2_variations_label->setText(
-                            QString::number(v2_optimizer.iteration_count / this->filtered_active_weapon_data.size())
+                            QString::number(v2_optimizer.iteration_count / this->filtered_active_game_data.size())
                         );
                         this->v2_iterations_label->setText(QString::number(v2_optimizer.iteration_count));
 
@@ -690,7 +690,7 @@ namespace erdo::ui
                     if constexpr (optimizer::valid_optimizer_target<integral_constant.value>)
                     {   
                         auto brute_force_optimizer = optimizer::BruteForce<integral_constant.value>{
-                            filtered_active_weapon_data,
+                            filtered_active_game_data,
                             attack_options,
                             max_attribute_points,
                             min_stats,
@@ -698,7 +698,7 @@ namespace erdo::ui
                             optimize_starting_class
                         };
                         this->brute_force_variations_label->setText(
-                            QString::number(brute_force_optimizer.iteration_count / this->filtered_active_weapon_data.size())
+                            QString::number(brute_force_optimizer.iteration_count / this->filtered_active_game_data.size())
                         );
                         this->brute_force_iterations_label->setText(QString::number(brute_force_optimizer.iteration_count));
 
@@ -739,16 +739,16 @@ namespace erdo::ui
             connect(this, &StatsTabBase::character_stats_changed, this, &OptimizeTab::prepare_optimization);
 
             // base game / dlc filter
-            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
+            connect(this->base_game_dlc_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_game_data);
 
             // weapon type filter
-            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
+            connect(this->type_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_game_data);
 
             // weapon base name filter
-            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
+            connect(this->base_name_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_game_data);
 
             // weapon affinity filter
-            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_weapon_data);
+            connect(this->affinity_list, &QListWidget::itemSelectionChanged, this, &OptimizeTab::filter_active_game_data);
 
             // optimize widget
             auto temp_layout = new QVBoxLayout();
@@ -776,10 +776,10 @@ namespace erdo::ui
             connect(this->start_v2_button, &QPushButton::clicked, this, [this](){ this->optimize(true); });
         }
     
-        void set_active_weapon_data(std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data)
+        void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            this->StatsTabBase::set_active_weapon_data(std::move(active_weapon_data));
-            this->filter_active_weapon_data();
+            this->StatsTabBase::set_active_game_data(std::move(active_game_data));
+            this->filter_active_game_data();
             this->weapon_table->model->set_rows({});
         }
     };
@@ -792,17 +792,21 @@ namespace erdo::ui
         OptimizeTab* optimize = new OptimizeTab();
         PlotTab* plot = new PlotTab();
 
-        std::shared_ptr<const std::vector<calculator::Weapon>> active_weapon_data{};
+        std::shared_ptr<const calculator::GameData> active_game_data{};
 
-        void set_active_weapon_data(const std::filesystem::path& dir)
+        void set_active_game_data(const std::filesystem::path& dir)
         {
-            auto future = QtConcurrent::run([&](){ return witchy::load_weapons(dir); });
+            auto future = QtConcurrent::run([&](){ return witchy::load_game_data(dir, ""); });
             execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
-            this->active_weapon_data = std::make_shared<const std::vector<calculator::Weapon>>(future.takeResult());
+            this->active_game_data = std::make_shared<const calculator::GameData>(future.takeResult());
 
-            this->stats->set_active_weapon_data(this->active_weapon_data);
-            this->optimize->set_active_weapon_data(this->active_weapon_data);
-            this->plot->set_active_weapon_data(this->active_weapon_data);
+            // std::ofstream file(std::format("{}.json", this->active_game_data->game_version));
+            // file << json::write(*this->active_game_data);
+            // file.close();
+
+            this->stats->set_active_game_data(this->active_game_data);
+            this->optimize->set_active_game_data(this->active_game_data);
+            this->plot->set_active_game_data(this->active_game_data);
         }
 
         void check_for_updates(QAction* action)
@@ -900,7 +904,7 @@ namespace erdo::ui
 
             auto action = this->menu_choose_weapon_data->addAction(
                 QString::fromStdString(action_text),
-                [this, dir]() { this->set_active_weapon_data(dir); }
+                [this, dir]() { this->set_active_game_data(dir); }
             );
             action->setCheckable(true);
             this->menu_weapon_data_group->addAction(action);
@@ -952,7 +956,7 @@ namespace erdo::ui
                 return std::pair{widget, edit};
             };
 
-            auto make_directory_picker = [&](const QString& initial) {
+            auto make_directory_picker = [&](const QString& initial, const QString& caption) {
                 auto* widget = new QWidget(&dialog);
                 auto* row = new QHBoxLayout(widget);
                 row->setContentsMargins(0, 0, 0, 0);
@@ -963,10 +967,10 @@ namespace erdo::ui
                 row->addWidget(edit, 1);
                 row->addWidget(browse);
 
-                connect(browse, &QPushButton::clicked, &dialog, [&, edit]() {
+                connect(browse, &QPushButton::clicked, &dialog, [&, edit, caption]() {
                         QString path = QFileDialog::getExistingDirectory(
                             &dialog,
-                            "Select a Save Directory",
+                            caption,
                             edit->text(),
                             QFileDialog::ShowDirsOnly |
                             QFileDialog::DontResolveSymlinks
@@ -981,13 +985,11 @@ namespace erdo::ui
 
             const auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
 
-            auto [elden_ring_widget, elden_ring_edit] = make_file_picker(
+            auto [elden_ring_widget, elden_ring_edit] = make_directory_picker(
                 {},
-                "Select eldenring.exe",
-                "Elden Ring Executable (eldenring.exe);;"
-                "All Executables (*.exe);;"
-                "All Files (*)"
+                "Select Elden Ring Game Directory"
             );
+            layout->addRow("Elden Ring game directory:", elden_ring_widget);
 
             auto [witchy_widget, witchy_edit] = make_file_picker(
                 {},
@@ -996,12 +998,11 @@ namespace erdo::ui
                 "All Executables (*.exe);;"
                 "All Files (*)"
             );
-
-            auto [save_widget, save_edit] = make_directory_picker(QString::fromStdString(xml_data_directory.string()));
-
-            layout->addRow("Elden Ring executable:", elden_ring_widget);
             layout->addRow("WitchyBND executable:", witchy_widget);
-            layout->addRow("Save directory:", save_widget);
+
+            auto delete_temp_directory_widget = new QCheckBox("", &dialog);
+            delete_temp_directory_widget->setChecked(true);
+            layout->addRow("Delete temporary directory:", delete_temp_directory_widget);
 
             auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 
@@ -1013,19 +1014,17 @@ namespace erdo::ui
             if (dialog.exec() != QDialog::Accepted)
                 return;
 
-            const auto elden_ring_executable = std::filesystem::path(elden_ring_edit->text().toStdString());
-
+            const auto elden_ring_directory = std::filesystem::path(elden_ring_edit->text().toStdString());
             const auto witchybnd_executable = std::filesystem::path(witchy_edit->text().toStdString());
-
-            const auto save_directory = std::filesystem::path(save_edit->text().toStdString());
+            const auto delete_temp_directory = delete_temp_directory_widget->isChecked();
 
             // Validate everything after the user presses OK.
-            if (!std::filesystem::is_regular_file(elden_ring_executable))
+            if (!std::filesystem::is_directory(elden_ring_directory))
             {
                 QMessageBox::critical(
                     this,
-                    "Invalid Elden Ring Executable",
-                    "The selected eldenring.exe does not exist."
+                    "Invalid Elden Ring Game Directory",
+                    QString("Not a directory: %1").arg(elden_ring_edit->text())
                 );
                 return;
             }
@@ -1040,21 +1039,11 @@ namespace erdo::ui
                 return;
             }
 
-            if (!std::filesystem::is_directory(save_directory))
-            {
-                QMessageBox::critical(
-                    this,
-                    "Invalid Directory",
-                    QString("Not a directory: %1").arg(save_edit->text())
-                );
-                return;
-            }
-
-            auto future = QtConcurrent::run([elden_ring_executable, witchybnd_executable, save_directory]() {
+            auto future = QtConcurrent::run([elden_ring_directory, witchybnd_executable, delete_temp_directory]() {
                     return witchy::run_witchy(
-                        elden_ring_executable.parent_path(),
+                        elden_ring_directory,
                         witchybnd_executable,
-                        save_directory
+                        delete_temp_directory
                     );
             });
 
@@ -1068,10 +1057,14 @@ namespace erdo::ui
 
             if (expected)
             {
+                std::ofstream file(std::format("{}.json", expected.value().game_version));
+                file << json::write(expected.value());
+                file.close();
+
                 QMessageBox::information(
                     this,
                     "Success",
-                    QString::fromStdString(expected.value())
+                    "successfully unpacked and parsed game data"
                 );
             }
             else
