@@ -800,8 +800,6 @@ namespace erdo::ui
             execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
             this->active_weapon_data = std::make_shared<const std::vector<calculator::Weapon>>(future.takeResult());
 
-            // auto json_string = rfl::json::write(*this->active_weapon_data);
-
             this->stats->set_active_weapon_data(this->active_weapon_data);
             this->optimize->set_active_weapon_data(this->active_weapon_data);
             this->plot->set_active_weapon_data(this->active_weapon_data);

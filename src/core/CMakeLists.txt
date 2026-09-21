@@ -6,12 +6,12 @@ CPMAddPackage(
 )
 
 # add reflect-cpp
-# CPMAddPackage(
-#     NAME reflect-cpp
-#     GITHUB_REPOSITORY getml/reflect-cpp
-#     # GIT_TAG v0.25.0 # broken for clang 24
-#     GIT_TAG main
-# )
+CPMAddPackage(
+    NAME reflect-cpp
+    GITHUB_REPOSITORY getml/reflect-cpp
+    # GIT_TAG v0.25.0 # broken for clang 24
+    GIT_TAG main
+)
 
 include(CheckIPOSupported)
 
@@ -23,6 +23,7 @@ function(configure_erdo_core_library target)
         PUBLIC FILE_SET CXX_MODULES
         BASE_DIRS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
         FILES
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/json.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/meta.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/witchy.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/xml.ixx

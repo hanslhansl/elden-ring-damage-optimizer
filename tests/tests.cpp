@@ -10,19 +10,16 @@ using namespace erdo;
 
 const auto& get_weapons()
 {
-    static std::once_flag flag;
-    static std::vector<calculator::Weapon> data;
-    static std::vector<std::reference_wrapper<const calculator::Weapon>> data_reference;
-
-    std::call_once(flag, [] {
+    static auto data = [] {
         auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
-        data = parser::load_weapons(xml_data_directory);
+        auto data = parser::load_weapons(xml_data_directory);
         std::ranges::sort(data, {}, &calculator::Weapon::full_name);
-        data_reference.reserve(data.size());
-        data_reference.append_range(data);
-    });
 
-    return data_reference;
+        auto json_string = erdo::json::write(data);
+        return erdo::json::read<decltype(data)>(json_string).value();
+    }();
+
+    return data;
 }
 
 const std::vector<double> expected_calculation_total_attack_power_1 {

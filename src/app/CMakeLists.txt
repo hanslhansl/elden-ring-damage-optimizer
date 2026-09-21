@@ -42,6 +42,7 @@ target_link_libraries(erdo_ui PRIVATE
     Qt6::PrintSupport
     Qt6::Network
     KDChart::kdchart
+    reflectcpp
 )
 
 # set up main executable

@@ -75,8 +75,8 @@ The project requires c++26. It is built using [cmake](https://cmake.org/).
 
 The dependencies are:
 - [CPM.cmake](https://github.com/cpm-cmake/cpm.cmake) (package manager)
-- [pugixml](https://github.com/zeux/pugixml)
-- [Catch2](https://github.com/catchorg/Catch2) (if building tests)
+- [pugixml](https://github.com/zeux/pugixml), released under MIT
+- [Catch2](https://github.com/catchorg/Catch2) if building tests, released under BSL-1.0
 - [Qt](https://www.qt.io/), licensed under LGPL
 
 The cmake build script automatically downloads *CPM.cmake* which it then uses to download *pugixml* and *Catch2*.
