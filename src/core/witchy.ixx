@@ -101,7 +101,7 @@ namespace erdo::witchy
             xml::load_file(temp_dir / "regulation-bin" / "_witchy-bnd4.xml"),
             { "bnd4", "version" }
         );
-        std::println("version {}", version);    
+        std::println("version {}", version);
 
         // compute paths of needed unpacked files
         auto needed_unpacked_file_paths = copied_uxm_file_paths

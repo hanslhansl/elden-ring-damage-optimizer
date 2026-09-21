@@ -10,8 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # create project
-project(erdo LANGUAGES C CXX)
-
+project(erdo
+    VERSION 4.2.2
+    LANGUAGES C CXX
+)
+add_compile_definitions(ERDO_VERSION="${PROJECT_VERSION}")
 
 # necessary for Qt
 add_compile_options("$<$<CXX_COMPILER_ID:Clang>:-pthread>")
