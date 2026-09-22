@@ -16,8 +16,8 @@ function(configure_test_executable target erdo_core_library test_prefix)
         Catch2::Catch2WithMain
     )
 
-    # copy xml_data to build directory
-    copy_xml_data(${target})
+    # copy game data to build directory
+    copy_game_data(${target})
 
     # discover tests
     catch_discover_tests(

@@ -786,28 +786,13 @@ namespace erdo::ui
 
     class MainWindow : public QMainWindow, public Ui::MainWindow
     {
-        QActionGroup* menu_weapon_data_group = new QActionGroup(this);
-        QMenu *menu_choose_weapon_data;
+        QActionGroup* menu_game_data_group = new QActionGroup(this);
+        QMenu *menu_choose_game_data;
         StatsTab* stats = new StatsTab();
         OptimizeTab* optimize = new OptimizeTab();
         PlotTab* plot = new PlotTab();
 
         std::shared_ptr<const calculator::GameData> active_game_data{};
-
-        void set_active_game_data(const std::filesystem::path& dir)
-        {
-            auto future = QtConcurrent::run([&](){ return witchy::load_game_data(dir, ""); });
-            execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
-            this->active_game_data = std::make_shared<const calculator::GameData>(future.takeResult());
-
-            // std::ofstream file(std::format("{}.json", this->active_game_data->game_version));
-            // file << json::write(*this->active_game_data);
-            // file.close();
-
-            this->stats->set_active_game_data(this->active_game_data);
-            this->optimize->set_active_game_data(this->active_game_data);
-            this->plot->set_active_game_data(this->active_game_data);
-        }
 
         void check_for_updates(QAction* action)
         {
@@ -872,62 +857,66 @@ namespace erdo::ui
             });
         }
 
-        QAction* add_weapon_data(std::filesystem::path dir)
+        void set_active_game_data_from_path(const std::filesystem::path& file)
         {
-            dir = std::filesystem::canonical(dir).make_preferred();
-            if (!std::filesystem::is_directory(dir))
+            auto future = QtConcurrent::run([&](){ return json::load<calculator::GameData>(file); });
+            execute_future_with_blocking_progress_bar<false>(future, this, "Loading Weapon Data...");
+            this->active_game_data = std::make_shared<const calculator::GameData>(future.takeResult());
+
+            this->stats->set_active_game_data(this->active_game_data);
+            this->optimize->set_active_game_data(this->active_game_data);
+            this->plot->set_active_game_data(this->active_game_data);
+        }
+
+        QAction* add_game_data_from_path(std::filesystem::path file)
+        {
+            file = std::filesystem::canonical(file).make_preferred();
+            if (!std::filesystem::is_regular_file(file))
             {
-                QMessageBox::critical(this, "Invalid Directory", std::format("Not a Directory: {}", dir).c_str());
+                QMessageBox::critical(this, "Invalid File", QString::fromStdString(std::format("Not a file: {}", file)));
                 return nullptr;
             }
 
-            auto action_text = dir.string();
-            auto version_string = dir.filename().string();
+            auto action_text = file.string();
 
-            if (version_string.size() == 8)
+            long long game_version;
+            auto s = file.filename().string();
+            auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), game_version);
+
+            if (!(ec != std::errc{} || ptr != s.data() + s.size()))
             {
-                std::size_t version_number;
-                auto result = std::from_chars(version_string.data(), version_string.data() + version_string.size(), version_number);
-                if (result)
-                {
-                    auto major = version_string.subview(0, 1);
-                    auto minor = version_string.subview(1, 2);
-                    auto patch = version_string.subview(3, std::string::npos);
-                    while (patch.ends_with('0'))
-                        patch.remove_suffix(1);
-                    version_string = std::format("{}.{}.{}", major, minor, patch);
-                    while(version_string.ends_with('.'))
-                        version_string.pop_back();
-                    action_text = std::format("{} ({})", action_text, version_string);
-                }
+                auto game_version_string = calculator::GameData{ .game_version=game_version }.parse_game_version();
+                if (game_version_string)
+                    action_text = std::format("{} ({})", action_text, game_version_string.value());
             }
 
-            auto action = this->menu_choose_weapon_data->addAction(
+            auto action = this->menu_choose_game_data->addAction(
                 QString::fromStdString(action_text),
-                [this, dir]() { this->set_active_game_data(dir); }
+                [this, file]() { this->set_active_game_data_from_path(file); }
             );
             action->setCheckable(true);
-            this->menu_weapon_data_group->addAction(action);
+            this->menu_game_data_group->addAction(action);
             
             return action;
         }
 
-        void load_weapon_data_from_directory()
+        void load_game_data_from_file_system()
         {
-            QString directory = QFileDialog::getExistingDirectory(
+            QString file = QFileDialog::getOpenFileName(
                 this,
-                "Select Weapon Data Directory",
+                "Select Weapon Data File",
                 QDir::homePath(),
-                QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+                "JSON (*.json);;"
+                "All Files (*)"
             );
 
-            if (directory.isEmpty())
+            if (file.isEmpty())
                 return;
             
-            this->add_weapon_data(std::filesystem::path(directory.toStdString()));
+            this->add_game_data_from_path(std::filesystem::path(file.toStdString()));
         }
 
-        void generate_weapon_data_from_game_data()
+        void generate_game_data_from_game_files()
         {
             QDialog dialog(this);
             dialog.setWindowTitle("Generate Weapon Data");
@@ -1004,6 +993,12 @@ namespace erdo::ui
             delete_temp_directory_widget->setChecked(true);
             layout->addRow("Delete temporary directory:", delete_temp_directory_widget);
 
+            auto [save_widget, save_edit] = make_directory_picker(
+                QString::fromStdString(xml_data_directory.string()),
+                "Select Save Directory"
+            );
+            layout->addRow("Save directory:", save_widget);
+
             auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 
             layout->addRow(buttons);
@@ -1017,6 +1012,7 @@ namespace erdo::ui
             const auto elden_ring_directory = std::filesystem::path(elden_ring_edit->text().toStdString());
             const auto witchybnd_executable = std::filesystem::path(witchy_edit->text().toStdString());
             const auto delete_temp_directory = delete_temp_directory_widget->isChecked();
+            const auto save_directory = std::filesystem::path(save_edit->text().toStdString());
 
             // Validate everything after the user presses OK.
             if (!std::filesystem::is_directory(elden_ring_directory))
@@ -1039,12 +1035,31 @@ namespace erdo::ui
                 return;
             }
 
-            auto future = QtConcurrent::run([elden_ring_directory, witchybnd_executable, delete_temp_directory]() {
-                    return witchy::run_witchy(
-                        elden_ring_directory,
-                        witchybnd_executable,
-                        delete_temp_directory
-                    );
+            if (!std::filesystem::is_directory(save_directory))
+            {
+                QMessageBox::critical(
+                    this,
+                    "Invalid Directory",
+                    QString("Not a directory: %1").arg(save_edit->text())
+                );
+                return;
+            }
+
+            auto future = QtConcurrent::run([elden_ring_directory, witchybnd_executable, delete_temp_directory, save_directory] ->std::expected<std::filesystem::path, std::string> {
+                auto expected_game_data = witchy::run_witchy(
+                    elden_ring_directory,
+                    witchybnd_executable,
+                    delete_temp_directory
+                );
+
+                if (!expected_game_data)
+                    return std::unexpected(expected_game_data.error());
+                auto&& game_data = expected_game_data.value();
+
+                auto save_file = save_directory / std::format("{}.json", game_data.game_version);
+                json::save(save_file, game_data);
+                
+                return save_file;
             });
 
             execute_future_with_blocking_progress_bar<false>(
@@ -1057,14 +1072,11 @@ namespace erdo::ui
 
             if (expected)
             {
-                std::ofstream file(std::format("{}.json", expected.value().game_version));
-                file << json::write(expected.value());
-                file.close();
-
+                this->add_game_data_from_path(expected.value());
                 QMessageBox::information(
                     this,
                     "Success",
-                    "successfully unpacked and parsed game data"
+                    QString::fromStdString(std::format("Successfully unpacked and parsed game data, saved to {}.", expected.value()))
                 );
             }
             else
@@ -1097,8 +1109,8 @@ namespace erdo::ui
 
             // load weapon data
             auto application_directory = std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()).make_preferred();
-            auto xml_data_directory = application_directory / "xml_data";
-            auto weapon_data_directories = std::filesystem::directory_iterator(xml_data_directory)
+            auto game_data_directory = application_directory / "game_data";
+            auto game_data_files = std::filesystem::directory_iterator(game_data_directory)
                 | std::views::transform(&std::filesystem::directory_entry::path)
                 | std::ranges::to<std::set<
                     std::filesystem::path,
@@ -1106,22 +1118,22 @@ namespace erdo::ui
                         return std::stoll(a.filename().string()) > std::stoll(b.filename().string());
                     })
                 >>();
-            if (weapon_data_directories.empty())
-                critical_error(this, "No weapon data directories found in xml_data directory.");
+            if (game_data_files.empty())
+                critical_error(this, "No game data files found in game_data directory.");
 
             // file menu
-            this->menu_choose_weapon_data = this->menu_file->addMenu("Choose Weapon Data");
-            this->menu_weapon_data_group->setExclusive(true);
-            for (auto&& [i, dir] : weapon_data_directories | std::views::enumerate)
+            this->menu_choose_game_data = this->menu_file->addMenu("Choose Game Data");
+            this->menu_game_data_group->setExclusive(true);
+            for (auto&& [i, file] : game_data_files | std::views::enumerate)
             {
-                auto action = this->add_weapon_data(dir);
+                auto action = this->add_game_data_from_path(file);
                 if (action == nullptr)
-                    throw std::runtime_error(std::format("Failed to add weapon data directory: {}", dir.string()));
+                    throw std::runtime_error(std::format("Failed to add game data file: {}", file.string()));
                 if (i == 0)
                     QTimer::singleShot(0, action, &QAction::trigger);
             }
-            this->menu_file->addAction("Load Weapon Data from Directory", this, &MainWindow::load_weapon_data_from_directory);
-            this->menu_file->addAction("Generate Weapon Data from Game Data", this, &MainWindow::generate_weapon_data_from_game_data);
+            this->menu_file->addAction("Load Game Data from Directory", this, &MainWindow::load_game_data_from_file_system);
+            this->menu_file->addAction("Generate Game Data from Game Files", this, &MainWindow::generate_game_data_from_game_files);
             this->menu_file->addSeparator();
             this->menu_file->addAction("Settings", [](){ settings.show(); });
 

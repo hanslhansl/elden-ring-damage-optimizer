@@ -42,7 +42,6 @@ target_link_libraries(erdo_ui PRIVATE
     Qt6::PrintSupport
     Qt6::Network
     KDChart::kdchart
-    reflectcpp
 )
 
 # set up main executable
@@ -53,7 +52,7 @@ set_target_properties(erdo PROPERTIES OUTPUT_NAME "elden-ring-damage-optimizer")
 target_link_libraries(erdo PRIVATE
     erdo_ui
 )
-copy_xml_data(erdo)
+copy_game_data(erdo)
 
 install(TARGETS erdo
     DESTINATION .

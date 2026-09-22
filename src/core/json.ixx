@@ -65,18 +65,30 @@ namespace rfl::parsing
 export namespace erdo::json
 {
     template <typename...Ps>
-    decltype(auto) write(const auto& _obj, const yyjson_write_flag _flag = 0)
+    auto write(const auto& _obj, const yyjson_write_flag _flag = 0)
     {
         reset_ids();
         return rfl::json::write<Ps...>(_obj, _flag);
-        reset_ids();
     }
 
     template <typename T, typename...Ps>
-    decltype(auto) read(const auto& _obj)
+    auto read(const auto& _obj)
     {
         reset_ids();
-        return rfl::json::read<T, rfl::AllowRawPtrs, Ps...>(_obj);
+        return rfl::json::read<T, rfl::AllowRawPtrs, Ps...>(_obj).value();
+    }
+
+    template <typename...Ps>
+    auto save(const std::filesystem::path& file, const auto& _obj, const yyjson_write_flag _flag = 0)
+    {
         reset_ids();
+        return rfl::json::save<Ps...>(file.string(), _obj, _flag).value();
+    }
+
+    template <typename T, typename...Ps>
+    auto load(const std::filesystem::path& file)
+    {
+        reset_ids();
+        return rfl::json::load<T, rfl::AllowRawPtrs, Ps...>(file.string()).value();
     }
 }

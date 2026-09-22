@@ -411,6 +411,22 @@ export namespace erdo::calculator
         std::string erdo_version;
         long long game_version;
         std::vector<Weapon> weapons{};
+
+        std::optional<std::string> parse_game_version() const
+        {
+            if (this->game_version < 0)
+                return {};
+
+            auto s = std::to_string(this->game_version);
+            if (s.size() != 8)
+                return {};
+            
+            return std::format("{}.{}.{}",
+                s.subview(0, 1),
+                s.subview(1, 2),
+                s.subview(3, std::string::npos)
+            );
+        }
     };
 
 

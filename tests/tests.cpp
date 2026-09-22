@@ -11,12 +11,10 @@ using namespace erdo;
 const auto& get_weapons()
 {
     static auto data = [] {
-        auto xml_data_directory = std::filesystem::current_path() / "xml_data" / "11611000";
-        auto data = witchy::load_weapons(xml_data_directory);
+        auto game_data_directory = std::filesystem::current_path() / "game_data" / "11611000.json";
+        auto data = json::load<calculator::GameData>(game_data_directory).weapons;
         std::ranges::sort(data, {}, &calculator::Weapon::full_name);
-
-        auto json_string = erdo::json::write(data);
-        return erdo::json::read<decltype(data)>(json_string).value();
+        return data;
     }();
 
     return data;

@@ -53,8 +53,8 @@ add_subdirectory(src/core)
 # add ui
 add_subdirectory(src/app)
 
-# # add testing
-# include(CTest)
-# if(BUILD_TESTING)
-#     add_subdirectory(tests)
-# endif()
+# add testing
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

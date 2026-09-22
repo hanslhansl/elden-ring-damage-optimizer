@@ -54,15 +54,15 @@ if(ipo_supported)
     )
 endif()
 
-function(copy_xml_data target)
+function(copy_game_data target)
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/xml_data
-            $<TARGET_FILE_DIR:${target}>/xml_data
-        COMMENT "Copying XML runtime data for ${target}"
+            ${CMAKE_SOURCE_DIR}/game_data
+            $<TARGET_FILE_DIR:${target}>/game_data
+        COMMENT "Copying game data for ${target}"
     )  
 endfunction()
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/xml_data
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/game_data
     TYPE BIN
 )
