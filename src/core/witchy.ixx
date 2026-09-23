@@ -45,15 +45,15 @@ namespace erdo::witchy
         "msg/engus/item_dlc02.msgbnd.dcx"
     };
 
-    const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param";
-    const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param";
-    const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param";
-    const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param";
-    const std::filesystem::path SpEffectParamFile = "SpEffectParam.param";
-    const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param";
-    const std::filesystem::path WeaponNameFile = "WeaponName.fmg";
-    const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg";
-    const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg";
+    const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param.xml";
+    const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param.xml";
+    const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param.xml";
+    const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param.xml";
+    const std::filesystem::path SpEffectParamFile = "SpEffectParam.param.xml";
+    const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param.xml";
+    const std::filesystem::path WeaponNameFile = "WeaponName.fmg.xml";
+    const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg.xml";
+    const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg.xml";
 
     const std::set<std::filesystem::path> needed_unpacked_files = {
         AttackElementCorrectParamFile,
@@ -395,18 +395,18 @@ namespace erdo::witchy
     export GameData load_game_data(const std::filesystem::path &xml_data_directory, long long game_version)
     {
         auto scaling_tiers = get_scaling_tiers(
-            xml_data_directory / GR_MenuTextFile += ".xml",
-            xml_data_directory / MenuValueTableParamFile += ".xml"
+            xml_data_directory / GR_MenuTextFile,
+            xml_data_directory / MenuValueTableParamFile
         );
 
-        const auto attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / AttackElementCorrectParamFile += ".xml");
+        const auto attackElementCorrectsById = get_attack_element_corrects_by_id(xml_data_directory / AttackElementCorrectParamFile);
 
-        const auto spEffectParams = read_param_file<long long>(xml_data_directory / SpEffectParamFile += ".xml");
-        const auto calcCorrectGraphs = read_param_file<double>(xml_data_directory / CalcCorrectGraphFile += ".xml");
-        const auto equipParamWeapons = read_param_file<double>(xml_data_directory / EquipParamWeaponFile += ".xml");
-        const auto reinforceParamWeapons = read_param_file<double>(xml_data_directory / ReinforceParamWeaponFile += ".xml");
-        const auto weaponNames = read_fmg_file(xml_data_directory / WeaponNameFile += ".xml");
-        const auto dlcWeaponNames = read_fmg_file(xml_data_directory / WeaponName_dlc01File += ".xml");
+        const auto spEffectParams = read_param_file<long long>(xml_data_directory / SpEffectParamFile);
+        const auto calcCorrectGraphs = read_param_file<double>(xml_data_directory / CalcCorrectGraphFile);
+        const auto equipParamWeapons = read_param_file<double>(xml_data_directory / EquipParamWeaponFile);
+        const auto reinforceParamWeapons = read_param_file<double>(xml_data_directory / ReinforceParamWeaponFile);
+        const auto weaponNames = read_fmg_file(xml_data_directory / WeaponNameFile);
+        const auto dlcWeaponNames = read_fmg_file(xml_data_directory / WeaponName_dlc01File);
 
         std::map<long long, std::vector<ReinforceTypesDict>> reinforce_types;
         for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)
@@ -725,7 +725,7 @@ namespace erdo::witchy
             | std::views::join
             | std::views::transform(&std::filesystem::directory_entry::path)
             // | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
-            | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename().replace_extension()); })
+            | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
             | std::ranges::to<std::set>([](const std::filesystem::path& l, const std::filesystem::path& r){ return std::less{}(l.filename(), r.filename()); });
         if (xml_file_paths.size() != needed_unpacked_files.size())
             return std::unexpected(std::format(
