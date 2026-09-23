@@ -646,17 +646,41 @@ namespace erdo::witchy
     }
 
 
-    std::string witchy_cmd(const std::filesystem::path& witchy_exe_path, const std::filesystem::path& arg, std::filesystem::path location = {})
+    std::expected<void, std::string> run_witchy(const std::filesystem::path& witchy_exe_path, const std::filesystem::path& arg)
     {
-        auto s = std::format("\"{} --passive", witchy_exe_path);
+        auto cmd = std::format("\"{} --passive {}\"", witchy_exe_path, arg);
 
-        if (!location.empty())
-            s += std::format(" --location {}", quote_path(location));
+        std::println("executing command: {}", cmd);
+        auto result = std::system(cmd.c_str());
+        if (result != 0)
+            return std::unexpected(std::format("WitchyBND failed with exit code {} for file {}", result, arg));
 
-        return s + std::format(" {}\"", arg);
+        return {};
     }
 
-    export std::expected<GameData, std::string> run_witchy(
+    std::filesystem::path copy_file_to(const std::filesystem::path& file, const std::filesystem::path& target_directory, std::filesystem::copy_options opt)
+    {
+        auto new_file = target_directory / file.filename();
+        std::filesystem::copy_file(file, new_file, opt);
+        std::println("copied file {} to {}", file, new_file);
+        return new_file;
+    }
+
+    std::expected<std::filesystem::path, std::string> move_directory(const std::filesystem::path& directory, const std::filesystem::path& target_directory)
+    {
+        if (!std::filesystem::is_directory(directory))
+            return std::unexpected(std::format("could not find directory: {}", directory));
+
+        if (!std::filesystem::is_directory(target_directory))
+            return std::unexpected(std::format("could not find target directory: {}", target_directory));
+
+        auto new_directory_path = target_directory / directory.filename();
+        std::filesystem::rename(directory, new_directory_path);
+        std::println("moved directory {} to {}", directory, new_directory_path);
+        return new_directory_path;
+    }
+
+    export std::expected<GameData, std::string> generate_game_data(
         const std::filesystem::path& input_files_directory,
         const std::filesystem::path& witchy_exe_path,
         bool delete_temp_directory
@@ -679,13 +703,9 @@ namespace erdo::witchy
         std::filesystem::create_directory(dcx_data_directory);
         const auto dcx_file_paths = needed_dcx_files
             | std::views::transform([&](const std::filesystem::path &input_dcx_file) {
-                auto input_dcx_file_path = input_files_directory / input_dcx_file;
-                auto new_dcx_file_path = dcx_data_directory / input_dcx_file.filename();
-                std::filesystem::copy_file(input_dcx_file_path, new_dcx_file_path, std::filesystem::copy_options::overwrite_existing);
-                return new_dcx_file_path;
+                return copy_file_to(input_dcx_file, dcx_data_directory, std::filesystem::copy_options::overwrite_existing);
             })
             | std::ranges::to<std::vector>();
-        std::println("copied needed dcx files to {}", dcx_data_directory);
 
         // unpack dcx files, move the resulting unpacked data directories
         const auto unpacked_data_directory = temp_dir / "unpacked_data";
@@ -693,23 +713,19 @@ namespace erdo::witchy
         std::vector<std::filesystem::path> unpacked_data_directories{};
         for (auto&& dcx_file_path : dcx_file_paths)
         {
-            auto cmd = witchy_cmd(witchy_exe_path, dcx_file_path);
-            std::println("executing command: {}", cmd);
-            auto result = std::system(cmd.c_str());
-            if (result != 0)
-                return std::unexpected(std::format("WitchyBND failed with exit code {} for file {}", result, dcx_file_path));
+            auto result = run_witchy(witchy_exe_path, dcx_file_path);
+            if (!result)
+                return std::unexpected(result.error());
 
             auto unpacked_directory_name = dcx_file_path.filename().string();
             std::ranges::replace(unpacked_directory_name, '.', '-');
             auto current_unpacked_directory_path = dcx_data_directory / unpacked_directory_name;
-            if (!std::filesystem::is_directory(current_unpacked_directory_path))
-                return std::unexpected(std::format("could not find unpacked directory: {}", current_unpacked_directory_path));
             std::println("unpacked dcx file {} in-place to {}", dcx_file_path, current_unpacked_directory_path);
 
-            auto new_unpacked_directory_path = unpacked_data_directory / unpacked_directory_name;
-            std::filesystem::rename(current_unpacked_directory_path, new_unpacked_directory_path);
-            unpacked_data_directories.emplace_back(new_unpacked_directory_path);
-            std::println("copied unpacked directory {} to {}", current_unpacked_directory_path, new_unpacked_directory_path);
+            auto move_result = move_directory(current_unpacked_directory_path, unpacked_data_directory);
+            if (!move_result)
+                return std::unexpected(move_result.error());
+            unpacked_data_directories.emplace_back(move_result.value());
         }
 
         // get game version from /regulation-bin/_witchy-bnd4.xml
@@ -724,7 +740,6 @@ namespace erdo::witchy
             | std::views::transform([](const std::filesystem::path& p){ return std::filesystem::directory_iterator(p); })
             | std::views::join
             | std::views::transform(&std::filesystem::directory_entry::path)
-            // | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
             | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
             | std::ranges::to<std::set>([](const std::filesystem::path& l, const std::filesystem::path& r){ return std::less{}(l.filename(), r.filename()); });
         if (xml_file_paths.size() != needed_unpacked_files.size())
@@ -742,12 +757,8 @@ namespace erdo::witchy
         // copy needed xml files
         const auto xml_data_directory = temp_dir / "xml_data";
         std::filesystem::create_directory(xml_data_directory);
-        for (auto&& current_xml_file_path : xml_file_paths)
-        {
-            auto new_xml_file_path = xml_data_directory / current_xml_file_path.filename();
-            std::filesystem::copy_file(current_xml_file_path, new_xml_file_path, std::filesystem::copy_options::overwrite_existing);
-        }
-        std::println("copied needed xml files to {}", xml_data_directory);
+        for (auto&& xml_file_path : xml_file_paths)
+            copy_file_to(xml_file_path, xml_data_directory, std::filesystem::copy_options::overwrite_existing);
 
         // parse xml files
         auto game_data = load_game_data(xml_data_directory, game_version);

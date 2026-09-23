@@ -1046,7 +1046,7 @@ namespace erdo::ui
             }
 
             auto future = QtConcurrent::run([elden_ring_directory, witchybnd_executable, delete_temp_directory, save_directory] ->std::expected<std::filesystem::path, std::string> {
-                auto expected_game_data = witchy::run_witchy(
+                auto expected_game_data = witchy::generate_game_data(
                     elden_ring_directory,
                     witchybnd_executable,
                     delete_temp_directory
