@@ -26,6 +26,7 @@ function(configure_erdo_core_library target)
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/json.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/meta.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/witchy.ixx
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/behavior_graph.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/calculator.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/optimizer.ixx
             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/erdo.ixx
@@ -62,6 +63,14 @@ function(copy_game_data target)
         COMMENT "Copying game data for ${target}"
     )  
 endfunction()
+
+add_executable(erdo_core_exe
+    main.cpp
+)
+target_link_libraries(erdo_core_exe PRIVATE
+    erdo_core
+)
+copy_game_data(erdo_core_exe)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/game_data
     TYPE BIN

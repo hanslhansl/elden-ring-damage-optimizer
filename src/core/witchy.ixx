@@ -33,38 +33,59 @@ struct std::formatter<std::filesystem::path, CharT> : std::formatter<std::basic_
 
 using namespace erdo::calculator;
 
-namespace erdo::witchy
+export namespace erdo::witchy
 {
-    const std::set<std::filesystem::path> needed_dcx_files = {
+    const std::set<std::filesystem::path> needed_packed_files = {
         "regulation.bin",
         "msg/engus/menu.msgbnd.dcx",
         "msg/engus/menu_dlc01.msgbnd.dcx",
         "msg/engus/menu_dlc02.msgbnd.dcx",
         "msg/engus/item.msgbnd.dcx",
         "msg/engus/item_dlc01.msgbnd.dcx",
-        "msg/engus/item_dlc02.msgbnd.dcx"
+        "msg/engus/item_dlc02.msgbnd.dcx",
+
+        "chr/c0000.anibnd.dcx",
     };
 
-    const std::filesystem::path AttackElementCorrectParamFile = "AttackElementCorrectParam.param.xml";
-    const std::filesystem::path CalcCorrectGraphFile = "CalcCorrectGraph.param.xml";
-    const std::filesystem::path EquipParamWeaponFile = "EquipParamWeapon.param.xml";
-    const std::filesystem::path ReinforceParamWeaponFile = "ReinforceParamWeapon.param.xml";
-    const std::filesystem::path SpEffectParamFile = "SpEffectParam.param.xml";
-    const std::filesystem::path MenuValueTableParamFile = "MenuValueTableParam.param.xml";
-    const std::filesystem::path WeaponNameFile = "WeaponName.fmg.xml";
-    const std::filesystem::path WeaponName_dlc01File = "WeaponName_dlc01.fmg.xml";
-    const std::filesystem::path GR_MenuTextFile = "GR_MenuText.fmg.xml";
+    const std::filesystem::path WitchyBnd4File = "regulation-bin/_witchy-bnd4.xml";
+    const std::filesystem::path AttackElementCorrectParamFile = "regulation-bin/AttackElementCorrectParam.param.xml";
+    const std::filesystem::path CalcCorrectGraphFile = "regulation-bin/CalcCorrectGraph.param.xml";
+    const std::filesystem::path EquipParamWeaponFile = "regulation-bin/EquipParamWeapon.param.xml";
+    const std::filesystem::path ReinforceParamWeaponFile = "regulation-bin/ReinforceParamWeapon.param.xml";
+    const std::filesystem::path SpEffectParamFile = "regulation-bin/SpEffectParam.param.xml";
+    const std::filesystem::path MenuValueTableParamFile = "regulation-bin/MenuValueTableParam.param.xml";
 
-    const std::set<std::filesystem::path> needed_unpacked_files = {
+    const std::filesystem::path AtkParam_PcFile = "regulation-bin/AtkParam_Pc.param.xml"; //
+    const std::filesystem::path BehaviorParam_PcFile = "regulation-bin/BehaviorParam_PC.param.xml";
+
+    const std::filesystem::path WeaponNameFile = "msg/engus/item-msgbnd-dcx/WeaponName.fmg.xml";
+    const std::filesystem::path WeaponName_dlc01File = "msg/engus/item_dlc01-msgbnd-dcx/WeaponName_dlc01.fmg.xml";
+    const std::filesystem::path WeaponName_dlc02File = "msg/engus/item_dlc02-msgbnd-dcx/WeaponName_dlc02.fmg.xml";
+
+    const std::filesystem::path GR_MenuTextFile = "msg/engus/menu-msgbnd-dcx/GR_MenuText.fmg.xml";
+    const std::filesystem::path GR_MenuText_dlc01File = "msg/engus/menu_dlc01-msgbnd-dcx/GR_MenuText_dlc01.fmg.xml";
+    const std::filesystem::path GR_MenuText_dlc02File = "msg/engus/menu_dlc02-msgbnd-dcx/GR_MenuText_dlc02.fmg.xml";
+
+    // just used for checking if the files are present
+    const std::vector needed_unpacked_files = {
+        WitchyBnd4File,
         AttackElementCorrectParamFile,
         CalcCorrectGraphFile,
         EquipParamWeaponFile,
         ReinforceParamWeaponFile,
         SpEffectParamFile,
         MenuValueTableParamFile,
+
+        AtkParam_PcFile,
+        BehaviorParam_PcFile,
+
         WeaponNameFile,
         WeaponName_dlc01File,
-        GR_MenuTextFile
+        WeaponName_dlc02File,
+
+        GR_MenuTextFile,
+        GR_MenuText_dlc01File,
+        GR_MenuText_dlc02File
     };
 
     long long assert_float_is_llong(double f)
@@ -392,9 +413,49 @@ namespace erdo::witchy
         return attack_element_corrects_by_id;
     }
 
-    export GameData load_game_data(const std::filesystem::path &xml_data_directory, long long game_version)
+    struct MoveDefinition {
+        MoveId id;
+        std::string_view name;
+        int animationId;
+        // Context-specific restriction; an unset category never breaks a tie.
+        std::optional<int> requiredCategory = std::nullopt;
+        // For verified single-behavior moves whose candidates share a category.
+        // This never bypasses variation/judge/category/reference validation.
+        std::optional<int> requiredBehaviorParamId = std::nullopt;
+        // Select a phase of a shared animation (e.g. mounted charge/release).
+        // Keep every matching event, its order, and its original timestamps.
+        std::optional<int> eventJudgeId = std::nullopt;
+        // A behavior-graph selection may use a weapon's special TAE category.
+        std::optional<int> motionCategory = std::nullopt;
+        // Successful criticals target the throw victim (TAE type 304). Ordinary
+        // collision attacks in the same clip are a separate target context.
+        std::optional<int> eventType = std::nullopt;
+    };
+
+    // Resolves a complete supported catalog before hit import. All listed
+    // weapon rows will share the result; a provider must validate that context.
+    using MovesetDefinitionResolver = std::function<std::vector<MoveDefinition>(
+        std::span<const long long>, std::span<const MoveDefinition>)>;
+
+    struct MovesetImportReport;
+    std::map<long long, std::shared_ptr<Moveset>> importWeaponMovesets(
+        const std::filesystem::path& root,
+        const std::map<long long, std::map<std::string, double>>& weapons,
+        std::vector<MovesetImportReport>* reports,
+        const MovesetDefinitionResolver& resolveDefinitions = {});
+
+    GameData load_game_data(const std::filesystem::path &xml_data_directory,
+        std::vector<MovesetImportReport>* movesetReports = nullptr,
+        const MovesetDefinitionResolver& resolveDefinitions = {})
     {
-        auto scaling_tiers = get_scaling_tiers(
+        // get game version from /regulation-bin/_witchy-bnd4.xml
+        const auto game_version = get_element_value<long long>(
+            load_file(xml_data_directory / WitchyBnd4File),
+            { "bnd4", "version" }
+        );
+        std::println("found game version {}", game_version);
+
+        const auto scaling_tiers = get_scaling_tiers(
             xml_data_directory / GR_MenuTextFile,
             xml_data_directory / MenuValueTableParamFile
         );
@@ -405,8 +466,20 @@ namespace erdo::witchy
         const auto calcCorrectGraphs = read_param_file<double>(xml_data_directory / CalcCorrectGraphFile);
         const auto equipParamWeapons = read_param_file<double>(xml_data_directory / EquipParamWeaponFile);
         const auto reinforceParamWeapons = read_param_file<double>(xml_data_directory / ReinforceParamWeaponFile);
-        const auto weaponNames = read_fmg_file(xml_data_directory / WeaponNameFile);
-        const auto dlcWeaponNames = read_fmg_file(xml_data_directory / WeaponName_dlc01File);
+
+        const auto base_game_weapon_names = read_fmg_file(xml_data_directory / WeaponNameFile);
+        const auto dlc1_weapon_names = read_fmg_file(xml_data_directory / WeaponName_dlc01File);
+        const auto dlc2_weapon_names = read_fmg_file(xml_data_directory / WeaponName_dlc02File);
+        auto get_name_and_dlc = [&](long long id) -> std::optional<std::pair<std::string, int>> {
+            if (dlc2_weapon_names.contains(id))
+                return {{dlc2_weapon_names.at(id), 2}};
+            if (dlc1_weapon_names.contains(id))
+                return {{dlc1_weapon_names.at(id), 1}};
+            if (base_game_weapon_names.contains(id))
+                return {{base_game_weapon_names.at(id), 0}};
+            return std::nullopt;
+        };
+
 
         std::map<long long, std::vector<ReinforceTypesDict>> reinforce_types;
         for (auto &&[reinforce_param_id, reinforce_param_weapon] : reinforceParamWeapons)
@@ -442,25 +515,16 @@ namespace erdo::witchy
 
         GameData game_data{ ERDO_VERSION, game_version };
         game_data.weapons.reserve(equipParamWeapons.size());
+        std::vector<long long> weaponRowIds;
         for (auto &&[k, row] : equipParamWeapons)
         {
             auto row_id = assert_float_is_llong(row.at("id"));
 
-            std::string name{};
-            bool dlc{};
-            if (weaponNames.contains(row_id))
-                name = weaponNames.at(row_id);
-            else if (dlcWeaponNames.contains(row_id))
-            {
-                name = dlcWeaponNames.at(row_id);
-                dlc = isVanilla;
-            }
-            else
-            {
+            auto name_and_dlc = get_name_and_dlc(row_id);
+            if (!name_and_dlc)
                 continue;
-            }
-
-            if (name.find("[ERROR]") != std::string::npos || name.find("%null%") != std::string::npos)
+            auto [full_name, dlc] = *name_and_dlc;
+            if (full_name.contains("[ERROR]") || full_name.contains("%null%"))
                 continue;
 
             const auto weaponType = weapon_type_overrides.contains(row_id)
@@ -471,7 +535,7 @@ namespace erdo::witchy
                 if (std::set{0, 81, 83, 85, 86}.contains(weaponType))
                     continue;
 
-                throw std::runtime_error(std::format("unknown weapon type {} for weapon {}", weaponType, name));
+                throw std::runtime_error(std::format("unknown weapon type {} for weapon {}", weaponType, full_name));
             }
 
             auto reinforce_type_id = assert_float_is_llong(row.at("reinforceTypeId"));
@@ -612,17 +676,13 @@ namespace erdo::witchy
                     attributeScaling.at(std::to_underlying(attribute)) = unupgradedScaling * reinforceParam.attributeScaling.at(std::to_underlying(attribute));
             }
 
-            auto weaponName = weaponNames.contains(uninfusedWeapon.at("id"))
-                ? weaponNames.at(uninfusedWeapon.at("id"))
-                : dlcWeaponNames.at(uninfusedWeapon.at("id"));
-            
             RelevantAttributeLevelsArray required_relevant_stats{};
             for (auto attribute : enumerators_of<RelevantAttribute>())
                 required_relevant_stats.at(std::to_underlying(attribute)) = assert_float_is_llong(row.at(std::format("proper{}", attribute_to_xml_string(attribute))));
 
             Weapon w{
-                name,
-                weaponName,
+                full_name,
+                get_name_and_dlc(uninfusedWeapon.at("id")).value().first,
                 dlc,
                 row.at("isDualBlade") == 1,
                 row.at("enableMagic") == 1,
@@ -637,18 +697,1277 @@ namespace erdo::witchy
                 scaling_tiers
             };
 
+            weaponRowIds.push_back(row_id);
             game_data.weapons.emplace_back(std::move(w));
         }
 
+        // Only exported weapons participate. Unnamed/debug parameter rows must
+        // not create unused movesets or invalidate a complete GameData import.
+        std::map<long long, std::map<std::string, double>> exportedWeaponRows;
+        for (const auto id : weaponRowIds) exportedWeaponRows.emplace(id, equipParamWeapons.at(id));
+        const auto weaponMovesets = importWeaponMovesets(xml_data_directory, exportedWeaponRows, movesetReports, resolveDefinitions);
+        for (std::size_t i = 0; i < weaponRowIds.size(); ++i)
+            if (const auto moveset = weaponMovesets.find(weaponRowIds[i]); moveset != weaponMovesets.end())
+                game_data.weapons[i].moveset = moveset->second;
         std::ranges::sort(game_data.weapons, {}, &Weapon::full_name);
         std::println("found {} weapons", game_data.weapons.size());
         return game_data;
     }
 
 
+
+    using pugi::xml_document;
+
+    using calculator::MotionValues;
+    using calculator::AttackEvent;
+    using calculator::ResolvedHit;
+    using calculator::MoveId;
+
+    // Owned provenance: reports remain valid after the XML tables are destroyed.
+    struct BehaviorCandidate {
+        int behaviorParamId = -1;
+        std::optional<int> category;
+        std::optional<int> refType;
+        std::optional<int> refId;
+    };
+
+    struct UnresolvedAttack {
+        AttackEvent event;
+        int behaviorVariationId;
+        std::optional<int> requiredCategory;
+        std::vector<BehaviorCandidate> candidates;
+        std::optional<int> requiredBehaviorParamId;
+    };
+
+    struct ResolutionResult {
+        std::vector<ResolvedHit> hits;
+        std::vector<std::string> diagnostics;
+        std::vector<UnresolvedAttack> unresolved;
+    };
+
+    std::string_view xmlValue(
+        pugi::xml_node node,
+        const char* name
+    ) {
+        if (auto attribute = node.attribute(name))
+            return attribute.value();
+
+        if (auto child = node.child(name))
+            return child.text().get();
+
+        return {};
+    }
+
+    int parseInt(std::string_view value) {
+        int result{};
+        const auto [ptr, ec] =
+            std::from_chars(value.data(), value.data() + value.size(), result);
+
+        if (ec != std::errc{} || ptr != value.data() + value.size())
+            throw std::runtime_error("Invalid integer: " + std::string(value));
+
+        return result;
+    }
+
+    std::optional<int> xmlInt(
+        pugi::xml_node node,
+        const char* name
+    ) {
+        const auto value = xmlValue(node, name);
+
+        if (value.empty())
+            return std::nullopt;
+
+        return parseInt(value);
+    }
+
+    std::optional<int> optionalInt(pugi::xml_attribute attribute) {
+        if (!attribute || !*attribute.value())
+            return std::nullopt;
+
+        return parseInt(attribute.value());
+    }
+
+    struct ParamTable {
+        pugi::xml_document document;
+
+        std::unordered_map<int, pugi::xml_node> rows;
+        std::unordered_map<std::string, std::string> defaults;
+
+        void load(const char* filename) {
+            rows.clear();
+            defaults.clear();
+            const auto result = document.load_file(filename);
+
+            if (!result)
+                throw std::runtime_error(
+                    std::string("Could not load ") + filename);
+
+            indexDocument();
+        }
+
+        void loadXml(const char* xml) {
+            rows.clear();
+            defaults.clear();
+            if (const auto result = document.load_string(xml); !result)
+                throw std::runtime_error(result.description());
+            indexDocument();
+        }
+
+        void indexDocument() {
+            rows.clear();
+            defaults.clear();
+
+            // Witchy stores row values as attributes.
+            for (auto row : document.select_nodes("//row")) {
+                const auto node = row.node();
+                const auto id = optionalInt(node.attribute("id"));
+
+                if (id)
+                    rows.emplace(*id, node);
+            }
+
+            for (auto field : document.select_nodes("//field")) {
+                const auto node = field.node();
+                const auto name = node.attribute("name");
+                const auto value = node.attribute("defaultValue");
+
+                if (name && value)
+                    defaults.emplace(name.value(), value.value());
+            }
+        }
+
+        pugi::xml_node find(int id) const {
+            const auto it = rows.find(id);
+            return it == rows.end() ? pugi::xml_node{} : it->second;
+        }
+
+        std::optional<int> integer(pugi::xml_node row, const char* field) const {
+            if (!row)
+                return std::nullopt;
+            if (const auto attribute = row.attribute(field))
+                return parseInt(attribute.value());
+            const auto it = defaults.find(field);
+            return it == defaults.end() ? std::nullopt : std::optional{parseInt(it->second)};
+        }
+
+        std::optional<float> number(
+            pugi::xml_node row,
+            const char* field
+        ) const {
+            if (!row)
+                return std::nullopt;
+
+            const auto attribute = row.attribute(field);
+
+            const auto it = defaults.find(field);
+            if (!attribute && it == defaults.end())
+                return std::nullopt;
+
+            const std::string_view value = attribute
+                ? std::string_view(attribute.value()) : std::string_view(it->second);
+            float parsed{};
+            const auto [end, ec] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+            if (ec != std::errc{} || end != value.data() + value.size() || !std::isfinite(parsed))
+                throw std::runtime_error(std::format("Invalid numeric field {}: {}", field, value));
+            return parsed;
+        }
+    };
+
+    struct BehaviorKey {
+        int variationId;
+        int judgeId;
+
+        bool operator==(const BehaviorKey&) const = default;
+    };
+
+    struct BehaviorKeyHash {
+        std::size_t operator()(const BehaviorKey& key) const {
+            const auto a = static_cast<std::uint32_t>(key.variationId);
+            const auto b = static_cast<std::uint32_t>(key.judgeId);
+
+            return (static_cast<std::uint64_t>(a) << 32) | b;
+        }
+    };
+
+    class BehaviorIndex {
+    public:
+        void build(const ParamTable& behaviors) {
+            byKey_.clear();
+            byId_ = behaviors.rows;
+            defaults_ = behaviors.defaults;
+            for (const auto& [id, row] : behaviors.rows) {
+                const auto variation =
+                    behaviors.integer(row, "variationId");
+                const auto judge =
+                    behaviors.integer(row, "behaviorJudgeId");
+
+                if (variation && judge)
+                    byKey_[{*variation, *judge}].push_back(row);
+            }
+            for (auto& [key, rows] : byKey_)
+                std::ranges::sort(rows, {}, [](auto row) { return parseInt(row.attribute("id").value()); });
+        }
+
+        std::optional<int> integer(pugi::xml_node row, const char* field) const {
+            if (const auto attribute = row.attribute(field))
+                return parseInt(attribute.value());
+            const auto it = defaults_.find(field);
+            return it == defaults_.end() ? std::nullopt : std::optional{parseInt(it->second)};
+        }
+
+        const std::vector<pugi::xml_node>& find(
+            int variation,
+            int judge
+        ) const {
+            const auto it = byKey_.find({variation, judge});
+            return it == byKey_.end() ? empty_ : it->second;
+        }
+
+        // Player weapon behavior lookup. Ordinary judges use namespace 1;
+        // judges 1000..9999 encode the namespace in their thousands digit.
+        // Follow DSAnimStudio's ER lookup: weapon variation, its hundred
+        // group, then common variation 0. First existing row wins; an invalid
+        // reference/category at that row is an error, not a reason to fall back.
+        // Source and equipped-weapon selection remain the caller's context.
+        std::vector<pugi::xml_node> findPlayerWeapon(int variation, int judge) const {
+            if (variation < 0 || judge < 0 || judge > 9999)
+                return {};
+            const long long prefix = static_cast<long long>(judge < 1000 ? 1 : judge / 1000) * 100000000;
+            for (int candidate : {variation, variation / 100 * 100, 0}) {
+                const long long id = prefix + static_cast<long long>(candidate) * 1000 + judge % 1000;
+                if (id > std::numeric_limits<int>::max()) return {};
+                const auto found = byId_.find(static_cast<int>(id));
+                if (found != byId_.end()) return {found->second};
+            }
+            return {};
+        }
+
+        std::vector<pugi::xml_node> findEncoded(int variation, int judge) const {
+            return judge >= 1000 ? findPlayerWeapon(variation, judge) : std::vector<pugi::xml_node>{};
+        }
+
+    private:
+        std::unordered_map<int, pugi::xml_node> byId_;
+        std::unordered_map<std::string, std::string> defaults_;
+        std::unordered_map<
+            BehaviorKey,
+            std::vector<pugi::xml_node>,
+            BehaviorKeyHash
+        > byKey_;
+
+        std::vector<pugi::xml_node> empty_;
+    };
+
+    // Read a TAE event parameter by name.
+    // In the Witchy XML inspected so far, parameters are:
+    // <param name="BehaviorJudgeID" value="805" />
+    std::optional<int> eventParameter(
+        pugi::xml_node event,
+        const char* name
+    ) {
+        for (const auto param : event.child("params").children("param")) {
+            if (std::string_view(param.attribute("name").value()) == name)
+                return optionalInt(param.attribute("value"));
+        }
+
+        return std::nullopt;
+    }
+
+    std::vector<AttackEvent> extractAttackEvents(
+        const pugi::xml_document& tae,
+        int animationId
+    ) {
+        std::vector<AttackEvent> events;
+
+        for (const auto event :
+            tae.child("anim").child("events").children("event"))
+        {
+            const auto type = xmlInt(event, "type");
+
+            if (!type || (*type != 1 && *type != 304))
+                continue;
+
+            const auto judge =
+                eventParameter(event, "BehaviorJudgeID");
+
+            if (!judge)
+                throw std::runtime_error("TAE attack event is missing BehaviorJudgeID");
+
+            AttackEvent attack;
+
+            attack.animationId = animationId;
+            attack.eventType = *type;
+            attack.behaviorJudgeId = *judge;
+
+            attack.attackIndex =
+                eventParameter(
+                    event,
+                    *type == 304 ? "Index" : "AttackIndex"
+                ).value_or(-1);
+
+            attack.source =
+                eventParameter(event, "Source").value_or(-1);
+
+            for (const auto param : event.child("params").children("param")) {
+                if (std::string_view(param.attribute("name").value()) != "StateInfo")
+                    continue;
+                const std::string_view value = param.attribute("value").value();
+                int condition{};
+                const auto [end, ec] = std::from_chars(value.data(), value.data() + value.size(), condition);
+                if (ec != std::errc{} || end != value.data() + value.size() || attack.stateInfo)
+                    throw std::runtime_error("Invalid or duplicate TAE StateInfo value");
+                attack.stateInfo = condition;
+            }
+
+            const auto start = xmlValue(event, "startTime");
+            const auto end   = xmlValue(event, "endTime");
+
+            if (start.empty() || end.empty())
+                throw std::runtime_error(
+                    "TAE attack event is missing timing data"
+                );
+
+            auto parseTime = [](std::string_view value) {
+                double parsed{};
+                const auto [end, ec] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+                if (ec != std::errc{} || end != value.data() + value.size())
+                    throw std::runtime_error("Invalid TAE timing value: " + std::string(value));
+                return parsed;
+            };
+            attack.startTime = parseTime(start);
+            attack.endTime = parseTime(end);
+
+            if (!std::isfinite(attack.startTime) || !std::isfinite(attack.endTime) ||
+                attack.startTime < 0 || attack.endTime < attack.startTime)
+                throw std::runtime_error("Invalid TAE attack window");
+
+            events.push_back(attack);
+        }
+
+        std::stable_sort(
+            events.begin(),
+            events.end(),
+            [](const AttackEvent& a, const AttackEvent& b) {
+                return a.startTime < b.startTime;
+            }
+        );
+
+        return events;
+    }
+
+    MotionValues extractMotionValues(
+        const ParamTable& attacks,
+        pugi::xml_node row
+    ) {
+        MotionValues result;
+
+        constexpr std::array<const char*, 5> damageFields = {
+            "atkPhysCorrection",
+            "atkMagCorrection",
+            "atkFireCorrection",
+            "atkThunCorrection",
+            "atkDarkCorrection"
+        };
+
+        for (std::size_t i = 0; i < damageFields.size(); ++i) {
+            if (const auto value = attacks.number(row, damageFields[i])) {
+                result.values[i] = *value;
+                result.known[i] = true;
+            }
+        }
+
+        // Validated against the spreadsheet for ordinary powerstance
+        // attacks. Retain independent channels for future exceptions.
+        if (const auto status = attacks.number(
+                row, "statusAilmentAtkPowerCorrectRate")) {
+
+            for (std::size_t i = 5; i < enumerators_of<AttackPowerType>().size(); ++i) {
+                result.values[i] = *status;
+                result.known[i] = true;
+            }
+        }
+
+        return result;
+    }
+
+    enum class BehaviorLookup {
+        // Diagnostic matching by fields; ordinary collisions remain explicit.
+        STRICT_FIELDS,
+        // The caller has selected a player weapon's behavior variation. This
+        // does not select a different weapon for mixed-pair or body events.
+        PLAYER_WEAPON
+    };
+
+    ResolutionResult resolveAttackEvents(
+        const std::vector<AttackEvent>& events,
+        int behaviorVariationId,
+        const BehaviorIndex& behaviors,
+        const ParamTable& attacks,
+        std::optional<int> requiredCategory = std::nullopt,
+        std::optional<int> requiredBehaviorParamId = std::nullopt,
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+    ) {
+        ResolutionResult result;
+
+        for (const auto& event : events) {
+            const auto matches = lookup == BehaviorLookup::PLAYER_WEAPON
+                ? behaviors.findPlayerWeapon(behaviorVariationId, event.behaviorJudgeId)
+                : event.behaviorJudgeId >= 1000 && event.behaviorJudgeId <= 9999
+                    ? behaviors.findEncoded(behaviorVariationId, event.behaviorJudgeId)
+                    : behaviors.find(behaviorVariationId, event.behaviorJudgeId);
+
+            auto fail = [&](std::string message) {
+                UnresolvedAttack unresolved{event, behaviorVariationId, requiredCategory, {}, requiredBehaviorParamId};
+                message += std::format(" [animation {}, variation {}, judge {}, required category {}]",
+                    event.animationId, behaviorVariationId, event.behaviorJudgeId,
+                    requiredCategory ? std::to_string(*requiredCategory) : "any");
+                if (requiredBehaviorParamId)
+                    message += std::format(" [required behavior {}]", *requiredBehaviorParamId);
+                for (const auto row : matches) {
+                    BehaviorCandidate candidate{
+                        parseInt(row.attribute("id").value()),
+                        behaviors.integer(row, "category"),
+                        behaviors.integer(row, "refType"),
+                        behaviors.integer(row, "refId")
+                    };
+                    auto display = [](std::optional<int> value) {
+                        return value ? std::to_string(*value) : "missing";
+                    };
+                    message += std::format("; candidate behavior={} category={} refType={} refId={}",
+                        candidate.behaviorParamId, display(candidate.category),
+                        display(candidate.refType), display(candidate.refId));
+                    unresolved.candidates.push_back(candidate);
+                }
+                result.diagnostics.push_back(std::move(message));
+                result.unresolved.push_back(std::move(unresolved));
+            };
+
+            // Do not silently select one if the behavior mapping
+            // is ambiguous or uses an unsupported reference type.
+            std::vector<pugi::xml_node> attackBehaviors;
+
+            for (const auto row : matches) {
+                if (behaviors.integer(row, "refType") == 0 &&
+                    (!requiredCategory ||
+                     behaviors.integer(row, "category") == requiredCategory) &&
+                    (!requiredBehaviorParamId ||
+                     optionalInt(row.attribute("id")) == requiredBehaviorParamId))
+                    attackBehaviors.push_back(row);
+            }
+
+            if (attackBehaviors.size() != 1) {
+                fail("Unresolved or ambiguous attack behavior");
+                continue;
+            }
+
+            const auto behavior = attackBehaviors.front();
+            const auto refId = behaviors.integer(behavior, "refId");
+            const auto behaviorId =
+                optionalInt(behavior.attribute("id"));
+
+            if (!refId) {
+                fail("Behavior has no valid refId");
+                continue;
+            }
+
+            const auto attack = attacks.find(*refId);
+
+            if (!attack) {
+                fail("Missing AtkParam_Pc row " + std::to_string(*refId));
+                continue;
+            }
+
+            ResolvedHit hit;
+            hit.event = event;
+            hit.behaviorParamId = behaviorId.value_or(-1);
+            hit.behaviorCategory = behaviors.integer(behavior, "category").value_or(-1);
+            hit.atkParamId = *refId;
+            try {
+                hit.motionValues = extractMotionValues(attacks, attack);
+                if (const auto opposing = attacks.number(attack, "opposeTarget")) {
+                    if (*opposing != 0 && *opposing != 1)
+                        throw std::runtime_error("Invalid AtkParam opposeTarget flag");
+                    hit.opposeTarget = *opposing == 1;
+                }
+            } catch (const std::runtime_error& error) {
+                fail(error.what());
+                continue;
+            }
+
+            result.hits.push_back(std::move(hit));
+        }
+
+        return result;
+    }
+
+
+    // Category 1 is established for the two otherwise ambiguous 1H entries.
+    // Other entries require a unique match: 2H/riposte and powerstance events
+    // use different categories, so there is deliberately no catalog-wide default.
+    inline constexpr std::array straightSwordCatalog = {
+        MoveDefinition{MoveId::ONE_HAND_R1_1, "1H R1 #1", 30000},
+        MoveDefinition{MoveId::ONE_HAND_R1_2, "1H R1 #2", 30010},
+        MoveDefinition{MoveId::ONE_HAND_R1_3, "1H R1 #3", 30020},
+        MoveDefinition{MoveId::ONE_HAND_R1_4, "1H R1 #4", 30030},
+        MoveDefinition{MoveId::ONE_HAND_R1_5, "1H R1 #5", 30040},
+
+        MoveDefinition{MoveId::ONE_HAND_R2_1, "1H R2 #1", 30505, 1},
+        MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_1, "1H Charged R2 #1", 30500},
+        MoveDefinition{MoveId::ONE_HAND_R2_2, "1H R2 #2", 30515},
+        MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_2, "1H Charged R2 #2", 30510},
+
+        MoveDefinition{MoveId::ONE_HAND_RUNNING_R1, "1H Running R1", 30200},
+        MoveDefinition{MoveId::ONE_HAND_RUNNING_R2, "1H Running R2", 30210},
+        MoveDefinition{MoveId::ONE_HAND_ROLLING_R1, "1H Rolling R1", 30300},
+        MoveDefinition{MoveId::ONE_HAND_BACKSTEP_R1, "1H Backstep R1", 30400},
+        MoveDefinition{MoveId::ONE_HAND_JUMPING_R1, "1H Jumping R1", 31030, 1},
+        MoveDefinition{MoveId::ONE_HAND_JUMPING_R2, "1H Jumping R2", 31230},
+        MoveDefinition{MoveId::ONE_HAND_GUARD_COUNTER, "1H Guard Counter", 30700},
+
+        MoveDefinition{MoveId::TWO_HAND_R1_1, "2H R1 #1", 32000},
+        MoveDefinition{MoveId::TWO_HAND_R1_2, "2H R1 #2", 32010},
+        MoveDefinition{MoveId::TWO_HAND_R1_3, "2H R1 #3", 32020},
+        MoveDefinition{MoveId::TWO_HAND_R1_4, "2H R1 #4", 32030},
+        MoveDefinition{MoveId::TWO_HAND_R1_5, "2H R1 #5", 32040},
+
+        MoveDefinition{MoveId::TWO_HAND_R2_1, "2H R2 #1", 32505},
+        MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_1, "2H Charged R2 #1", 32500},
+        MoveDefinition{MoveId::TWO_HAND_R2_2, "2H R2 #2", 32515},
+        MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_2, "2H Charged R2 #2", 32510},
+
+        MoveDefinition{MoveId::TWO_HAND_RUNNING_R1, "2H Running R1", 32200},
+        MoveDefinition{MoveId::TWO_HAND_RUNNING_R2, "2H Running R2", 32210},
+        MoveDefinition{MoveId::TWO_HAND_ROLLING_R1, "2H Rolling R1", 32300},
+        MoveDefinition{MoveId::TWO_HAND_BACKSTEP_R1, "2H Backstep R1", 32400},
+        MoveDefinition{MoveId::TWO_HAND_JUMPING_R1, "2H Jumping R1", 33030},
+        MoveDefinition{MoveId::TWO_HAND_JUMPING_R2, "2H Jumping R2", 33230},
+        MoveDefinition{MoveId::TWO_HAND_GUARD_COUNTER, "2H Guard Counter", 32700},
+
+        MoveDefinition{MoveId::POWERSTANCE_L1_1, "Powerstance L1 #1", 34000},
+        MoveDefinition{MoveId::POWERSTANCE_L1_2, "Powerstance L1 #2", 34010},
+        MoveDefinition{MoveId::POWERSTANCE_L1_3, "Powerstance L1 #3", 34020},
+        MoveDefinition{MoveId::POWERSTANCE_L1_4, "Powerstance L1 #4", 34030},
+        MoveDefinition{MoveId::POWERSTANCE_RUNNING_L1, "Powerstance Running L1", 34200},
+        MoveDefinition{MoveId::POWERSTANCE_ROLLING_L1, "Powerstance Rolling L1", 34300},
+        MoveDefinition{MoveId::POWERSTANCE_BACKSTEP_L1, "Powerstance Backstep L1", 34400},
+        MoveDefinition{MoveId::POWERSTANCE_JUMPING_L1, "Powerstance Jumping L1", 34530},
+
+        MoveDefinition{MoveId::OFFHAND_R1_1, "Offhand R1 #1", 35000},
+        MoveDefinition{MoveId::OFFHAND_R1_2, "Offhand R1 #2", 35010},
+        MoveDefinition{MoveId::OFFHAND_R1_3, "Offhand R1 #3", 35020},
+        MoveDefinition{MoveId::OFFHAND_R1_4, "Offhand R1 #4", 35030},
+        MoveDefinition{MoveId::OFFHAND_R1_5, "Offhand R1 #5", 35040},
+
+        MoveDefinition{MoveId::MOUNTED_R1_1, "Mounted R1 #1", 38000},
+        MoveDefinition{MoveId::MOUNTED_R1_2, "Mounted R1 #2", 38010},
+        MoveDefinition{MoveId::MOUNTED_R1_3, "Mounted R1 #3", 38020},
+        MoveDefinition{MoveId::MOUNTED_R2, "Mounted R2", 38110},
+        MoveDefinition{MoveId::MOUNTED_R2_CHARGING, "Mounted R2 Charging", 38100, 12, std::nullopt, 630},
+        MoveDefinition{MoveId::MOUNTED_CHARGED_R2, "Mounted Charged R2", 38100, 12, std::nullopt, 635},
+        MoveDefinition{MoveId::MOUNTED_L1_1, "Mounted L1 #1", 39000},
+        MoveDefinition{MoveId::MOUNTED_L1_2, "Mounted L1 #2", 39010},
+        MoveDefinition{MoveId::MOUNTED_L1_3, "Mounted L1 #3", 39020},
+        MoveDefinition{MoveId::MOUNTED_L2, "Mounted L2", 39110},
+        MoveDefinition{MoveId::MOUNTED_L2_CHARGING, "Mounted L2 Charging", 39100, 12, std::nullopt, 730},
+        MoveDefinition{MoveId::MOUNTED_CHARGED_L2, "Mounted Charged L2", 39100, 12, std::nullopt, 735},
+
+        // Judge 590 is the zero-damage throw acquisition; 509 is the whiff strike.
+        MoveDefinition{MoveId::BACKSTAB_WHIFF, "Backstab Whiff", 31719, 12, std::nullopt, 509},
+        MoveDefinition{MoveId::BACKSTAB, "Backstab", 31710},
+        MoveDefinition{MoveId::RIPOSTE, "Riposte", 31700},
+        // ThrowParam selects 31720 for small-target backstabs, 31730 for ripostes.
+        MoveDefinition{MoveId::SMALL_PVE_BACKSTAB, "Small PvE Backstab", 31720},
+        MoveDefinition{MoveId::SMALL_PVE_RIPOSTE, "Small PvE Riposte", 31730},
+        MoveDefinition{MoveId::LARGE_PVE_RIPOSTE, "Large PvE Riposte", 31750}
+    };
+
+    // Ordinary axes share this 63-move vocabulary, graph clip IDs and mounted
+    // phase judges with straight swords. Hit data comes from their own TAE and
+    // behavior rows. Criticals select victim-directed throw hits explicitly.
+    inline constexpr auto axeCatalog = [] {
+        auto catalog = straightSwordCatalog;
+        for (auto& definition : catalog) {
+            definition.requiredCategory.reset();
+            definition.requiredBehaviorParamId.reset();
+            switch (definition.id) {
+            case MoveId::BACKSTAB: case MoveId::RIPOSTE:
+            case MoveId::SMALL_PVE_BACKSTAB: case MoveId::SMALL_PVE_RIPOSTE:
+            case MoveId::LARGE_PVE_RIPOSTE:
+                definition.eventType = 304;
+                break;
+            default: break;
+            }
+        }
+        return catalog;
+    }();
+
+    // Ordinary hammers use the same complete move vocabulary and phase filters.
+    // Their TAE aliases and behavior rows retain hammer-specific hit data.
+    inline constexpr auto hammerCatalog = axeCatalog;
+    inline constexpr auto katanaCatalog = axeCatalog;
+
+    // Derive complete class membership from the shared move vocabulary. A
+    // missing/duplicate omission fails at compile time instead of leaving a
+    // default definition or quietly changing the expected catalog size.
+    template<std::size_t N, std::size_t M>
+    consteval auto omitCatalogMoves(const std::array<MoveDefinition, N>& source,
+        const std::array<MoveId, M>& omitted) {
+        std::array<MoveDefinition, N - M> result;
+        std::size_t next = 0;
+        for (const auto& definition : source) {
+            if (std::ranges::find(omitted, definition.id) != omitted.end()) continue;
+            if (next == result.size()) throw "Invalid omitted catalog membership";
+            result[next++] = definition;
+        }
+        if (next != result.size()) throw "Invalid omitted catalog membership";
+        return result;
+    }
+
+    // HKS limits ordinary/offhand flail chains to four stages; powerstance
+    // still has four. Other move families retain the shared phase definitions.
+    inline constexpr auto flailCatalog = omitCatalogMoves(axeCatalog, std::array{
+        MoveId::ONE_HAND_R1_5, MoveId::TWO_HAND_R1_5, MoveId::OFFHAND_R1_5});
+
+    // HKS gives these ordinary heavy families four single-weapon lights and
+    // three paired lights. Graph import independently verifies membership.
+    inline constexpr auto greatswordCatalog = omitCatalogMoves(flailCatalog, std::array{
+        MoveId::POWERSTANCE_L1_4});
+    inline constexpr auto greataxeCatalog = greatswordCatalog;
+    inline constexpr auto greathammerCatalog = greatswordCatalog;
+    inline constexpr auto curvedGreatswordCatalog = greatswordCatalog;
+
+    // Colossal classes have three ordinary/offhand and paired light stages.
+    inline constexpr auto colossalSwordCatalog = omitCatalogMoves(greatswordCatalog, std::array{
+        MoveId::ONE_HAND_R1_4, MoveId::TWO_HAND_R1_4, MoveId::OFFHAND_R1_4});
+    inline constexpr auto colossalWeaponCatalog = colossalSwordCatalog;
+
+    inline constexpr auto halberdCatalog = greatswordCatalog;
+    // Scythe mounted charge clips contain release judges 635/735 only;
+    // holding the charge has no attack event to import as a damaging move.
+    inline constexpr auto scytheCatalog = omitCatalogMoves(halberdCatalog, std::array{
+        MoveId::MOUNTED_R2_CHARGING, MoveId::MOUNTED_L2_CHARGING});
+
+    inline constexpr auto spearCatalog = []() consteval {
+        std::array<MoveDefinition, greatswordCatalog.size() + 1> result;
+        std::ranges::copy(greatswordCatalog, result.begin());
+        // Explicit ordinary guard-style sample, not inferred left equipment.
+        result.back() = {MoveId::SHIELDPOKE, "Shieldpoke (normal guard)", 30900};
+        return result;
+    }();
+
+    // Three ordinary/offhand lights, three paired lights and explicit shieldpoke.
+    // Conditional a37 events remain in the hit data and require evaluation context.
+    inline constexpr auto greatSpearCatalog = omitCatalogMoves(spearCatalog, std::array{
+        MoveId::ONE_HAND_R1_4, MoveId::TWO_HAND_R1_4, MoveId::OFFHAND_R1_4});
+
+    // Whips cannot initiate critical throws (enableThrow=0). Their mounted
+    // charge clips contain release hits only, as in the scythe vocabulary.
+    inline constexpr auto whipCatalog = omitCatalogMoves(scytheCatalog, std::array{
+        MoveId::BACKSTAB_WHIFF, MoveId::BACKSTAB, MoveId::RIPOSTE,
+        MoveId::SMALL_PVE_BACKSTAB, MoveId::SMALL_PVE_RIPOSTE, MoveId::LARGE_PVE_RIPOSTE});
+
+    // Six ordinary/offhand lights, four paired lights, shieldpoke and four
+    // charged-heavy feints. Neutral definitions retain the shared phase filters.
+    inline constexpr auto thrustingSwordCatalog = []() consteval {
+        std::array<MoveDefinition, axeCatalog.size() + 8> result;
+        std::ranges::copy(axeCatalog, result.begin());
+        std::size_t next = axeCatalog.size();
+        for (const auto& definition : std::array{
+                MoveDefinition{MoveId::ONE_HAND_R1_6, "1H R1 #6", 30050},
+                MoveDefinition{MoveId::TWO_HAND_R1_6, "2H R1 #6", 32050},
+                MoveDefinition{MoveId::OFFHAND_R1_6, "Offhand R1 #6", 35050},
+                MoveDefinition{MoveId::SHIELDPOKE, "Shieldpoke (normal guard)", 30900},
+                MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_1_FEINT, "1H Charged R2 #1 Feint", 30950},
+                MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_2_FEINT, "1H Charged R2 #2 Feint", 30955},
+                MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_1_FEINT, "2H Charged R2 #1 Feint", 32950},
+                MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_2_FEINT, "2H Charged R2 #2 Feint", 32955}})
+            result[next++] = definition;
+        return result;
+    }();
+
+    // Curved swords share the six-stage lights and four feints, but the native
+    // guard-attack eligibility excludes this category.
+    inline constexpr auto curvedSwordCatalog = omitCatalogMoves(thrustingSwordCatalog, std::array{
+        MoveId::SHIELDPOKE});
+
+    // Great katanas have four ordinary/offhand and three paired light stages,
+    // with the same four requested feints and explicit mounted phase filters.
+    inline constexpr auto greatKatanaCatalog = omitCatalogMoves(curvedSwordCatalog, std::array{
+        MoveId::ONE_HAND_R1_5, MoveId::TWO_HAND_R1_5, MoveId::OFFHAND_R1_5,
+        MoveId::ONE_HAND_R1_6, MoveId::TWO_HAND_R1_6, MoveId::OFFHAND_R1_6,
+        MoveId::POWERSTANCE_L1_4});
+
+    // Mounted Start has release judges 638/738 after its charge window and
+    // no charging attack phase. Other events retain raw opposing-target flags.
+    inline constexpr auto lightGreatswordCatalog = []() consteval {
+        auto result = omitCatalogMoves(axeCatalog, std::array{
+            MoveId::MOUNTED_R2_CHARGING, MoveId::MOUNTED_L2_CHARGING});
+        for (auto& definition : result) {
+            if (definition.id == MoveId::MOUNTED_CHARGED_R2) definition.eventJudgeId = 638;
+            if (definition.id == MoveId::MOUNTED_CHARGED_L2) definition.eventJudgeId = 738;
+        }
+        return result;
+    }();
+
+    // HKS excludes matching powerstance for thrusting shields. Their four
+    // ordinary/offhand stages and mounted charging phases remain available.
+    inline constexpr auto thrustingShieldCatalog = omitCatalogMoves(flailCatalog, std::array{
+        MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_L1_2, MoveId::POWERSTANCE_L1_3,
+        MoveId::POWERSTANCE_L1_4, MoveId::POWERSTANCE_RUNNING_L1, MoveId::POWERSTANCE_ROLLING_L1,
+        MoveId::POWERSTANCE_BACKSTEP_L1, MoveId::POWERSTANCE_JUMPING_L1});
+
+    // Audited ordinary stance signatures, not arbitrary native pose routing.
+    // Attack graph selectors still use the weapon category (offsets 13/16).
+    constexpr int ordinaryWeaponMotionPosition(int motionCategory, bool twoHanded) {
+        // Heavy thrusting swords have asymmetric authored stance positions.
+        if (motionCategory == 39 || motionCategory == 60) return twoHanded ? 10 : 3;
+        if (motionCategory == 36 || motionCategory == 37 || motionCategory == 38 || motionCategory == 50
+            || motionCategory == 57)
+            return twoHanded ? 13 : 3;
+        const bool heavy = motionCategory == 25 || motionCategory == 26 || motionCategory == 31
+            || motionCategory == 32 || motionCategory == 35 || motionCategory == 40 || motionCategory == 61;
+        return (twoHanded ? 10 : 0) + (heavy ? 2 : 0);
+    }
+
+    // Verified for the base Dagger's variation 100, not all dagger-type weapons.
+    inline constexpr std::array daggerCatalog = {
+        MoveDefinition{MoveId::ONE_HAND_R1_1, "1H R1 #1", 30000},
+        MoveDefinition{MoveId::ONE_HAND_R1_2, "1H R1 #2", 30010},
+        MoveDefinition{MoveId::ONE_HAND_R1_3, "1H R1 #3", 30020},
+        MoveDefinition{MoveId::ONE_HAND_R1_4, "1H R1 #4", 30030},
+        MoveDefinition{MoveId::ONE_HAND_R1_5, "1H R1 #5", 30040},
+        MoveDefinition{MoveId::ONE_HAND_R1_6, "1H R1 #6", 30050},
+        MoveDefinition{MoveId::ONE_HAND_R2_1, "1H R2 #1", 30505},
+        MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_1, "1H Charged R2 #1", 30500},
+        MoveDefinition{MoveId::ONE_HAND_R2_2, "1H R2 #2", 30515},
+        MoveDefinition{MoveId::ONE_HAND_CHARGED_R2_2, "1H Charged R2 #2", 30510},
+        MoveDefinition{MoveId::ONE_HAND_RUNNING_R1, "1H Running R1", 30200},
+        MoveDefinition{MoveId::ONE_HAND_RUNNING_R2, "1H Running R2", 30210},
+        MoveDefinition{MoveId::ONE_HAND_ROLLING_R1, "1H Rolling R1", 30300},
+        MoveDefinition{MoveId::ONE_HAND_BACKSTEP_R1, "1H Backstep R1", 30400},
+        MoveDefinition{MoveId::ONE_HAND_JUMPING_R1, "1H Jumping R1", 31030, 1},
+        MoveDefinition{MoveId::ONE_HAND_JUMPING_R2, "1H Jumping R2", 31230},
+        MoveDefinition{MoveId::ONE_HAND_GUARD_COUNTER, "1H Guard Counter", 30700},
+
+        MoveDefinition{MoveId::TWO_HAND_R1_1, "2H R1 #1", 32000},
+        MoveDefinition{MoveId::TWO_HAND_R1_2, "2H R1 #2", 32010},
+        MoveDefinition{MoveId::TWO_HAND_R1_3, "2H R1 #3", 32020},
+        MoveDefinition{MoveId::TWO_HAND_R1_4, "2H R1 #4", 32030},
+        MoveDefinition{MoveId::TWO_HAND_R1_5, "2H R1 #5", 32040},
+        MoveDefinition{MoveId::TWO_HAND_R1_6, "2H R1 #6", 32050},
+        MoveDefinition{MoveId::TWO_HAND_R2_1, "2H R2 #1", 32505},
+        MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_1, "2H Charged R2 #1", 32500},
+        // XML labels these rows "Default - Dagger". Blood Tax has the same
+        // variation, judge AND category, so category 12 alone is insufficient.
+        MoveDefinition{MoveId::TWO_HAND_R2_2, "2H R2 #2", 32515, 12, 100100310},
+        MoveDefinition{MoveId::TWO_HAND_CHARGED_R2_2, "2H Charged R2 #2", 32510, 12, 100100315},
+        MoveDefinition{MoveId::TWO_HAND_RUNNING_R1, "2H Running R1", 32200},
+        MoveDefinition{MoveId::TWO_HAND_RUNNING_R2, "2H Running R2", 32210},
+        MoveDefinition{MoveId::TWO_HAND_ROLLING_R1, "2H Rolling R1", 32300},
+        MoveDefinition{MoveId::TWO_HAND_BACKSTEP_R1, "2H Backstep R1", 32400},
+        MoveDefinition{MoveId::TWO_HAND_JUMPING_R1, "2H Jumping R1", 33030},
+        MoveDefinition{MoveId::TWO_HAND_JUMPING_R2, "2H Jumping R2", 33230},
+        MoveDefinition{MoveId::TWO_HAND_GUARD_COUNTER, "2H Guard Counter", 32700},
+
+        MoveDefinition{MoveId::POWERSTANCE_L1_1, "Powerstance L1 #1", 34000},
+        MoveDefinition{MoveId::POWERSTANCE_L1_2, "Powerstance L1 #2", 34010},
+        MoveDefinition{MoveId::POWERSTANCE_L1_3, "Powerstance L1 #3", 34020},
+        MoveDefinition{MoveId::POWERSTANCE_L1_4, "Powerstance L1 #4", 34030},
+        MoveDefinition{MoveId::POWERSTANCE_RUNNING_L1, "Powerstance Running L1", 34200},
+        MoveDefinition{MoveId::POWERSTANCE_ROLLING_L1, "Powerstance Rolling L1", 34300},
+        MoveDefinition{MoveId::POWERSTANCE_BACKSTEP_L1, "Powerstance Backstep L1", 34400},
+        MoveDefinition{MoveId::POWERSTANCE_JUMPING_L1, "Powerstance Jumping L1", 34530},
+
+        MoveDefinition{MoveId::OFFHAND_R1_1, "Offhand R1 #1", 35000},
+        MoveDefinition{MoveId::OFFHAND_R1_2, "Offhand R1 #2", 35010},
+        MoveDefinition{MoveId::OFFHAND_R1_3, "Offhand R1 #3", 35020},
+        MoveDefinition{MoveId::OFFHAND_R1_4, "Offhand R1 #4", 35030},
+        MoveDefinition{MoveId::OFFHAND_R1_5, "Offhand R1 #5", 35040},
+        MoveDefinition{MoveId::OFFHAND_R1_6, "Offhand R1 #6", 35050},
+
+        MoveDefinition{MoveId::MOUNTED_R1_1, "Mounted R1 #1", 38000},
+        MoveDefinition{MoveId::MOUNTED_R1_2, "Mounted R1 #2", 38010},
+        MoveDefinition{MoveId::MOUNTED_R1_3, "Mounted R1 #3", 38020},
+        MoveDefinition{MoveId::MOUNTED_R2, "Mounted R2", 38110},
+        MoveDefinition{MoveId::MOUNTED_R2_CHARGING, "Mounted R2 Charging", 38100, 12, std::nullopt, 630},
+        MoveDefinition{MoveId::MOUNTED_CHARGED_R2, "Mounted Charged R2", 38100, 12, std::nullopt, 635},
+        MoveDefinition{MoveId::MOUNTED_L1_1, "Mounted L1 #1", 39000},
+        MoveDefinition{MoveId::MOUNTED_L1_2, "Mounted L1 #2", 39010},
+        MoveDefinition{MoveId::MOUNTED_L1_3, "Mounted L1 #3", 39020},
+        MoveDefinition{MoveId::MOUNTED_L2, "Mounted L2", 39110},
+        MoveDefinition{MoveId::MOUNTED_L2_CHARGING, "Mounted L2 Charging", 39100, 12, std::nullopt, 730},
+        MoveDefinition{MoveId::MOUNTED_CHARGED_L2, "Mounted Charged L2", 39100, 12, std::nullopt, 735},
+
+        MoveDefinition{MoveId::BACKSTAB_WHIFF, "Backstab Whiff", 31719, 12, std::nullopt, 509},
+        MoveDefinition{MoveId::BACKSTAB, "Backstab", 31710},
+        MoveDefinition{MoveId::RIPOSTE, "Riposte", 31700},
+        // Default - Dagger and Repeating Thrust share judge 530 and category 12.
+        MoveDefinition{MoveId::SMALL_PVE_BACKSTAB, "Small PvE Backstab", 31720, 12, 100100530},
+        MoveDefinition{MoveId::SMALL_PVE_RIPOSTE, "Small PvE Riposte", 31730, 12, 100100530},
+        MoveDefinition{MoveId::LARGE_PVE_RIPOSTE, "Large PvE Riposte", 31750}
+    };
+
+    class AnimationCache {
+    public:
+        explicit AnimationCache(std::filesystem::path tempDir)
+            : taeRoot_(
+                std::move(tempDir) /
+                "chr/c0000-anibnd-dcx-wanibnd/"
+                "INTERROOT_win64/chr/c0000/tae"
+            ) {}
+
+        const std::vector<AttackEvent>& get(
+            int motionCategory,
+            int animationId
+        ) {
+            std::set<std::pair<int, int>> active;
+            return load(motionCategory, animationId, active);
+        }
+
+    private:
+        const std::vector<AttackEvent>& load(
+            int motionCategory, int animationId, std::set<std::pair<int, int>>& active
+        ) {
+            const auto key = std::pair{
+                motionCategory, animationId
+            };
+
+            if (auto it = cache_.find(key); it != cache_.end())
+                return it->second;
+
+            if (!active.insert(key).second)
+                throw std::runtime_error(std::format("TAE alias cycle at a{} / {:06}", motionCategory, animationId));
+            if (active.size() > 64)
+                throw std::runtime_error("TAE alias chain exceeds 64 animations");
+
+            const auto path =
+                taeRoot_ /
+                std::format("a{}-tae", motionCategory) /
+                std::format("anim-{:06}.xml", animationId);
+
+            pugi::xml_document tae;
+            const auto result = tae.load_file(path.string().c_str());
+
+            if (!result)
+                throw std::runtime_error(
+                    std::format(
+                        "Failed to load {}: {}",
+                        path.string(),
+                        result.description()
+                    )
+                );
+
+            std::vector<AttackEvent> events;
+            const auto header = tae.child("anim").child("header");
+            if (xmlValue(header, "type") == "ImportOtherAnim") {
+                const auto target = xmlInt(header, "animId");
+                if (!target || *target < 0)
+                    throw std::runtime_error(std::format("Invalid TAE alias target in {}", path));
+                // ImportOtherAnim replaces the event source with the referenced
+                // animation; local rows are inactive, even if they contain attacks.
+                // DSAnimStudio f1bff06, DSAProj.INNER_SolveAnimRefChain and
+                // NewAnimationContainer.NewGetAnimFromRequest resolve this chain
+                // before assigning TaeAnimation. Never merge the local rows.
+                // The exported full animation ID encodes category * 1,000,000 + local ID.
+                try {
+                    events = load(*target / 1000000, *target % 1000000, active);
+                } catch (const std::runtime_error& error) {
+                    throw std::runtime_error(std::format("TAE alias {} -> {}: {}", path, *target, error.what()));
+                }
+                for (auto& event : events)
+                    event.animationId = animationId;
+            } else {
+                events = extractAttackEvents(tae, animationId);
+                for (auto& event : events) {
+                    event.sourceMotionCategory = motionCategory;
+                    event.sourceAnimationId = animationId;
+                }
+            }
+
+            active.erase(key);
+
+            return cache_.emplace(
+                key, std::move(events)
+            ).first->second;
+        }
+
+    private:
+        std::filesystem::path taeRoot_;
+
+        std::map<
+            std::pair<int, int>,
+            std::vector<AttackEvent>
+        > cache_;
+    };
+
+    struct MoveImportFailure {
+        MoveId moveId;
+        std::string name;
+        int animationId;
+        std::vector<std::string> diagnostics;
+        std::vector<UnresolvedAttack> unresolved;
+    };
+
+    struct MovesetImportReport {
+        int motionCategory;
+        int behaviorVariation;
+        std::size_t requestedMoves;
+        std::size_t importedMoves = 0;
+        std::vector<MoveImportFailure> failures;
+    };
+
+    template <class AddMove>
+        requires std::invocable<AddMove&, const MoveDefinition&, const std::vector<ResolvedHit>&>
+    MovesetImportReport importMoveset(
+        AnimationCache& animationCache,
+        int motionCategory,
+        int behaviorVariation,
+        std::span<const MoveDefinition> catalog,
+        const BehaviorIndex& behaviors,
+        const ParamTable& attacks,
+        AddMove&& addMove,
+        std::optional<int> requiredCategory = std::nullopt,
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+    ) {
+        MovesetImportReport report{motionCategory, behaviorVariation, catalog.size()};
+        for (const auto& definition : catalog) {
+            ResolutionResult result;
+            try {
+                const auto& events = animationCache.get(definition.motionCategory.value_or(motionCategory), definition.animationId);
+                std::vector<AttackEvent> selectedEvents;
+                if (definition.eventType && *definition.eventType != 1 && *definition.eventType != 304)
+                    throw std::runtime_error("Unsupported attack event type filter");
+                if (definition.eventJudgeId || definition.eventType) {
+                    std::ranges::copy_if(events, std::back_inserter(selectedEvents), [&](const auto& event) {
+                        return (!definition.eventJudgeId || event.behaviorJudgeId == *definition.eventJudgeId)
+                            && (!definition.eventType || event.eventType == *definition.eventType);
+                    });
+                    if (selectedEvents.empty())
+                        throw std::runtime_error(std::format("No attack events for selected judge {} and event type {}",
+                            definition.eventJudgeId ? std::to_string(*definition.eventJudgeId) : "any",
+                            definition.eventType ? std::to_string(*definition.eventType) : "any"));
+                }
+                result = resolveAttackEvents((definition.eventJudgeId || definition.eventType) ? selectedEvents : events,
+                    behaviorVariation, behaviors, attacks,
+                    requiredCategory ? requiredCategory : definition.requiredCategory,
+                    definition.requiredBehaviorParamId, lookup);
+            } catch (const std::runtime_error& error) {
+                result.diagnostics.emplace_back(error.what());
+            }
+
+            if (result.diagnostics.empty() && result.hits.empty())
+                result.diagnostics.emplace_back("No attack events");
+
+            if (!result.diagnostics.empty()) {
+                for (const auto& diagnostic : result.diagnostics) {
+                    std::println(
+                        stderr,
+                        "{}: {}",
+                        definition.name,
+                        diagnostic
+                    );
+                }
+
+                report.failures.push_back({definition.id, std::string(definition.name),
+                    definition.animationId, std::move(result.diagnostics), std::move(result.unresolved)});
+
+                // Don't publish a partially resolved move as complete.
+                continue;
+            }
+
+            // The callback copies the resolved data into your OO model.
+            addMove(definition, result.hits);
+            ++report.importedMoves;
+        }
+        return report;
+    }
+
+    struct MovesetImportResult {
+        std::shared_ptr<Moveset> moveset;
+        MovesetImportReport report;
+    };
+
+    MovesetImportResult importMoveset(
+        AnimationCache& animationCache,
+        int motionCategory,
+        int behaviorVariation,
+        std::span<const MoveDefinition> catalog,
+        const BehaviorIndex& behaviors,
+        const ParamTable& attacks,
+        std::optional<int> requiredCategory = std::nullopt,
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+    ) {
+        auto moveset = std::make_shared<Moveset>(motionCategory, behaviorVariation);
+        auto report = importMoveset(animationCache, motionCategory, behaviorVariation,
+            catalog, behaviors, attacks,
+            [&](const MoveDefinition& definition, const std::vector<ResolvedHit>& hits) {
+                moveset->moves.push_back({definition.id, std::string(definition.name), definition.animationId, hits});
+            }, requiredCategory, lookup);
+        return {std::move(moveset), std::move(report)};
+    }
+
+    std::map<long long, std::shared_ptr<Moveset>> importWeaponMovesets(
+        const std::filesystem::path& root,
+        const std::map<long long, std::map<std::string, double>>& weapons,
+        std::vector<MovesetImportReport>* reports,
+        const MovesetDefinitionResolver& resolveDefinitions
+    ) {
+        struct SupportedCatalog {
+            int weaponType;
+            int motionCategory;
+            int baseBehaviorVariation;
+            std::span<const MoveDefinition> moves;
+            int enableThrow = 1;
+        };
+        const std::array catalogs{
+            SupportedCatalog{1, 20, 100, daggerCatalog},
+            SupportedCatalog{3, 23, 200, straightSwordCatalog},
+            SupportedCatalog{17, 30, 1400, axeCatalog},
+            SupportedCatalog{21, 33, 1100, hammerCatalog},
+            SupportedCatalog{24, 34, 1300, flailCatalog},
+            SupportedCatalog{5, 25, 300, greatswordCatalog},
+            SupportedCatalog{19, 32, 1500, greataxeCatalog},
+            SupportedCatalog{23, 35, 1200, greathammerCatalog},
+            SupportedCatalog{13, 29, 900, katanaCatalog},
+            SupportedCatalog{11, 40, 800, curvedGreatswordCatalog},
+            SupportedCatalog{7, 26, 400, colossalSwordCatalog},
+            SupportedCatalog{41, 31, 2300, colossalWeaponCatalog},
+            SupportedCatalog{29, 38, 1800, halberdCatalog},
+            SupportedCatalog{31, 50, 1900, scytheCatalog},
+            SupportedCatalog{25, 36, 1600, spearCatalog},
+            SupportedCatalog{28, 37, 1700, greatSpearCatalog},
+            SupportedCatalog{39, 43, 2000, whipCatalog, 0},
+            SupportedCatalog{15, 27, 500, thrustingSwordCatalog},
+            SupportedCatalog{9, 28, 700, curvedSwordCatalog},
+            SupportedCatalog{94, 61, 6600, greatKatanaCatalog},
+            SupportedCatalog{93, 60, 6700, lightGreatswordCatalog},
+            SupportedCatalog{90, 57, 6100, thrustingShieldCatalog}
+        };
+
+        // Share complete validated families only when all routing inputs match.
+        // Names/weapon IDs, attack power, scaling and passive status do not select
+        // these animations or behavior rows. Special, paired and catalyst routing
+        // require separate support; never inherit a family by category alone.
+        // The behavior resolver already implements exact -> hundred-family ->
+        // common lookup. Different exact variations must never share hit data.
+        std::map<std::pair<std::size_t, int>, std::vector<long long>> supportedRows;
+        for (const auto& [id, row] : weapons) {
+            for (std::size_t i = 0; i < catalogs.size(); ++i) {
+                const auto& catalog = catalogs[i];
+                const auto matches = [&](const char* field, double expected) {
+                    const auto found = row.find(field);
+                    return found != row.end() && found->second == expected;
+                };
+                const auto variationField = row.find("behaviorVariationId");
+                if (variationField == row.end() || !std::isfinite(variationField->second)
+                    || variationField->second < catalog.baseBehaviorVariation
+                    || variationField->second >= catalog.baseBehaviorVariation + 100
+                    || std::trunc(variationField->second) != variationField->second) continue;
+                const int variation = static_cast<int>(variationField->second);
+                if (matches("wepmotionCategory", catalog.motionCategory) &&
+                    matches("wepType", catalog.weaponType) &&
+                    matches("wepmotionOneHandId", ordinaryWeaponMotionPosition(catalog.motionCategory, false)) &&
+                    matches("wepmotionBothHandId", ordinaryWeaponMotionPosition(catalog.motionCategory, true)) &&
+                    matches("spAtkcategory", 0) && matches("isWeaponCatalyst", 0) &&
+                    matches("isDualBlade", 0) && matches("enableThrow", catalog.enableThrow))
+                    supportedRows[{i, variation}].push_back(id);
+            }
+        }
+        if (supportedRows.empty())
+            return {};
+
+        ParamTable attacks;
+        attacks.load((root / AtkParam_PcFile).string().c_str());
+        ParamTable behaviors;
+        behaviors.load((root / BehaviorParam_PcFile).string().c_str());
+        BehaviorIndex index;
+        index.build(behaviors);
+        AnimationCache cache(root);
+        std::map<long long, std::shared_ptr<Moveset>> result;
+        std::string failures;
+        for (const auto& [key, rows] : supportedRows) {
+            const auto [i, variation] = key;
+            const auto& catalog = catalogs[i];
+            // Keep the original constrained catalogs as regression references.
+            // Production behavior selection follows player row addressing; it
+            // no longer needs per-move category/behavior-ID tie breakers.
+            std::vector<MoveDefinition> definitions(catalog.moves.begin(), catalog.moves.end());
+            for (auto& definition : definitions) {
+                definition.requiredCategory.reset();
+                definition.requiredBehaviorParamId.reset();
+            }
+            MovesetImportResult imported{nullptr,
+                {catalog.motionCategory, variation, definitions.size()}};
+            try {
+                if (resolveDefinitions) {
+                    auto resolved = resolveDefinitions(rows, definitions);
+                    if (resolved.size() != definitions.size() ||
+                        !std::ranges::equal(resolved, definitions, {}, &MoveDefinition::id, &MoveDefinition::id))
+                        throw std::runtime_error("Definition resolver must preserve complete catalog IDs and order");
+                    definitions = std::move(resolved);
+                }
+                imported = importMoveset(cache, catalog.motionCategory, variation,
+                    definitions, index, attacks, std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+            } catch (const std::runtime_error& error) {
+                // A definition failure invalidates this entire supported set.
+                // Keep the existing per-move report shape and collect all groups.
+                for (const auto& definition : definitions)
+                    imported.report.failures.push_back({definition.id, std::string(definition.name),
+                        definition.animationId, {std::string("Definition resolution failed: ") + error.what()}, {}});
+            }
+            if (imported.report.failures.empty()) {
+                for (const auto id : rows)
+                    result.emplace(id, imported.moveset);
+            } else {
+                for (const auto& failure : imported.report.failures) {
+                    for (const auto& diagnostic : failure.diagnostics)
+                        failures += std::format("\nWeapon {}, motion {}, variation {}, {} ({:06}): {}",
+                            rows.front(), catalog.motionCategory, variation,
+                            failure.name, failure.animationId, diagnostic);
+                }
+            }
+            if (reports)
+                reports->push_back(std::move(imported.report));
+        }
+        // Retain every report before rejecting an incomplete supported import.
+        if (!failures.empty())
+            throw std::runtime_error("Could not import supported weapon movesets:" + failures);
+        return result;
+    }
+
+
+    struct ExpectedHit {
+        int judge;
+        float physicalMV;
+        std::optional<float> statusMV;
+
+        // -1 means we have not established the expected source.
+        int source = -1;
+
+        // Optional expected TAE attack-window times.
+        std::optional<double> start;
+        std::optional<double> end;
+    };
+
+    void testAnimation(
+        const std::filesystem::path& tempDir,
+        const ParamTable& attacks,
+        const BehaviorIndex& behaviorIndex,
+        int motionCategory,
+        int animationId,
+        int behaviorVariation,
+        const std::vector<ExpectedHit>& expected
+    ) {
+        const auto path =
+            tempDir /
+            "chr/c0000-anibnd-dcx-wanibnd/INTERROOT_win64/chr/c0000/tae" /
+            std::format("a{}-tae", motionCategory) /
+            std::format("anim-{:06}.xml", animationId);
+
+        pugi::xml_document tae;
+
+        if (auto loaded = tae.load_file(path.string().c_str()); !loaded) {
+            throw std::runtime_error(
+                std::format("Cannot load {}: {}", path.string(),
+                            loaded.description()));
+        }
+
+        const auto events = extractAttackEvents(tae, animationId);
+
+        const auto result = resolveAttackEvents(
+            events, behaviorVariation, behaviorIndex, attacks
+        );
+
+        std::println("\nAnimation {:06}: {} events, {} resolved hits",
+                    animationId, events.size(), result.hits.size());
+
+        for (const auto& diagnostic : result.diagnostics)
+            std::println("  DIAGNOSTIC: {}", diagnostic);
+
+        if (!result.diagnostics.empty())
+            throw std::runtime_error("Unexpected resolution diagnostics");
+
+        if (result.hits.size() != expected.size())
+            throw std::runtime_error("Unexpected hit count");
+
+        constexpr auto physicalIndex =
+            std::to_underlying(AttackPowerType::PHYSICAL);
+        constexpr auto statusIndex =
+            std::to_underlying(AttackPowerType::POISON);
+
+        // Match expected hits by judge. This avoids assuming an event
+        // order we haven't yet confirmed for every animation.
+        std::vector<bool> matched(expected.size(), false);
+
+        for (std::size_t i = 0; i < result.hits.size(); ++i) {
+            const auto& hit = result.hits[i];
+
+            if (i > 0 &&
+                hit.event.startTime < result.hits[i - 1].event.startTime)
+                throw std::runtime_error("Events are not in time order");
+
+            const ExpectedHit* check = nullptr;
+
+            for (std::size_t j = 0; j < expected.size(); ++j) {
+                if (!matched[j] &&
+                    expected[j].judge == hit.event.behaviorJudgeId) {
+                    matched[j] = true;
+                    check = &expected[j];
+                    break;
+                }
+            }
+
+            if (!check)
+                throw std::runtime_error("Unexpected or duplicate judge");
+
+            const auto& mv = hit.motionValues;
+
+            if (!mv.known[physicalIndex] ||
+                std::abs(mv.values[physicalIndex] -
+                        check->physicalMV) > 0.001f)
+                throw std::runtime_error("Physical MV mismatch");
+
+            if (check->statusMV) {
+                if (!mv.known[statusIndex] ||
+                    std::abs(mv.values[statusIndex] -
+                            *check->statusMV) > 0.001f)
+                    throw std::runtime_error("Status MV mismatch");
+            }
+
+            if (check->source >= 0 &&
+                hit.event.source != check->source)
+                throw std::runtime_error("Attack source mismatch");
+
+            if (check->start &&
+                std::abs(hit.event.startTime - *check->start) > 0.0001)
+                throw std::runtime_error("Start time mismatch");
+
+            if (check->end &&
+                std::abs(hit.event.endTime - *check->end) > 0.0001)
+                throw std::runtime_error("End time mismatch");
+
+            std::println(
+                "  hit {}: judge={}, source={}, time={:.3f}-{:.3f}, "
+                "physical={}, status={}",
+                i + 1,
+                hit.event.behaviorJudgeId,
+                hit.event.source,
+                hit.event.startTime,
+                hit.event.endTime,
+                mv.values[physicalIndex],
+                mv.values[statusIndex]
+            );
+        }
+
+        std::println("  PASS");
+    }
+
+
+
     std::expected<void, std::string> run_witchy(const std::filesystem::path& witchy_exe_path, const std::filesystem::path& arg)
     {
-        auto cmd = std::format("\"{} --passive {}\"", witchy_exe_path, arg);
+        auto cmd = std::format("\"{} --passive --parallel {}\"", witchy_exe_path, arg);
 
         std::println("executing command: {}", cmd);
         auto result = std::system(cmd.c_str());
@@ -658,111 +1977,60 @@ namespace erdo::witchy
         return {};
     }
 
-    std::filesystem::path copy_file_to(const std::filesystem::path& file, const std::filesystem::path& target_directory, std::filesystem::copy_options opt)
-    {
-        auto new_file = target_directory / file.filename();
-        std::filesystem::copy_file(file, new_file, opt);
-        std::println("copied file {} to {}", file, new_file);
-        return new_file;
-    }
-
-    std::expected<std::filesystem::path, std::string> move_directory(const std::filesystem::path& directory, const std::filesystem::path& target_directory)
-    {
-        if (!std::filesystem::is_directory(directory))
-            return std::unexpected(std::format("could not find directory: {}", directory));
-
-        if (!std::filesystem::is_directory(target_directory))
-            return std::unexpected(std::format("could not find target directory: {}", target_directory));
-
-        auto new_directory_path = target_directory / directory.filename();
-        std::filesystem::rename(directory, new_directory_path);
-        std::println("moved directory {} to {}", directory, new_directory_path);
-        return new_directory_path;
-    }
-
-    export std::expected<GameData, std::string> generate_game_data(
-        const std::filesystem::path& input_files_directory,
+    std::expected<GameData, std::string> generate_game_data(
+        const std::filesystem::path& elden_ring_exe_path,
         const std::filesystem::path& witchy_exe_path,
         bool delete_temp_directory
     ) try
     {
-        if (!std::filesystem::is_directory(input_files_directory))
-            return std::unexpected(std::format("Not a directory: {}", input_files_directory));
+        if (!std::filesystem::is_regular_file(elden_ring_exe_path))
+            return std::unexpected(std::format("Not a file: {}", elden_ring_exe_path));
+        const auto input_files_directory = elden_ring_exe_path.parent_path();
 
         if (!std::filesystem::is_regular_file(witchy_exe_path))
             return std::unexpected(std::format("Not a file: {}", witchy_exe_path));
         
-        // create temporary directory
+        // set up temporary directory structure
         const auto temp_dir = std::filesystem::temp_directory_path() / "elden-ring-damage-optimizer";
         std::filesystem::remove_all(temp_dir);
         std::filesystem::create_directory(temp_dir);
-        std::println("created temporary directory {}", temp_dir);
-
-        // copy needed dcx files to temporary directory
-        const auto dcx_data_directory = temp_dir / "dcx_data";
-        std::filesystem::create_directory(dcx_data_directory);
-        const auto dcx_file_paths = needed_dcx_files
-            | std::views::transform([&](const std::filesystem::path &input_dcx_file) {
-                return copy_file_to(input_dcx_file, dcx_data_directory, std::filesystem::copy_options::overwrite_existing);
-            })
-            | std::ranges::to<std::vector>();
-
-        // unpack dcx files, move the resulting unpacked data directories
         const auto unpacked_data_directory = temp_dir / "unpacked_data";
         std::filesystem::create_directory(unpacked_data_directory);
-        std::vector<std::filesystem::path> unpacked_data_directories{};
-        for (auto&& dcx_file_path : dcx_file_paths)
+        std::println("created temporary directory {}", temp_dir);
+
+        // copy elden ring executable file to temporary directory
+        std::filesystem::copy_file(elden_ring_exe_path, unpacked_data_directory / elden_ring_exe_path.filename());
+        std::println("copied elden ring executable file {} to {}", elden_ring_exe_path, unpacked_data_directory / elden_ring_exe_path.filename());
+
+        // iterate over needed packed files
+        for (auto&& needed_packed_file : needed_packed_files)
         {
-            auto result = run_witchy(witchy_exe_path, dcx_file_path);
-            if (!result)
-                return std::unexpected(result.error());
+            const auto needed_packed_file_path = input_files_directory / needed_packed_file;
 
-            auto unpacked_directory_name = dcx_file_path.filename().string();
-            std::ranges::replace(unpacked_directory_name, '.', '-');
-            auto current_unpacked_directory_path = dcx_data_directory / unpacked_directory_name;
-            std::println("unpacked dcx file {} in-place to {}", dcx_file_path, current_unpacked_directory_path);
+            // copy needed packed file
+            const auto packed_file_path = unpacked_data_directory / needed_packed_file;
+            std::filesystem::create_directories(packed_file_path.parent_path());
+            std::filesystem::copy_file(needed_packed_file_path, packed_file_path);
+            std::println("copied packed file {} to {}", needed_packed_file_path, packed_file_path);
 
-            auto move_result = move_directory(current_unpacked_directory_path, unpacked_data_directory);
-            if (!move_result)
-                return std::unexpected(move_result.error());
-            unpacked_data_directories.emplace_back(move_result.value());
+            // unpack packed file in-place
+            const auto witchy_result = run_witchy(witchy_exe_path, packed_file_path);
+            if (!witchy_result)
+                return std::unexpected(witchy_result.error());
+            std::println("unpacked packed file {} in-place", packed_file_path);
         }
 
-        // get game version from /regulation-bin/_witchy-bnd4.xml
-        const auto game_version = get_element_value<long long>(
-            load_file(unpacked_data_directory / "regulation-bin" / "_witchy-bnd4.xml"),
-            { "bnd4", "version" }
-        );
-        std::println("found game version {}", game_version);
-
-        // compute paths of needed xml files
-        const auto xml_file_paths = unpacked_data_directories
-            | std::views::transform([](const std::filesystem::path& p){ return std::filesystem::directory_iterator(p); })
-            | std::views::join
-            | std::views::transform(&std::filesystem::directory_entry::path)
-            | std::views::filter([](const std::filesystem::path& p){ return needed_unpacked_files.contains(p.filename()); })
-            | std::ranges::to<std::set>([](const std::filesystem::path& l, const std::filesystem::path& r){ return std::less{}(l.filename(), r.filename()); });
-        if (xml_file_paths.size() != needed_unpacked_files.size())
-            return std::unexpected(std::format(
-                "only {} out of {} needed xml files were found in {}",
-                xml_file_paths.size(),
-                needed_unpacked_files.size(),
-                unpacked_data_directory
-            ));
-        for (auto&& xml_file_path : xml_file_paths)
-            if (!std::filesystem::is_regular_file(xml_file_path))
-                return std::unexpected(std::format("could not find xml file: {}", xml_file_path));
-        std::println("found all {} needed xml files in {}", xml_file_paths.size(), unpacked_data_directory);
-
-        // copy needed xml files
-        const auto xml_data_directory = temp_dir / "xml_data";
-        std::filesystem::create_directory(xml_data_directory);
-        for (auto&& xml_file_path : xml_file_paths)
-            copy_file_to(xml_file_path, xml_data_directory, std::filesystem::copy_options::overwrite_existing);
+        // assert that all needed unpacked files are present
+        for (auto&& needed_unpacked_file : needed_unpacked_files)
+        {
+            const auto needed_unpacked_path = unpacked_data_directory / needed_unpacked_file;
+            if (!std::filesystem::is_regular_file(needed_unpacked_path))
+                return std::unexpected(std::format("could not find unpacked file: {}", needed_unpacked_path));
+        }
 
         // parse xml files
-        auto game_data = load_game_data(xml_data_directory, game_version);
-        std::println("\nsuccessfully unpacked and parsed game data"); 
+        auto game_data = load_game_data(unpacked_data_directory);
+        std::println("\nsuccessfully unpacked and parsed game data in {}", unpacked_data_directory);
 
         // potentially remove temporary directory
         if (delete_temp_directory)

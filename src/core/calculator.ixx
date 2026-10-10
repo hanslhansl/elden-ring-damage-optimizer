@@ -220,6 +220,145 @@ export namespace erdo::calculator
     constexpr auto defaultStatusCalcCorrectGraphId = 6;
 
 
+    // Shared importer/calculator data; motion values remain in percent units.
+    struct MotionValues {
+        // Stored as percentages: 80 means an 80% MV.
+        std::array<float, enumerators_of<AttackPowerType>().size()> values{};
+        std::array<bool, enumerators_of<AttackPowerType>().size()> known{};
+    };
+
+    struct AttackEvent {
+        int animationId = -1;
+        int eventType = -1;
+        int behaviorJudgeId = -1;
+        int attackIndex = -1;
+        int source = -1; // Preserve the raw TAE value.
+
+        // Scheduled animation-relative activation window, not confirmed contact.
+        double startTime = 0.0;
+        double endTime = 0.0;
+
+        // Original event file after following ImportOtherAnim aliases. Optional
+        // so older serialized movesets without this provenance still load.
+        std::optional<int> sourceMotionCategory;
+        std::optional<int> sourceAnimationId;
+
+        // Raw TAE activation condition. Absent/zero/negative means ungated;
+        // positive IDs require explicit runtime context. Optional for old JSON.
+        std::optional<int> stateInfo;
+    };
+
+    struct ResolvedHit {
+        AttackEvent event;
+        int behaviorParamId = -1;
+        int behaviorCategory = -1;
+        int atkParamId = -1;
+        MotionValues motionValues;
+        // Raw AtkParam opposing-target eligibility. Optional for legacy JSON;
+        // omitted data retains the previous opposing-target calculation.
+        std::optional<bool> opposeTarget;
+    };
+
+    enum class MoveId {
+        ONE_HAND_R1_1,
+        ONE_HAND_R1_2,
+        ONE_HAND_R1_3,
+        ONE_HAND_R1_4,
+        ONE_HAND_R1_5,
+
+        ONE_HAND_R2_1,
+        ONE_HAND_CHARGED_R2_1,
+        ONE_HAND_R2_2,
+        ONE_HAND_CHARGED_R2_2,
+
+        ONE_HAND_RUNNING_R1,
+        ONE_HAND_RUNNING_R2,
+        ONE_HAND_ROLLING_R1,
+        ONE_HAND_BACKSTEP_R1,
+        ONE_HAND_JUMPING_R1,
+        ONE_HAND_JUMPING_R2,
+        ONE_HAND_GUARD_COUNTER,
+
+        TWO_HAND_R1_1,
+        TWO_HAND_R1_2,
+        TWO_HAND_R1_3,
+        TWO_HAND_R1_4,
+        TWO_HAND_R1_5,
+
+        TWO_HAND_R2_1,
+        TWO_HAND_CHARGED_R2_1,
+        TWO_HAND_R2_2,
+        TWO_HAND_CHARGED_R2_2,
+
+        TWO_HAND_RUNNING_R1,
+        TWO_HAND_RUNNING_R2,
+        TWO_HAND_ROLLING_R1,
+        TWO_HAND_BACKSTEP_R1,
+        TWO_HAND_JUMPING_R1,
+        TWO_HAND_JUMPING_R2,
+        TWO_HAND_GUARD_COUNTER,
+
+        POWERSTANCE_L1_1,
+        LARGE_PVE_RIPOSTE,
+
+        ONE_HAND_R1_6,
+        TWO_HAND_R1_6,
+        POWERSTANCE_L1_2,
+        POWERSTANCE_L1_3,
+        POWERSTANCE_L1_4,
+
+        // Append IDs to preserve existing enum values.
+        OFFHAND_R1_1,
+        OFFHAND_R1_2,
+        OFFHAND_R1_3,
+        OFFHAND_R1_4,
+        OFFHAND_R1_5,
+        OFFHAND_R1_6,
+        BACKSTAB_WHIFF,
+        BACKSTAB,
+        RIPOSTE,
+        SMALL_PVE_BACKSTAB,
+        SMALL_PVE_RIPOSTE,
+        SHIELDPOKE,
+        ONE_HAND_CHARGED_R2_1_FEINT,
+        ONE_HAND_CHARGED_R2_2_FEINT,
+        TWO_HAND_CHARGED_R2_1_FEINT,
+        TWO_HAND_CHARGED_R2_2_FEINT,
+        POWERSTANCE_L1_5,
+        POWERSTANCE_L1_6,
+        POWERSTANCE_RUNNING_L1,
+        POWERSTANCE_ROLLING_L1,
+        POWERSTANCE_BACKSTEP_L1,
+        POWERSTANCE_JUMPING_L1,
+        MOUNTED_R1_1,
+        MOUNTED_R1_2,
+        MOUNTED_R1_3,
+        MOUNTED_R2,
+        MOUNTED_R2_CHARGING,
+        MOUNTED_CHARGED_R2,
+        MOUNTED_L1_1,
+        MOUNTED_L1_2,
+        MOUNTED_L1_3,
+        MOUNTED_L2,
+        MOUNTED_L2_CHARGING,
+        MOUNTED_CHARGED_L2
+    };
+
+    struct Move {
+        MoveId id;
+        std::string name;
+        int animationId;
+        std::vector<ResolvedHit> hits;
+    };
+
+    // Contains the imported catalog only; it does not imply every in-game move
+    // is covered or resolve mixed-weapon powerstance behavior selection.
+    struct Moveset {
+        int motionCategory;
+        int behaviorVariation;
+        std::vector<Move> moves;
+    };
+
     struct Weapon
     {
         enum class Affinity {
@@ -289,8 +428,8 @@ export namespace erdo::calculator
         std::string full_name;
         // the base weapon name without an affinity specified, e.g. "Nightrider Glaive"
         std::string base_name;
-        // true if the weapon was introduced with SOTE
-        bool dlc;
+        // 0: base game, else: dlc number (1 or 2)
+        int dlc;
         // true if the weapon doesn't get a strength bonus when two-handing
         bool paired;
         // true if this weapon can cast glintstone sorceries
@@ -376,6 +515,8 @@ export namespace erdo::calculator
             return result;
         }();
 
+
+        std::shared_ptr<Moveset> moveset;
 
         std::string fandom_url() const
         {
@@ -697,6 +838,228 @@ export namespace erdo::calculator
             Attack attack{ weapon, stats, attack_options };
             attack.calculate_inplace();
             return attack;
+        }
+    };
+    struct MoveSelection {
+        MoveId id;
+        // Unset selects the whole move. Indices follow the imported hit order.
+        std::optional<std::size_t> hit_index;
+    };
+
+    constexpr bool move_uses_two_hands(MoveId id)
+    {
+        return (id >= MoveId::TWO_HAND_R1_1 && id <= MoveId::TWO_HAND_GUARD_COUNTER) ||
+            id == MoveId::TWO_HAND_R1_6 || id == MoveId::TWO_HAND_CHARGED_R2_1_FEINT ||
+            id == MoveId::TWO_HAND_CHARGED_R2_2_FEINT;
+    }
+
+    const Move* find_move(const Weapon& weapon, MoveId id)
+    {
+        if (!weapon.moveset)
+            return nullptr;
+        const auto found = std::ranges::find(weapon.moveset->moves, id, &Move::id);
+        return found == weapon.moveset->moves.end() ? nullptr : &*found;
+    }
+
+    // Base/full values use the same convention as AttackRating. These are raw
+    // MV-adjusted powers, before critical bonuses, other modifiers or defense.
+    struct MoveAttackPowers {
+        AttackPowers attack_powers{};
+        AttackPower total_attack_power{};
+    };
+
+    struct HitAttack {
+        ResolvedHit hit;
+        MoveAttackPowers powers;
+        bool active = true;
+    };
+
+    struct MoveAttack {
+        MoveId id;
+        std::vector<HitAttack> hits;
+        MoveAttackPowers total;
+
+        const MoveAttackPowers& selected_powers(std::optional<std::size_t> hit_index = std::nullopt) const
+        {
+            return hit_index ? hits.at(*hit_index).powers : total;
+        }
+    };
+
+    std::expected<double, std::string> motion_multiplier(const ResolvedHit& hit, std::size_t channel)
+    {
+        if (!hit.motionValues.known.at(channel))
+            return std::unexpected(std::format("Unknown motion value for attack {} channel {}", hit.atkParamId, channel));
+        const double value = hit.motionValues.values.at(channel) / 100.;
+        if (!std::isfinite(value))
+            return std::unexpected(std::format("Non-finite motion value for attack {} channel {}", hit.atkParamId, channel));
+        return value;
+    }
+
+    // 0 means the weapon being evaluated, including offhand/mounted contexts.
+    // Source-less type-304 criticals use that weapon too. Other sources must
+    // be recognized explicitly; never silently treat an unknown source as right.
+    std::expected<bool, std::string> hit_uses_secondary_weapon(const ResolvedHit& hit)
+    {
+        switch (hit.event.source) {
+        case 0: case 1: return false;
+        case 2: return true;
+        case -1:
+            if (hit.event.eventType == 304)
+                return false;
+            break;
+        }
+        return std::unexpected(std::format("Unsupported attack source {}", hit.event.source));
+    }
+
+    // Flags are fixed for this evaluation. The caller supplies their activity;
+    // weapon IDs, behavior namespaces and attack indices do not imply it.
+    struct MoveContext {
+        std::map<int, bool> state_info;
+    };
+
+    enum class MoveEnvironment { ORDINARY_COMBAT, RYKARD_ARENA_EFFECT };
+
+    // Native m16 events grant/remove SpEffect 1908, whose stateInfo is 187.
+    // These scenarios decide only that verified flag; other conditions stay unknown.
+    MoveContext move_context(MoveEnvironment environment)
+    {
+        switch (environment) {
+        case MoveEnvironment::ORDINARY_COMBAT: return {{{187, false}}};
+        case MoveEnvironment::RYKARD_ARENA_EFFECT: return {{{187, true}}};
+        }
+        throw std::invalid_argument("Unsupported move environment");
+    }
+
+    std::expected<bool, std::string> attack_event_active(const AttackEvent& event, const MoveContext& context)
+    {
+        const int condition = event.stateInfo.value_or(0);
+        if (condition <= 0)
+            return true;
+        const auto found = context.state_info.find(condition);
+        if (found == context.state_info.end())
+            return std::unexpected(std::format("Unknown TAE StateInfo condition {} for animation {} judge {}",
+                condition, event.animationId, event.behaviorJudgeId));
+        return found->second;
+    }
+
+    // Eligibility for the calculator's opposing-target powers, not contact.
+    std::expected<bool, std::string> attack_hit_active(const ResolvedHit& hit, const MoveContext& context)
+    {
+        if (hit.opposeTarget == false) return false;
+        return attack_event_active(hit.event, context);
+    }
+
+    std::expected<MoveAttack, std::string> calculate_move(
+        const Move& move, const AttackRating& primary, const AttackRating* secondary = nullptr,
+        const MoveContext& context = {})
+    {
+        if (move.hits.empty())
+            return std::unexpected("Move has no hits");
+        MoveAttack result{move.id};
+        result.hits.reserve(move.hits.size());
+        for (const auto& hit : move.hits) {
+            // These powers describe an opposing target. Keep ineligible events
+            // in hit order, but they need no source, MV or activation decision.
+            const auto active = attack_hit_active(hit, context);
+            if (!active)
+                return std::unexpected(active.error());
+            HitAttack evaluated{hit};
+            evaluated.active = *active;
+            if (!*active) {
+                // Retain ordered hit identity for selected-hit objectives.
+                result.hits.push_back(std::move(evaluated));
+                continue;
+            }
+            const auto secondary_source = hit_uses_secondary_weapon(hit);
+            if (!secondary_source)
+                return std::unexpected(secondary_source.error());
+            if (*secondary_source && !secondary)
+                return std::unexpected("Move requires an explicit second weapon");
+            const auto& rating = *secondary_source ? *secondary : primary;
+            for (std::size_t channel = 0; channel < evaluated.powers.attack_powers.size(); ++channel) {
+                const auto multiplier = motion_multiplier(hit, channel);
+                if (!multiplier)
+                    return std::unexpected(multiplier.error());
+                for (std::size_t component = 0; component < AttackPower{}.size(); ++component) {
+                    const double value = rating.attack_powers[channel][component] * *multiplier;
+                    if (!std::isfinite(value))
+                        return std::unexpected("Non-finite move attack power");
+                    evaluated.powers.attack_powers[channel][component] = value;
+                    result.total.attack_powers[channel][component] += value;
+                    if (!std::isfinite(result.total.attack_powers[channel][component]))
+                        return std::unexpected("Non-finite move attack power total");
+                    if (channel < enumerators_of<DamageType>().size()) {
+                        evaluated.powers.total_attack_power[component] += value;
+                        result.total.total_attack_power[component] += value;
+                        if (!std::isfinite(evaluated.powers.total_attack_power[component]) ||
+                            !std::isfinite(result.total.total_attack_power[component]))
+                            return std::unexpected("Non-finite move attack power total");
+                    }
+                }
+            }
+            result.hits.push_back(std::move(evaluated));
+        }
+        return result;
+    }
+
+    struct MoveEvaluation {
+        MoveId id;
+        std::expected<MoveAttack, std::string> result;
+    };
+
+    // Compute weapon scaling once per stance, then reuse it for every move.
+    // Supplying the primary weapon again explicitly evaluates a matching pair.
+    class MoveEvaluator {
+        Attack one_handed_;
+        Attack two_handed_;
+        std::optional<Attack> secondary_;
+        MoveContext context_;
+
+    public:
+        MoveEvaluator(const Weapon& weapon, const AttributeLevels& stats, const UpgradeLevels& upgrades,
+                      const Weapon* secondary = nullptr, MoveContext context = {})
+            : one_handed_(Attack::calculate(weapon, stats, {upgrades, false})),
+              two_handed_(Attack::calculate(weapon, stats, {upgrades, true})),
+              context_(std::move(context))
+        {
+            if (secondary)
+                secondary_ = Attack::calculate(*secondary, stats, {upgrades, false});
+        }
+
+        std::expected<MoveAttack, std::string> evaluate(MoveId id) const
+        {
+            const auto& weapon = one_handed_.weapon.get();
+            const auto* move = find_move(weapon, id);
+            if (!move)
+                return std::unexpected("Weapon has no imported mapping for this move");
+            bool requires_secondary = false;
+            for (const auto& hit : move->hits) {
+                const auto active = attack_hit_active(hit, context_);
+                if (!active)
+                    return std::unexpected(active.error());
+                requires_secondary |= *active && hit.event.source == 2;
+            }
+            if (requires_secondary) {
+                if (!secondary_)
+                    return std::unexpected("Move requires an explicit second weapon");
+                const auto& other = secondary_->weapon.get();
+                if (!other.moveset || weapon.moveset->motionCategory != other.moveset->motionCategory ||
+                    weapon.moveset->behaviorVariation != other.moveset->behaviorVariation)
+                    return std::unexpected("Mixed moveset Powerstance behavior is not validated");
+            }
+            const AttackRating& primary = move_uses_two_hands(id) ? two_handed_ : one_handed_;
+            return calculate_move(*move, primary, secondary_ ? &*secondary_ : nullptr, context_);
+        }
+
+        std::vector<MoveEvaluation> evaluate_all() const
+        {
+            std::vector<MoveEvaluation> results;
+            if (const auto& moveset = one_handed_.weapon.get().moveset) {
+                results.reserve(moveset->moves.size());
+                for (const auto& move : moveset->moves)
+                    results.push_back({move.id, evaluate(move.id)});
+            }
+            return results;
         }
     };
 } // namespace erdo::calculator

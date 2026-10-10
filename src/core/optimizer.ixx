@@ -867,19 +867,147 @@ namespace erdo::optimizer
         sizeof(EfficientCalculateAttack<target>);
     };
 
+    export struct MoveObjective {
+        MoveSelection selection;
+        // Explicitly compare two copies of each candidate weapon. Optimizing
+        // independently equipped weapon pairs requires a separate search space.
+        bool matching_powerstance = false;
+        MoveContext context;
+    };
+
+    struct PreparedMoveObjective {
+        BaseAttackPowers multipliers{};
+
+        double operator()(const Attack& attack) const
+        {
+            double value = 0.;
+            for (std::size_t channel = 0; channel < multipliers.size(); ++channel)
+                if (multipliers[channel] != 0.)
+                    value += attack.attack_powers[channel][1] * multipliers[channel];
+            return value;
+        }
+    };
+
+    std::expected<PreparedMoveObjective, std::string> prepare_move_objective(
+        const Weapon& weapon, const MoveObjective& objective, std::optional<AttackPowerType> type)
+    {
+        const auto* move = find_move(weapon, objective.selection.id);
+        if (!move)
+            return std::unexpected("Weapon has no imported mapping for this move");
+        if (move->hits.empty())
+            return std::unexpected("Move has no hits");
+        if (objective.selection.hit_index && *objective.selection.hit_index >= move->hits.size())
+            return std::unexpected("Selected hit does not exist for this weapon");
+        const auto first = objective.selection.hit_index.value_or(0);
+        const auto end = objective.selection.hit_index ? first + 1 : move->hits.size();
+        const std::size_t first_channel = type ? std::to_underlying(*type) : 0;
+        const std::size_t end_channel = type ? first_channel + 1 : enumerators_of<DamageType>().size();
+        PreparedMoveObjective result;
+        for (std::size_t i = first; i < end; ++i) {
+            const auto& hit = move->hits[i];
+            const auto active = attack_hit_active(hit, objective.context);
+            if (!active)
+                return std::unexpected(active.error());
+            if (!*active)
+                continue;
+            const auto secondary = hit_uses_secondary_weapon(hit);
+            if (!secondary)
+                return std::unexpected(secondary.error());
+            if (*secondary && !objective.matching_powerstance)
+                return std::unexpected("Powerstance optimization requires an explicit matching pair");
+            for (std::size_t channel = first_channel; channel < end_channel; ++channel) {
+                const auto multiplier = motion_multiplier(hit, channel);
+                if (!multiplier)
+                    return std::unexpected(multiplier.error());
+                result.multipliers[channel] += *multiplier;
+                if (!std::isfinite(result.multipliers[channel]))
+                    return std::unexpected("Non-finite move multiplier total");
+            }
+        }
+        return result;
+    }
+
+    export std::optional<std::string> move_unsupported_reason(
+        const Weapon& weapon, const MoveObjective& objective, Target target)
+    {
+        std::optional<AttackPowerType> type;
+        if (target != Target::TOTAL_ATTACK_POWER) {
+            const auto channel = std::to_underlying(target) - std::to_underlying(Target::PHYSICAL_ATTACK_POWER);
+            if (!is_valid_enum_integral<AttackPowerType>(channel))
+                return "This optimization target does not support moves";
+            type = integral_to_enum<AttackPowerType>(channel);
+        }
+        const auto prepared = prepare_move_objective(weapon, objective, type);
+        return prepared ? std::nullopt : std::optional{prepared.error()};
+    }
+
+    template<Target target>
+    struct SelectedProjection {
+        std::optional<MoveObjective> move_objective;
+
+        explicit SelectedProjection(std::optional<MoveObjective> objective = std::nullopt)
+            : move_objective(std::move(objective))
+        {
+            if constexpr (target == Target::SPELL_SCALING)
+                if (move_objective)
+                    throw std::invalid_argument("A weapon move cannot be used as a spell-scaling objective");
+        }
+
+        std::expected<PreparedMoveObjective, std::string> prepare(const Weapon& weapon) const
+        {
+            if (!move_objective)
+                return PreparedMoveObjective{};
+            if constexpr (target == Target::TOTAL_ATTACK_POWER)
+                return prepare_move_objective(weapon, *move_objective, std::nullopt);
+            else if constexpr (requires { Projection<target>::attack_power_type; })
+                return prepare_move_objective(weapon, *move_objective, Projection<target>::attack_power_type);
+            else
+                return std::unexpected("This optimization target does not support moves");
+        }
+
+        double operator()(const Attack& attack) const
+        {
+            if (!move_objective)
+                return Projection<target>{}(attack);
+            const auto prepared = prepare(attack.weapon.get());
+            if (!prepared)
+                throw std::invalid_argument(prepared.error());
+            return (*prepared)(attack);
+        }
+    };
+
     template<Target target_> requires valid_optimizer_target<target_>
     struct OptimizerBase
     {
         static constexpr auto target = target_;
-        static constexpr Projection<target> projection{};
+        SelectedProjection<target> projection;
         static constexpr EfficientCalculateAttack<target> efficient_calculate_attack{};
 
-        static Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options, const std::vector<AttributeLevels>& stat_variations)
+        explicit OptimizerBase(std::optional<MoveObjective> objective = std::nullopt)
+            : projection(std::move(objective)) {}
+
+        std::optional<std::string> unsupported_reason(const Weapon& weapon) const
+        {
+            const auto prepared = projection.prepare(weapon);
+            return prepared ? std::nullopt : std::optional{prepared.error()};
+        }
+
+        bool supports(const Weapon& weapon) const { return !unsupported_reason(weapon); }
+
+        Attack optimize_weapon(const Weapon& weapon, const AttackOptions& attack_options,
+                               const std::vector<AttributeLevels>& stat_variations) const
         {
             if (stat_variations.empty())
                 throw std::invalid_argument("stat_variations must not be empty.");
 
-            Attack attack{ weapon, {}, attack_options };
+            // Prepare the selected move once, not for every stat distribution.
+            const auto prepared = projection.prepare(weapon);
+            if (!prepared)
+                throw std::invalid_argument(prepared.error());
+            auto options = attack_options;
+            if (projection.move_objective)
+                options.two_handing = move_uses_two_hands(projection.move_objective->selection.id);
+            Attack attack{ weapon, {}, options };
             AttributeLevels const* best_stats = nullptr;
             auto best_value = std::numeric_limits<std::remove_cvref_t<decltype(projection(attack))>>::lowest();
 
@@ -888,7 +1016,7 @@ namespace erdo::optimizer
                 attack.stats = stats;
                 efficient_calculate_attack(attack);
 
-                auto new_value = projection(attack);
+                auto new_value = projection.move_objective ? (*prepared)(attack) : Projection<target>{}(attack);
                 if (best_value < new_value ||
                     (best_stats && best_value == new_value && character_level(*best_stats) > character_level(attack.stats)))
                 {
@@ -906,6 +1034,7 @@ namespace erdo::optimizer
         std::vector<Attack> run_synchronously(this const auto& self, const std::ranges::sized_range auto& weapons)
         {
             return weapons
+                | std::views::filter([&](const Weapon& weapon) { return self.supports(weapon); })
                 | std::views::transform(self)
                 | std::ranges::to<std::vector>();
         }
@@ -925,8 +1054,9 @@ namespace erdo::optimizer
             int max_attribute_points,
             const AttributeLevels &min_attr_lvls,
             int max_attr_lvl,
-            bool optimize_starting_class
-        ) : attack_options{ attack_options }
+            bool optimize_starting_class,
+            std::optional<MoveObjective> move_objective = std::nullopt
+        ) : OptimizerBase<target>{std::move(move_objective)}, attack_options{ attack_options }
         {
             auto max_attr_lvls = make_filled_array<AttributeLevels>(max_attr_lvl);
 
@@ -949,7 +1079,8 @@ namespace erdo::optimizer
                 );
             }
             
-            this->iteration_count = this->stat_variations.size() * weapons.size();
+            this->iteration_count = this->stat_variations.size() *
+                std::ranges::count_if(weapons, [&](const Weapon& weapon) { return this->supports(weapon); });
         }
 
         Attack operator()(const Weapon& weapon) const
@@ -1004,13 +1135,16 @@ namespace erdo::optimizer
             int max_attribute_points,
             const AttributeLevels &min_attr_lvls,
             int max_attr_lvl,
-            bool optimize_starting_class
-        ) : attack_options{ attack_options }
+            bool optimize_starting_class,
+            std::optional<MoveObjective> move_objective = std::nullopt
+        ) : OptimizerBase<target>{std::move(move_objective)}, attack_options{ attack_options }
         {
             auto max_attr_lvls = make_filled_array<AttributeLevels>(max_attr_lvl);
 
             for (auto&& weapon : weapons)
             {
+                if (!this->supports(weapon))
+                    continue;
                 auto&& nonscaling_attributes = std::invoke(&Weapon::nonscaling_attributes, weapon);
                 auto [it, inserted] = this->optimized_stat_variations_map.try_emplace(nonscaling_attributes);
                 auto&& optimized_stat_variations = it->second;
@@ -1049,6 +1183,8 @@ namespace erdo::optimizer
 
         Attack operator()(const Weapon& weapon) const
         {
+            if (const auto reason = this->unsupported_reason(weapon))
+                throw std::invalid_argument(*reason);
             auto&& optimized_stat_variations = this->optimized_stat_variations_map.at(weapon.nonscaling_attributes);
             return this->optimize_weapon(weapon, attack_options, optimized_stat_variations);
         }

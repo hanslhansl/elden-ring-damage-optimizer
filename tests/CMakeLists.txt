@@ -6,37 +6,54 @@ CPMAddPackage(
 list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 include(Catch)
 
-function(configure_test_executable target erdo_core_library test_prefix)
-    # add an executable for the test
-    add_executable(${target} tests.cpp)
+option(ERDO_TEST_COVERAGE "Instrument the core and tests for LLVM coverage (Clang)" OFF)
+option(ERDO_TEST_BENCHMARKS "Enable Catch2 benchmark sections in the tests" OFF)
 
-    # link to the core library and Catch2
-    target_link_libraries(${target} PRIVATE
-        ${erdo_core_library}
-        Catch2::Catch2WithMain
-    )
+# Local game XML is optional; the portable importer checks always run.
+set(ERDO_MOVESET_XML_ROOT "" CACHE PATH "Directory containing unpacked moveset XML")
+set(ERDO_MOVESET_BEHAVIOR_XML "" CACHE FILEPATH "Optional HKLib XML export of the player behavior graph")
 
-    # copy game data to build directory
-    copy_game_data(${target})
+add_executable(tests tests.cpp moveset_tests.cpp move_calculation_tests.cpp behavior_graph_tests.cpp)
+target_link_libraries(tests PRIVATE erdo_core Catch2::Catch2WithMain)
 
-    # discover tests
-    catch_discover_tests(
-        ${target}
-        TEST_PREFIX "${test_prefix}."
-        WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target}>"
-    )
-endfunction()
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+target_sources(tests PRIVATE ui_move_tests.cpp)
+target_link_libraries(tests PRIVATE erdo_ui Qt6::Widgets)
+set(test_dll_paths "$<TARGET_FILE_DIR:Qt6::Core>" "$<TARGET_FILE_DIR:kdchart>")
 
-# normal tests
-configure_test_executable(tests erdo_core "normal")
+if(ERDO_MOVESET_XML_ROOT)
+    file(TO_CMAKE_PATH "${ERDO_MOVESET_XML_ROOT}" moveset_xml_root)
+    target_compile_definitions(tests PRIVATE ERDO_MOVESET_XML_ROOT="${moveset_xml_root}")
+endif()
 
-# tests with coverage instrumentation
-configure_erdo_core_library(erdo_core_with_coverage)
-target_compile_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
-target_compile_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>")
-target_link_options(erdo_core_with_coverage PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>")
-configure_test_executable(test_with_coverage erdo_core_with_coverage "coverage")
+if(ERDO_MOVESET_BEHAVIOR_XML)
+    file(TO_CMAKE_PATH "${ERDO_MOVESET_BEHAVIOR_XML}" moveset_behavior_xml)
+    target_compile_definitions(tests PRIVATE ERDO_MOVESET_BEHAVIOR_XML="${moveset_behavior_xml}")
+endif()
 
-# tests with benchmarks
-configure_test_executable(test_with_benchmarks erdo_core "benchmarks")
-target_compile_definitions(test_with_benchmarks PUBLIC ENABLE_BENCHMARKS)
+set(test_properties)
+if(ERDO_TEST_COVERAGE)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(Clang|AppleClang)$")
+        message(FATAL_ERROR "ERDO_TEST_COVERAGE requires Clang/LLVM coverage support.")
+    endif()
+
+    # Reuse the core library; this build's consumers also need coverage flags
+    # and the profiling runtime. No second core library is compiled.
+    target_compile_options(erdo_core PUBLIC -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(erdo_core PUBLIC -fprofile-instr-generate)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/profiles")
+    # CTest runs each case in its own process, possibly in parallel.
+    set(test_properties ENVIRONMENT "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/profiles/erdo-%p.profraw")
+endif()
+
+if(ERDO_TEST_BENCHMARKS)
+    target_compile_definitions(tests PRIVATE ENABLE_BENCHMARKS)
+endif()
+
+copy_game_data(tests)
+catch_discover_tests(tests
+    TEST_PREFIX "normal."
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:tests>"
+    DL_PATHS ${test_dll_paths}
+    PROPERTIES ${test_properties}
+)
