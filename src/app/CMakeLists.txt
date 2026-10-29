@@ -1,4 +1,5 @@
-﻿find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent PrintSupport Network)
+﻿# add Qt6
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Concurrent PrintSupport Network)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)

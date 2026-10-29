@@ -16,10 +16,10 @@ set(ERDO_MOVESET_BEHAVIOR_XML "" CACHE FILEPATH "Optional HKLib XML export of th
 add_executable(tests tests.cpp moveset_tests.cpp move_calculation_tests.cpp behavior_graph_tests.cpp)
 target_link_libraries(tests PRIVATE erdo_core Catch2::Catch2WithMain)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-target_sources(tests PRIVATE ui_move_tests.cpp)
-target_link_libraries(tests PRIVATE erdo_ui Qt6::Widgets)
-set(test_dll_paths "$<TARGET_FILE_DIR:Qt6::Core>" "$<TARGET_FILE_DIR:kdchart>")
+# QTemporaryDir in behavior_graph_tests.cpp needs QtCore.
+find_package(Qt6 REQUIRED COMPONENTS Core)
+target_link_libraries(tests PRIVATE Qt6::Core)
+set(test_dll_paths "$<TARGET_FILE_DIR:Qt6::Core>")
 
 if(ERDO_MOVESET_XML_ROOT)
     file(TO_CMAKE_PATH "${ERDO_MOVESET_XML_ROOT}" moveset_xml_root)

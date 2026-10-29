@@ -18,8 +18,6 @@
 #include <QNetworkRequest>
 #include <QTimer>
 #include <QVersionNumber>
-#include <QTableWidget>
-#include <QStandardItemModel>
 #include "ui_main_window.h"
 #include "ui_stats_tab.h"
 #include "ui_optimize_widget.h"
@@ -205,7 +203,7 @@ namespace erdo::ui
         std::shared_ptr<const calculator::GameData> active_game_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
 
-        QSet<int> base_game_dlc_filter{};
+        QSet<bool> base_game_dlc_filter{};
         QSet<int> type_filter{};
         QSet<QString> base_name_filter{};
         QSet<int> affinity_filter{};
@@ -220,7 +218,7 @@ namespace erdo::ui
             for (int i = 0; i < this->base_game_dlc_list->count(); ++i)
             {
                 auto item = this->base_game_dlc_list->item(i);
-                const auto dlc_value = item->data(Qt::UserRole).toInt();
+                const auto dlc_value = item->data(Qt::UserRole).toBool();
                 auto visible = true;
                 item->setHidden(!visible);
                 if (visible && item->isSelected())
@@ -335,7 +333,6 @@ namespace erdo::ui
                 sections::AttackPowers,
                 sections::StatusEffects,
                 sections::SpellScaling,
-                sections::MoveScore,
                 sections::StartingClasses,
                 sections::Stats,
                 sections::Requirements,
@@ -417,7 +414,6 @@ namespace erdo::ui
             this->weapon_table = new WeaponTable<Row>(false, "No items to display", this);
             this->weapon_table->set_section_hidden<sections::UpgradeLevel>(true);
             this->weapon_table->set_section_hidden<sections::TwoHanding>(true);
-            this->weapon_table->set_section_hidden<sections::MoveScore>(true);
 
             this->main_layout->addWidget(this->weapon_table, 1);
         };
@@ -453,7 +449,7 @@ namespace erdo::ui
                 | std::ranges::to<std::set>()
             )
             {
-                auto item = new QListWidgetItem(dlc ? QString("DLC %1").arg(dlc) : QString("Base Game"), this->base_game_dlc_list);
+                auto item = new QListWidgetItem(dlc ? "DLC" : "Base Game", this->base_game_dlc_list);
                 item->setData(Qt::UserRole, dlc);
             }
 
@@ -500,183 +496,8 @@ namespace erdo::ui
         void filter_changed();
     };
 
-    class MoveSelector : public QGroupBox
+    class StatsTab : public StatsTabBase
     {
-        Q_OBJECT
-        bool all_moves_mode_;
-        std::map<calculator::MoveId, std::pair<std::string, std::size_t>> moves_;
-
-        void update_hits()
-        {
-            const QSignalBlocker blocker(hit);
-            std::size_t count = 0;
-            if (const auto selected = selection())
-                count = moves_.at(selected->id).second;
-            else if (all_moves_mode_)
-                for (const auto& [id, description] : moves_)
-                    count = std::max(count, description.second);
-            hit->setMaximum(static_cast<int>(count));
-            hit->setEnabled(count > 0);
-            matching_pair->setEnabled(count > 0);
-            environment->setEnabled(count > 0);
-        }
-
-    public:
-        QComboBox* move = new QComboBox(this);
-        QSpinBox* hit = new QSpinBox(this);
-        QCheckBox* matching_pair = new QCheckBox("Matching weapon in both hands", this);
-        QComboBox* environment = new QComboBox(this);
-        QLabel* status = new QLabel(this);
-
-        explicit MoveSelector(bool all_moves_mode, QWidget* parent = nullptr)
-            : QGroupBox("Move", parent), all_moves_mode_(all_moves_mode)
-        {
-            auto* layout = new QHBoxLayout(this);
-            move->setObjectName("moveSelection");
-            hit->setObjectName("moveHitSelection");
-            matching_pair->setObjectName("matchingPowerstance");
-            environment->setObjectName("moveEnvironment");
-            environment->addItem("Ordinary combat", std::to_underlying(calculator::MoveEnvironment::ORDINARY_COMBAT));
-            environment->addItem("Rykard arena effect", std::to_underlying(calculator::MoveEnvironment::RYKARD_ARENA_EFFECT));
-            environment->setToolTip("Select whether the Rykard arena effect is active. Powers do not establish which attack hitboxes make contact.");
-            hit->setMinimum(0);
-            hit->setSpecialValueText("All hits");
-            hit->setPrefix("Hit ");
-            hit->setToolTip("Hit numbers follow the move's attack order. All hits selects the move total.");
-            matching_pair->setToolTip("For Powerstance, use two copies of the same weapon, affinity and upgrade level.");
-            move->addItem(all_moves_mode_ ? "All moves" : "Weapon attack power", -1);
-            layout->addWidget(move, 1);
-            layout->addWidget(hit);
-            layout->addWidget(matching_pair);
-            layout->addWidget(environment);
-            layout->addWidget(status, 1);
-            status->setWordWrap(true);
-            connect(move, &QComboBox::currentIndexChanged, this, [this] {
-                { const QSignalBlocker blocker(hit); hit->setValue(0); }
-                update_hits();
-                emit changed();
-            });
-            connect(hit, &QSpinBox::valueChanged, this, [this] { emit changed(); });
-            connect(matching_pair, &QCheckBox::toggled, this, [this] { emit changed(); });
-            connect(environment, &QComboBox::currentIndexChanged, this, [this] { emit changed(); });
-            update_hits();
-        }
-
-        std::optional<calculator::MoveSelection> selection() const
-        {
-            const int id = move->currentData().toInt();
-            if (move->currentIndex() <= 0 || id < 0)
-                return std::nullopt;
-            return calculator::MoveSelection{static_cast<calculator::MoveId>(id),
-                hit->value() ? std::optional<std::size_t>{static_cast<std::size_t>(hit->value() - 1)} : std::nullopt};
-        }
-
-        std::optional<optimizer::MoveObjective> objective() const
-        {
-            const auto selected = selection();
-            return selected ? std::optional{optimizer::MoveObjective{*selected, matching_pair->isChecked(), context()}} : std::nullopt;
-        }
-
-        calculator::MoveContext context() const
-        {
-            return calculator::move_context(static_cast<calculator::MoveEnvironment>(environment->currentData().toInt()));
-        }
-
-        void set_moves(const std::vector<std::reference_wrapper<const calculator::Weapon>>& weapons)
-        {
-            const QSignalBlocker blocker(this);
-            const auto previous = move->currentData();
-            const int previous_hit = hit->value();
-            moves_.clear();
-            for (const auto& weapon : weapons)
-                if (const auto& moveset = weapon.get().moveset)
-                    for (const auto& entry : moveset->moves) {
-                        auto& description = moves_[entry.id];
-                        description.first = entry.name;
-                        description.second = std::max(description.second, entry.hits.size());
-                    }
-            const QSignalBlocker move_blocker(move);
-            move->clear();
-            move->addItem(all_moves_mode_ ? "All moves" : "Weapon attack power", -1);
-            for (const auto& [id, description] : moves_)
-                move->addItem(QString::fromStdString(description.first), std::to_underlying(id));
-            move->setCurrentIndex(std::max(0, move->findData(previous)));
-            move->setEnabled(!moves_.empty());
-            update_hits();
-            hit->setValue(previous_hit);
-        }
-
-    signals:
-        void changed();
-    };
-
-    export class StatsTab : public StatsTabBase
-    {
-        MoveSelector* move_selector = new MoveSelector(true, this);
-        QTableWidget* move_results = new QTableWidget(this);
-
-        void refresh_moves()
-        {
-            move_results->setRowCount(0);
-            const auto index = weapon_table->proxy_model->mapToSource(weapon_table->currentIndex());
-            if (!index.isValid() || index.row() >= weapon_table->model->rowCount()) {
-                move_selector->set_moves({});
-                move_selector->status->setText("Select a weapon to view its moves.");
-                return;
-            }
-            const auto& attack = weapon_table->model->rows.at(index.row()).attack;
-            const auto& weapon = attack.weapon.get();
-            move_selector->set_moves({std::cref(weapon)});
-            if (!weapon.moveset) {
-                move_selector->status->setText("No moveset available for this weapon in the loaded game data.");
-                return;
-            }
-            move_selector->status->setText("MV-adjusted power and buildup; before critical bonuses and enemy defenses. Stance follows the move.");
-            const calculator::MoveEvaluator evaluator(weapon, attack.stats, attack.upgrade_levels,
-                move_selector->matching_pair->isChecked() ? &weapon : nullptr, move_selector->context());
-            const auto selected = move_selector->selection();
-            auto append = [&](const QString& name, const QString& hit, const calculator::MoveAttackPowers* powers,
-                              const QString& diagnostic = {}) {
-                const int row = move_results->rowCount();
-                move_results->insertRow(row);
-                move_results->setItem(row, 0, new QTableWidgetItem(name));
-                move_results->setItem(row, 1, new QTableWidgetItem(hit));
-                if (!powers) {
-                    auto* item = new QTableWidgetItem(diagnostic);
-                    item->setToolTip(diagnostic);
-                    move_results->setItem(row, 2, item);
-                    return;
-                }
-                move_results->setItem(row, 2, new QTableWidgetItem(QString::number(powers->total_attack_power[1], 'g', 10)));
-                for (std::size_t channel = 0; channel < powers->attack_powers.size(); ++channel)
-                    move_results->setItem(row, static_cast<int>(channel) + 3,
-                        new QTableWidgetItem(QString::number(powers->attack_powers[channel][1], 'g', 10)));
-            };
-            for (const auto& move : weapon.moveset->moves) {
-                if (selected && selected->id != move.id)
-                    continue;
-                const auto name = QString::fromStdString(move.name);
-                const int hit_number = move_selector->hit->value();
-                if (hit_number > 0) {
-                    const auto result = evaluator.evaluate_hit(move.id, static_cast<std::size_t>(hit_number - 1));
-                    if (!result)
-                        append(name, QString("Hit %1").arg(hit_number), nullptr, QString::fromStdString(result.error()));
-                    else
-                        append(name, QString("Hit %1%2").arg(hit_number).arg(result->active ? "" : " (inactive)"), &result->powers);
-                    continue;
-                }
-                const auto result = evaluator.evaluate(move.id);
-                if (!result) {
-                    append(name, "Unsupported", nullptr, QString::fromStdString(result.error()));
-                    continue;
-                }
-                append(name, "All hits", &result->total);
-                for (std::size_t hit = 0; hit < result->hits.size(); ++hit)
-                    append(name, QString("Hit %1%2").arg(hit + 1).arg(result->hits[hit].active ? "" : " (inactive)"), &result->hits[hit].powers);
-            }
-            move_results->resizeColumnsToContents();
-        }
-
     public:
         explicit StatsTab(QWidget *parent = nullptr) : StatsTabBase(parent)
         {
@@ -703,29 +524,10 @@ namespace erdo::ui
             // weapon table view
             this->weapon_table->set_section_hidden<sections::CharacterLevel>(true);
             this->weapon_table->set_section_hidden<sections::Stats>(true);
-            main_layout->addWidget(move_selector);
-            move_results->setObjectName("moveResults");
-            QStringList headers{"Move", "Hit", "Total / availability"};
-            for (auto type : enumerators_of<calculator::AttackPowerType>())
-                headers.push_back(enum_to_display(type));
-            move_results->setColumnCount(headers.size());
-            move_results->setHorizontalHeaderLabels(headers);
-            move_results->setEditTriggers(QAbstractItemView::NoEditTriggers);
-            move_results->setMinimumHeight(180);
-            main_layout->addWidget(move_results, 1);
-            connect(move_selector, &MoveSelector::changed, this, &StatsTab::refresh_moves);
-            connect(weapon_table->selectionModel(), &QItemSelectionModel::currentRowChanged,
-                this, [this] { refresh_moves(); });
-            connect(weapon_table->model, &QAbstractItemModel::dataChanged, this, [this] { refresh_moves(); });
-            connect(weapon_table->model, &QAbstractItemModel::modelReset, this, [this] {
-                weapon_table->setCurrentIndex(weapon_table->proxy_model->index(0, 0));
-                refresh_moves();
-            });
         }
 
         void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            const auto previous_data = this->active_game_data; // Retain row references during filter signals.
             this->StatsTabBase::set_active_game_data(std::move(active_game_data));
 
             // temporary attack object to avoid copying the weapon data multiple times
@@ -746,8 +548,6 @@ namespace erdo::ui
         
         void calculate_weapon_stats()
         {
-            if (!active_game_data)
-                return;
             // get character stats
             auto stats = this->get_character_stats();
 
@@ -767,34 +567,16 @@ namespace erdo::ui
         }
     };
 
-    export class OptimizeTab : public StatsTabBase, public Ui::OptimizeWidget
+    class OptimizeTab : public StatsTabBase, public Ui::OptimizeWidget
     {
         std::vector<std::reference_wrapper<const calculator::Weapon>> filtered_active_game_data{};
-        MoveSelector* move_selector = new MoveSelector(false, this);
 
         QSpinBox* max_character_level_spinbox{};
         QLabel* max_attribute_points_label{};
         QLabel* free_attribute_points_label{};
 
-        void update_move_selection()
-        {
-            const bool selected = move_selector->selection().has_value();
-            two_handing_checkbox->setEnabled(!selected);
-            weapon_table->set_section_hidden<sections::MoveScore>(!selected);
-            auto* targets = qobject_cast<QStandardItemModel*>(target_combobox->model());
-            targets->item(std::to_underlying(optimizer::Target::SPELL_SCALING))->setEnabled(!selected);
-            if (selected && target_combobox->currentIndex() == std::to_underlying(optimizer::Target::SPELL_SCALING))
-                target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
-            weapon_table->model->set_rows({});
-            filter_active_game_data();
-        }
-
         void filter_active_game_data()
         {
-            if (!active_game_data)
-                return;
-            const auto objective = move_selector->objective();
-            const auto target = static_cast<optimizer::Target>(target_combobox->currentIndex());
             this->filtered_active_game_data.clear();
             this->filtered_active_game_data.reserve(this->active_game_data->weapons.size());
             this->filtered_active_game_data.append_range(this->active_game_data->weapons
@@ -802,15 +584,10 @@ namespace erdo::ui
                     return (this->base_game_dlc_filter.empty() || this->base_game_dlc_filter.contains(w.dlc))
                         && (this->type_filter.empty() || this->type_filter.contains(std::to_underlying(w.type)))
                         && (this->base_name_filter.empty() || this->base_name_filter.contains(QString::fromStdString(w.base_name)))
-                        && (this->affinity_filter.empty() || this->affinity_filter.contains(std::to_underlying(w.affinity)))
-                        && (!objective || !optimizer::move_unsupported_reason(w, *objective, target));
+                        && (this->affinity_filter.empty() || this->affinity_filter.contains(std::to_underlying(w.affinity)));
                 })
             );
             this->weapons_label->setText(QString::number(this->filtered_active_game_data.size()));
-            move_selector->status->setText(objective
-                ? QString("%1 supported weapons. Move scores are before critical bonuses and enemy defenses.")
-                    .arg(filtered_active_game_data.size())
-                : "Optimize weapon attack power or spell scaling.");
 
             this->prepare_optimization();
         }
@@ -854,13 +631,6 @@ namespace erdo::ui
             auto optimize_starting_class = this->optimize_starting_class_checkbox->isChecked();
 
             auto target = static_cast<optimizer::Target>(this->target_combobox->currentIndex());
-            const auto objective = move_selector->objective();
-
-            if (filtered_active_game_data.empty()) {
-                QMessageBox::information(this, "No Supported Weapons",
-                    "No weapons support the selected filters, move and hit. Powerstance requires the matching-weapon option.");
-                return;
-            }
 
             auto optimizer_visitor = [&](const auto& optimizer) {
                 if(optimizer.iteration_count == 0)
@@ -875,12 +645,7 @@ namespace erdo::ui
 
                 auto future = QtConcurrent::mapped(
                     this->filtered_active_game_data,
-                    [&](const calculator::Weapon& weapon) {
-                        Row row(optimizer(weapon));
-                        if (objective)
-                            std::get<sections::MoveScore>(row).set_value(optimizer.projection(row.attack));
-                        return row;
-                    }
+                    [&](const calculator::Weapon& weapon) { return Row(optimizer(weapon)); }
                 );
 
                 std::vector<Row> rows{};
@@ -893,8 +658,6 @@ namespace erdo::ui
                     );
                 }
                 this->weapon_table->model->set_rows(std::move(rows));
-                if (objective)
-                    weapon_table->sortByColumn(Row::section_column_begin_indices[tuple_index_v<sections::MoveScore, Row>], Qt::DescendingOrder);
             };
 
             if (use_v2)
@@ -908,8 +671,7 @@ namespace erdo::ui
                             max_attribute_points,
                             min_stats,
                             calculator::attribute_level_limit, 
-                            optimize_starting_class,
-                            objective
+                            optimize_starting_class
                         };
                         this->v2_variations_label->setText(
                             QString::number(v2_optimizer.iteration_count / this->filtered_active_game_data.size())
@@ -933,8 +695,7 @@ namespace erdo::ui
                             max_attribute_points,
                             min_stats,
                             calculator::attribute_level_limit, 
-                            optimize_starting_class,
-                            objective
+                            optimize_starting_class
                         };
                         this->brute_force_variations_label->setText(
                             QString::number(brute_force_optimizer.iteration_count / this->filtered_active_game_data.size())
@@ -964,7 +725,6 @@ namespace erdo::ui
 
             // max character level label
             max_character_stats_layout->addRow("Max Character Level:", this->max_character_level_spinbox = new QSpinBox());
-            this->max_character_level_spinbox->setObjectName("max_character_level_spinbox");
             this->max_character_level_spinbox->setMinimum(1);
             calculator::AttributeLevels max_stats{};
             max_stats.fill(99);
@@ -1007,12 +767,6 @@ namespace erdo::ui
                 }(), ...);
             }(1);
             this->target_combobox->setCurrentIndex(std::to_underlying(optimizer::Target::TOTAL_ATTACK_POWER));
-            main_layout->insertWidget(1, move_selector);
-            connect(move_selector, &MoveSelector::changed, this, &OptimizeTab::update_move_selection);
-            connect(target_combobox, &QComboBox::currentIndexChanged, this, [this] {
-                weapon_table->model->set_rows({});
-                filter_active_game_data();
-            });
             
             // optimize starting class checkbox
             connect(this->optimize_starting_class_checkbox, &QCheckBox::toggled, this, &OptimizeTab::prepare_optimization);
@@ -1024,16 +778,13 @@ namespace erdo::ui
     
         void set_active_game_data(std::shared_ptr<const calculator::GameData> active_game_data)
         {
-            const auto previous_data = this->active_game_data;
             this->StatsTabBase::set_active_game_data(std::move(active_game_data));
-            move_selector->set_moves(this->active_game_data->weapons
-                | std::views::transform([](const auto& weapon) { return std::cref(weapon); })
-                | std::ranges::to<std::vector>());
-            update_move_selection();
+            this->filter_active_game_data();
+            this->weapon_table->model->set_rows({});
         }
     };
 
-    export class MainWindow : public QMainWindow, public Ui::MainWindow
+    class MainWindow : public QMainWindow, public Ui::MainWindow
     {
         QActionGroup* menu_game_data_group = new QActionGroup(this);
         QMenu *menu_choose_game_data;
@@ -1117,7 +868,6 @@ namespace erdo::ui
             this->plot->set_active_game_data(this->active_game_data);
         }
 
-    public:
         QAction* add_game_data_from_path(std::filesystem::path file)
         {
             file = std::filesystem::canonical(file).make_preferred();
@@ -1150,7 +900,6 @@ namespace erdo::ui
             return action;
         }
 
-    private:
         void load_game_data_from_file_system()
         {
             QString file = QFileDialog::getOpenFileName(
@@ -1225,17 +974,14 @@ namespace erdo::ui
 
             const auto xml_data_directory = (std::filesystem::absolute(QCoreApplication::applicationDirPath().toStdString()) / "xml_data").make_preferred();
 
-            auto [elden_ring_widget, elden_ring_edit] = make_file_picker(
-                "F:/Programme/Steam/steamapps/common/ELDEN RING/Game/eldenring.exe"/*{}*/,
-                "Select Elden Ring Game Directory",
-                "Elden Ring Executable (eldenring.exe);;"
-                "All Executables (*.exe);;"
-                "All Files (*)"
+            auto [elden_ring_widget, elden_ring_edit] = make_directory_picker(
+                {},
+                "Select Elden Ring Game Directory"
             );
             layout->addRow("Elden Ring game directory:", elden_ring_widget);
 
             auto [witchy_widget, witchy_edit] = make_file_picker(
-                "C:/Users/Paul/Downloads/WitchyBND-3.0.1.0-win-x64/WitchyBND.exe"/*{}*/,
+                {},
                 "Select WitchyBND.exe",
                 "WitchyBND Executable (WitchyBND.exe);;"
                 "All Executables (*.exe);;"
@@ -1244,11 +990,11 @@ namespace erdo::ui
             layout->addRow("WitchyBND executable:", witchy_widget);
 
             auto delete_temp_directory_widget = new QCheckBox("", &dialog);
-            // delete_temp_directory_widget->setChecked(true);
+            delete_temp_directory_widget->setChecked(true);
             layout->addRow("Delete temporary directory:", delete_temp_directory_widget);
 
             auto [save_widget, save_edit] = make_directory_picker(
-                "C:/Users/Paul/Downloads"/*QString::fromStdString(xml_data_directory.string())*/,
+                QString::fromStdString(xml_data_directory.string()),
                 "Select Save Directory"
             );
             layout->addRow("Save directory:", save_widget);
