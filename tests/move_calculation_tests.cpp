@@ -155,6 +155,57 @@ TEST_CASE("move calculation - cached stances and all moves", "[moveset][unit][ca
     CHECK(MoveEvaluator(unsupported, stats, {0, 0, 0}).evaluate_all().empty());
 }
 
+TEST_CASE("move calculation - paired weapon and PCBehavior powers", "[moveset][unit][calculation]")
+{
+    auto weapon = make_weapon();
+    weapon.paired = true;
+    auto pc = make_hit(150, 100, 65, -1);
+    pc.event.eventType = 307;
+    pc.event.attackIndex = -1;
+    pc.event.pcBehaviorType = 16;
+    pc.event.pcBehaviorCondition = 0;
+    pc.event.pcBehaviorOffset = 0;
+    weapon.moveset->moves.push_back({MoveId::ONE_HAND_RUNNING_R1, "PC attack", 30200, {pc}});
+    const auto stats = get_character_starting_class_attributes("Wretch");
+    const AttackOptions options{{0, 0, 0}, false};
+    const std::vector<std::reference_wrapper<const Weapon>> weapons{weapon};
+    const MoveEvaluator single(weapon, stats, options.upgrade_levels);
+    const auto one = Attack::calculate(weapon, stats, options);
+    CHECK(Attack::calculate(weapon, stats, {{0, 0, 0}, true}).attack_powers == one.attack_powers);
+    REQUIRE(single.evaluate(MoveId::TWO_HAND_R1_1));
+    CHECK(single.evaluate(MoveId::TWO_HAND_R1_1)->total.total_attack_power == one.total_attack_power);
+    REQUIRE_FALSE(single.evaluate(MoveId::POWERSTANCE_L1_1));
+    REQUIRE(MoveEvaluator(weapon, stats, options.upgrade_levels, &weapon).evaluate(MoveId::POWERSTANCE_L1_1));
+    const auto expected = single.evaluate(MoveId::ONE_HAND_RUNNING_R1);
+    REQUIRE(expected);
+    CHECK(expected->hits[0].hit.event.source == -1);
+    CHECK(expected->hits[0].powers.attack_powers[0][1] == one.attack_powers[0][1] * 1.5);
+    for (const auto id : {MoveId::TWO_HAND_R1_1, MoveId::ONE_HAND_RUNNING_R1}) {
+        const auto powers = single.evaluate(id);
+        REQUIRE(powers);
+        for (const auto hit : {std::optional<std::size_t>{}, std::optional<std::size_t>{0}}) {
+            const optimizer::MoveObjective objective{{id, hit}};
+            const optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER> brute{
+                weapons, options, 80, stats, 99, false, objective};
+            const optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER> v2{
+                weapons, options, 80, stats, 99, false, objective};
+            REQUIRE(brute.supports(weapon));
+            REQUIRE(v2.supports(weapon));
+            CHECK_THAT(brute.projection(brute(weapon)), Catch::Matchers::WithinAbs(powers->total.total_attack_power[1], 1e-10));
+            CHECK_THAT(v2.projection(v2(weapon)), Catch::Matchers::WithinAbs(powers->total.total_attack_power[1], 1e-10));
+        }
+    }
+    for (const auto member : {&AttackEvent::pcBehaviorType, &AttackEvent::pcBehaviorCondition,
+            &AttackEvent::pcBehaviorOffset}) {
+        auto invalid = pc;
+        invalid.event.*member = 999;
+        weapon.moveset->moves.back().hits = {invalid};
+        CHECK_FALSE(single.evaluate(MoveId::ONE_HAND_RUNNING_R1));
+        const optimizer::MoveObjective objective{{MoveId::ONE_HAND_RUNNING_R1, std::nullopt}};
+        CHECK(optimizer::move_unsupported_reason(weapon, objective, optimizer::Target::TOTAL_ATTACK_POWER));
+    }
+}
+
 TEST_CASE("move calculation - feint stances and optimizer scores", "[moveset][unit][calculation]")
 {
     auto weapon = make_weapon();
@@ -287,6 +338,158 @@ TEST_CASE("move calculation - opposing target eligibility", "[moveset][unit][cal
         REQUIRE_FALSE(failed);
         CHECK_THAT(failed.error(), Catch::Matchers::ContainsSubstring("condition 999"));
     }
+}
+
+TEST_CASE("move calculation - Bullet references require projectile context", "[moveset][unit][calculation][optimization]")
+{
+    auto weapon = make_weapon();
+    auto& move = weapon.moveset->moves.front();
+    move.hits[1].bulletParamId = 200031311;
+    const auto stats = get_character_starting_class_attributes("Wretch");
+    const AttackOptions options{{0, 0, 0}, false};
+    const auto evaluated = MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(move.id);
+    REQUIRE_FALSE(evaluated);
+    CHECK_THAT(evaluated.error(), Catch::Matchers::ContainsSubstring("Bullet 200031311"));
+    const auto direct = calculate_move(move, AttackRating{});
+    REQUIRE_FALSE(direct);
+    CHECK_THAT(direct.error(), Catch::Matchers::ContainsSubstring("projectile emission and contact context"));
+    std::vector<std::reference_wrapper<const Weapon>> weapons{weapon};
+    for (const auto selected : {std::optional<std::size_t>{}, std::optional<std::size_t>{0}, std::optional<std::size_t>{1}}) {
+        const optimizer::MoveObjective objective{{move.id, selected}};
+        const optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER> brute{
+            weapons, options, 82, stats, 99, false, objective};
+        const optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER> v2{
+            weapons, options, 82, stats, 99, false, objective};
+        CHECK(brute.supports(weapon) == (selected == 0));
+        CHECK(v2.supports(weapon) == (selected == 0));
+        if (selected != 0) {
+            REQUIRE(brute.unsupported_reason(weapon));
+            REQUIRE(v2.unsupported_reason(weapon));
+            CHECK_THAT(*brute.unsupported_reason(weapon), Catch::Matchers::ContainsSubstring("Bullet 200031311"));
+            CHECK_THAT(*v2.unsupported_reason(weapon), Catch::Matchers::ContainsSubstring("Bullet 200031311"));
+        }
+    }
+    // Ineligible events retain their identity but contribute zero, just as
+    // direct events do. Projectile requirements apply only to active hits.
+    move.hits[1].opposeTarget = false;
+    const auto inactive = MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(move.id);
+    REQUIRE(inactive);
+    CHECK_FALSE(inactive->hits[1].active);
+    CHECK(inactive->hits[1].hit.bulletParamId == 200031311);
+    move.hits[1].opposeTarget.reset();
+    move.hits[1].event.stateInfo = 187;
+    const auto gated = MoveEvaluator(weapon, stats, options.upgrade_levels, nullptr, {{{187, false}}}).evaluate(move.id);
+    REQUIRE(gated);
+    CHECK_FALSE(gated->hits[1].active);
+    CHECK_FALSE(MoveEvaluator(weapon, stats, options.upgrade_levels, nullptr, {{{187, true}}}).evaluate(move.id));
+    // Metadata without its Bullet ID must never become a direct weapon hit,
+    // including on legacy type-1 events and selected optimizer objectives.
+    move.hits[1].event.stateInfo.reset();
+    move.hits[1].bulletParamId.reset();
+    move.hits[1].bulletParameters.emplace();
+    const auto malformed = calculate_move(move, AttackRating{});
+    REQUIRE_FALSE(malformed);
+    CHECK_THAT(malformed.error(), Catch::Matchers::ContainsSubstring("no Bullet provenance"));
+    CHECK_FALSE(MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(move.id));
+    const optimizer::MoveObjective objective{{move.id, 1}};
+    const optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER> brute{
+        weapons, options, 82, stats, 99, false, objective};
+    const optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER> v2{
+        weapons, options, 82, stats, 99, false, objective};
+    CHECK_FALSE(brute.supports(weapon));
+    CHECK_FALSE(v2.supports(weapon));
+}
+
+TEST_CASE("move calculation - selected hits isolate unsupported siblings", "[moveset][unit][calculation][optimization]")
+{
+    const auto stats = get_character_starting_class_attributes("Wretch");
+    const AttackOptions options{{0, 0, 0}, false};
+    for (int failure = 0; failure < 5; ++failure) {
+        CAPTURE(failure);
+        auto weapon = make_weapon();
+        auto& move = weapon.moveset->moves[0];
+        const auto complete = MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(move.id);
+        REQUIRE(complete);
+        auto& sibling = move.hits[1];
+        switch (failure) {
+        case 0: sibling.bulletParamId = 200031311; break;
+        case 1: sibling.event.source = 99; break;
+        case 2: sibling.motionValues.known[1] = false; break;
+        case 3: sibling.event.stateInfo = 188; break;
+        case 4: sibling.event.source = 2; break;
+        }
+        const MoveEvaluator evaluator(weapon, stats, options.upgrade_levels);
+        CHECK_FALSE(evaluator.evaluate(move.id));
+        CHECK_FALSE(evaluator.evaluate_hit(move.id, 1));
+        const auto selected = evaluator.evaluate_hit(move.id, 0);
+        REQUIRE(selected);
+        CHECK(selected->active);
+        CHECK(selected->powers.attack_powers == complete->hits[0].powers.attack_powers);
+        CHECK(selected->powers.total_attack_power == complete->hits[0].powers.total_attack_power);
+        const auto rating = Attack::calculate(weapon, stats, options);
+        const auto lowLevel = calculate_hit(move.hits[0], move.id, rating);
+        REQUIRE(lowLevel);
+        CHECK(lowLevel->powers.attack_powers == selected->powers.attack_powers);
+
+        std::vector<std::reference_wrapper<const Weapon>> weapons{weapon};
+        const optimizer::MoveObjective objective{{move.id, 0}};
+        const optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER> brute{
+            weapons, options, 82, stats, 99, false, objective};
+        const optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER> v2{
+            weapons, options, 82, stats, 99, false, objective};
+        REQUIRE(brute.supports(weapon));
+        REQUIRE(v2.supports(weapon));
+        const auto best = brute(weapon);
+        const auto other = v2(weapon);
+        const auto expected = MoveEvaluator(weapon, best.stats, options.upgrade_levels).evaluate_hit(move.id, 0);
+        REQUIRE(expected);
+        CHECK_THAT(brute.projection(best), Catch::Matchers::WithinAbs(expected->powers.total_attack_power[1], 1e-10));
+        CHECK_THAT(v2.projection(other), Catch::Matchers::WithinAbs(brute.projection(best), 1e-10));
+
+        // Imported indices are authoritative even when the unsupported record
+        // occurs first. Never renumber or discard records to recover a result.
+        std::swap(move.hits[0], move.hits[1]);
+        const auto later = evaluator.evaluate_hit(move.id, 1);
+        REQUIRE(later);
+        CHECK(later->powers.attack_powers == selected->powers.attack_powers);
+        CHECK_FALSE(evaluator.evaluate_hit(move.id, 0));
+        CHECK_FALSE(evaluator.evaluate_hit(move.id, 2));
+        CHECK_FALSE(evaluator.evaluate_hit(move.id, std::numeric_limits<std::size_t>::max()));
+    }
+
+    auto weapon = make_weapon();
+    auto other = make_weapon();
+    other.moveset->behaviorVariation += 1;
+    const MoveEvaluator mismatched(weapon, stats, options.upgrade_levels, &other);
+    CHECK(mismatched.evaluate_hit(MoveId::POWERSTANCE_L1_1, 2)); // Primary-only hit.
+    const auto secondary = mismatched.evaluate_hit(MoveId::POWERSTANCE_L1_1, 0);
+    REQUIRE_FALSE(secondary);
+    CHECK_THAT(secondary.error(), Catch::Matchers::ContainsSubstring("moveset context"));
+    const MoveEvaluator paired(weapon, stats, options.upgrade_levels, &weapon);
+    const auto wholePair = paired.evaluate(MoveId::POWERSTANCE_L1_1);
+    REQUIRE(wholePair);
+    const auto pairedHit = paired.evaluate_hit(MoveId::POWERSTANCE_L1_1, 0);
+    REQUIRE(pairedHit);
+    CHECK(pairedHit->powers.attack_powers == wholePair->hits[0].powers.attack_powers);
+    const auto twoHanded = paired.evaluate(MoveId::TWO_HAND_R1_1);
+    REQUIRE(twoHanded);
+    const auto twoHandedHit = paired.evaluate_hit(MoveId::TWO_HAND_R1_1, 0);
+    REQUIRE(twoHandedHit);
+    CHECK(twoHandedHit->powers.attack_powers == twoHanded->hits[0].powers.attack_powers);
+    CHECK_FALSE(paired.evaluate_hit(MoveId::OFFHAND_R1_1, 0));
+    auto& inactive = weapon.moveset->moves[0].hits[1];
+    inactive.bulletParamId = 200031311;
+    inactive.event.stateInfo = 187;
+    inactive.motionValues.known.fill(false);
+    const MoveEvaluator gated(weapon, stats, options.upgrade_levels, nullptr, {{{187, false}}});
+    const auto zero = gated.evaluate_hit(MoveId::ONE_HAND_R1_1, 1);
+    REQUIRE(zero);
+    CHECK_FALSE(zero->active);
+    CHECK(zero->hit.bulletParamId == 200031311);
+    CHECK(zero->powers.total_attack_power == AttackPower{});
+    CHECK(zero->powers.attack_powers == AttackPowers{});
+    weapon.moveset->moves[0].hits.clear();
+    CHECK_FALSE(gated.evaluate_hit(MoveId::ONE_HAND_R1_1, 0));
 }
 
 TEST_CASE("move calculation - known combat environments", "[moveset][unit][calculation]")
@@ -477,4 +680,86 @@ TEST_CASE("move optimization - status and support checks", "[moveset][unit][opti
         REQUIRE_THROWS_AS((optimizer::V2<optimizer::Target::SPELL_SCALING>{weapons, options, 82, stats, 99, false, objective}),
                           std::invalid_argument);
     }
+}
+
+TEST_CASE("move calculation - offhand source roles and optimizer scores", "[moveset][unit][calculation][optimization]")
+{
+    AttackRating primary{}, secondary{};
+    primary.attack_powers[0] = {200, 400};
+    primary.attack_powers[1] = {50, 100};
+    primary.attack_powers[7] = {40, 50};
+    secondary.attack_powers[0] = {1000, 2000};
+    secondary.attack_powers[1] = {500, 1000};
+    secondary.attack_powers[7] = {400, 500};
+    for (const auto id : {MoveId::OFFHAND_R1_1, MoveId::OFFHAND_R1_2, MoveId::OFFHAND_R1_3,
+            MoveId::OFFHAND_R1_4, MoveId::OFFHAND_R1_5, MoveId::OFFHAND_R1_6}) {
+        CAPTURE(id);
+        Move move{id, "Explicit left source", 35000, {make_hit(80, 120, 65, 2)}};
+        const auto left = calculate_move(move, primary);
+        REQUIRE(left);
+        CHECK(left->hits[0].hit.event.source == 2);
+        CHECK((left->total.attack_powers[0] == AttackPower{160, 320}));
+        CHECK((left->total.attack_powers[1] == AttackPower{60, 120}));
+        CHECK((left->total.attack_powers[7] == AttackPower{26, 32.5}));
+        const auto supplied = calculate_move(move, primary, &secondary);
+        REQUIRE(supplied);
+        CHECK(supplied->total.attack_powers == left->total.attack_powers);
+        move.hits[0].event.source = 0;
+        REQUIRE(calculate_move(move, primary));
+        CHECK(calculate_move(move, primary)->total.attack_powers == left->total.attack_powers);
+        move.hits[0].event.source = 1;
+        REQUIRE_FALSE(calculate_move(move, primary));
+        const auto right = calculate_move(move, primary, &secondary);
+        REQUIRE(right);
+        CHECK((right->total.attack_powers[0] == AttackPower{800, 1600}));
+        move.hits[0].event.eventType = 307;
+        move.hits[0].event.source = -1;
+        move.hits[0].event.pcBehaviorType = 16;
+        move.hits[0].event.pcBehaviorCondition = 0;
+        move.hits[0].event.pcBehaviorOffset = 0;
+        REQUIRE_FALSE(calculate_move(move, primary));
+        REQUIRE(calculate_move(move, primary, &secondary));
+        CHECK(calculate_move(move, primary, &secondary)->total.attack_powers == right->total.attack_powers);
+    }
+    // Other move roles retain explicit right/left selection.
+    Move rightMove{MoveId::ONE_HAND_R1_1, "Right", 30000, {make_hit(100, 100, 100, 2)}};
+    CHECK_FALSE(calculate_move(rightMove, primary));
+    rightMove.hits[0].event.source = 1;
+    REQUIRE(calculate_move(rightMove, primary));
+    CHECK(calculate_move(rightMove, primary)->total.attack_powers == primary.attack_powers);
+
+    auto weapon = make_weapon();
+    weapon.moveset->moves = {{MoveId::OFFHAND_R1_1, "Offhand", 35000,
+        {make_hit(80, 120, 65, 2), make_hit(50, 20, 100, 0)}}};
+    const auto stats = get_character_starting_class_attributes("Wretch");
+    const AttackOptions options{{0, 0, 0}, false};
+    const auto evaluated = MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(MoveId::OFFHAND_R1_1);
+    REQUIRE(evaluated);
+    auto other = make_weapon();
+    other.moveset = std::make_shared<Moveset>(*other.moveset);
+    other.moveset->behaviorVariation = 999;
+    other.base_attack_powers_at_upgrade_levels[0][0] = 1000;
+    const auto ignored = MoveEvaluator(weapon, stats, options.upgrade_levels, &other).evaluate(MoveId::OFFHAND_R1_1);
+    REQUIRE(ignored);
+    CHECK(ignored->total.attack_powers == evaluated->total.attack_powers);
+    for (const auto selected : {std::optional<std::size_t>{}, std::optional<std::size_t>{0}, std::optional<std::size_t>{1}}) {
+        const optimizer::MoveObjective objective{{MoveId::OFFHAND_R1_1, selected}, false};
+        std::vector<std::reference_wrapper<const Weapon>> weapons{weapon};
+        const optimizer::BruteForce<optimizer::Target::TOTAL_ATTACK_POWER> brute{
+            weapons, options, 80, stats, 99, false, objective};
+        const optimizer::V2<optimizer::Target::TOTAL_ATTACK_POWER> v2{
+            weapons, options, 80, stats, 99, false, objective};
+        REQUIRE(brute.supports(weapon));
+        REQUIRE(v2.supports(weapon));
+        CHECK_THAT(brute.projection(brute(weapon)), Catch::Matchers::WithinAbs(
+            evaluated->selected_powers(selected).total_attack_power[1], 1e-10));
+        CHECK_THAT(v2.projection(v2(weapon)), Catch::Matchers::WithinAbs(
+            evaluated->selected_powers(selected).total_attack_power[1], 1e-10));
+    }
+    weapon.moveset->moves[0].hits[0].event.source = 1;
+    CHECK_FALSE(MoveEvaluator(weapon, stats, options.upgrade_levels).evaluate(MoveId::OFFHAND_R1_1));
+    CHECK_FALSE(MoveEvaluator(weapon, stats, options.upgrade_levels, &other).evaluate(MoveId::OFFHAND_R1_1));
+    CHECK(MoveEvaluator(weapon, stats, options.upgrade_levels, &weapon).evaluate(MoveId::OFFHAND_R1_1));
+    CHECK(optimizer::move_unsupported_reason(weapon, {{MoveId::OFFHAND_R1_1, std::nullopt}, false},
+        optimizer::Target::TOTAL_ATTACK_POWER));
 }

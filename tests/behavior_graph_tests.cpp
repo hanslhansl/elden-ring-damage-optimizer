@@ -636,8 +636,11 @@ TEST_CASE("behavior graph - complete catalog bridge rejects hidden fallbacks", "
     const auto objects = fixture.substr(fixture.find(" <object"), fixture.rfind("</hktagfile>") - fixture.find(" <object"));
     std::set<MoveId> covered;
     std::set<std::string_view> states;
-    for (const auto& definition : straightSwordCatalog) {
-        const auto state = directAttackState(definition.id).or_else([&] { return mountedAttackState(definition.id); });
+    std::vector<MoveDefinition> allDefinitions(clawCatalog.begin(), clawCatalog.end());
+    allDefinitions.insert(allDefinitions.end(), beastClawCatalog.begin(), beastClawCatalog.end());
+    for (const auto& definition : allDefinitions) {
+        const auto state = directAttackState(definition.id).or_else([&] { return mountedAttackState(definition.id); })
+            .or_else([&] { return feintAttackState(definition.id); });
         if (!state) continue;
         covered.insert(definition.id);
         if (!states.insert(state->first).second) continue;
@@ -674,10 +677,29 @@ TEST_CASE("behavior graph - complete catalog bridge rejects hidden fallbacks", "
       <field name="wepType" defaultValue="3"/><field name="isDualBlade" defaultValue="0"/><field name="enableThrow" defaultValue="1"/>
       </fields><rows><row id="1"/><row id="2"/><row id="3" spAtkcategory="111"/>
       <row id="4" wepmotionCategory="57" wepmotionOneHandId="3" wepmotionBothHandId="13"
-        behaviorVariationId="6100" wepType="90"/></rows></param>)");
+        behaviorVariationId="6100" wepType="90"/>
+      <row id="5" wepmotionCategory="21" behaviorVariationId="2400" wepType="87" enableThrow="0"/>
+      <row id="6" wepmotionCategory="22" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="2200" wepType="37" bothHandEquipable="1"/>
+      <row id="7" wepmotionCategory="42" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="2121" wepType="35" bothHandEquipable="1"/>
+      <row id="8" wepmotionCategory="42" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="2121" wepType="35" bothHandEquipable="0"/>
+      <row id="9" wepmotionCategory="42" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="2121" wepType="35"/>
+      <row id="10" wepmotionCategory="62" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6800" wepType="95" bothHandEquipable="1"/>
+      <row id="11" wepmotionCategory="62" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6800" wepType="95" bothHandEquipable="0"/>
+      <row id="12" wepmotionCategory="62" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6800" wepType="95"/>
+      <row id="13" wepmotionCategory="58" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6400" wepType="92" bothHandEquipable="1"/>
+      <row id="14" wepmotionCategory="58" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6400" wepType="92" bothHandEquipable="0"/>
+      <row id="15" wepmotionCategory="58" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6400" wepType="92"/>
+      <row id="16" wepmotionCategory="55" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6300" wepType="88" bothHandEquipable="1"/>
+      <row id="17" wepmotionCategory="55" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6300" wepType="88" bothHandEquipable="0"/>
+      <row id="18" wepmotionCategory="55" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6300" wepType="88"/>
+      <row id="19" wepmotionCategory="55" spAtkcategory="246" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6301" wepType="88" bothHandEquipable="1"/>
+      <row id="20" wepmotionCategory="55" spAtkcategory="247" wepmotionBothHandId="0" isDualBlade="1" behaviorVariationId="6301" wepType="88" bothHandEquipable="1"/>
+      <row id="21" spAtkcategory="110" behaviorVariationId="201"/>
+      <row id="22" spAtkcategory="110" behaviorVariationId="201"/>
+      </rows></param>)");
     const auto resolved = graph.resolveSupportedCatalog(weapons, std::array{1LL, 2LL}, straightSwordCatalog);
     REQUIRE(resolved.size() == straightSwordCatalog.size());
-    CHECK(covered.size() == 58);
+    CHECK(covered.size() == 67);
     for (std::size_t i = 0; i < resolved.size(); ++i) {
         auto expected = straightSwordCatalog[i];
         if (covered.contains(expected.id)) {
@@ -688,40 +710,157 @@ TEST_CASE("behavior graph - complete catalog bridge rejects hidden fallbacks", "
         }
         CHECK(erdo::json::write(resolved[i]) == erdo::json::write(expected));
     }
+    auto components = std::vector<MoveDefinition>(straightSwordCatalog.begin(), straightSwordCatalog.end());
+    components.front().additionalEventSelections = std::vector{AttackEventSelection{2, 102, 1}};
+    const auto composedDefinitions = graph.resolveSupportedCatalog(weapons, std::array{1LL}, components);
+    REQUIRE(composedDefinitions.front().additionalEventSelections);
+    CHECK(erdo::json::write(*composedDefinitions.front().additionalEventSelections)
+        == erdo::json::write(*components.front().additionalEventSelections));
+    CHECK(composedDefinitions.front().animationId == 77);
     // Native class exclusion must work without any paired graph registration.
     // Ordinary mappings still resolve non-arithmetic clips and stay complete.
-    auto shieldXml = xml;
-    replaceText(shieldXml, "a023_", "a057_");
-    replaceText(shieldXml, "AttackDual", "ForbiddenPairedState");
-    graph.loadXml(shieldXml);
-    const auto shield = graph.resolveSupportedCatalog(weapons, std::array{4LL}, thrustingShieldCatalog);
-    REQUIRE(shield.size() == 52);
-    for (std::size_t i = 0; i < shield.size(); ++i) {
-        auto expected = thrustingShieldCatalog[i];
+    for (const auto& [weaponId, category, catalog] : {
+            std::tuple{4LL, 57, std::span<const MoveDefinition>(thrustingShieldCatalog)},
+            std::tuple{5LL, 21, std::span<const MoveDefinition>(torchCatalog)}}) {
+        CAPTURE(category);
+        auto shieldXml = xml;
+        replaceText(shieldXml, "a023_", std::format("a{:03}_", category));
+        replaceText(shieldXml, "AttackDual", "ForbiddenPairedState");
+        graph.loadXml(shieldXml);
+        const auto shield = graph.resolveSupportedCatalog(weapons, std::array{weaponId}, catalog);
+        REQUIRE(shield.size() == catalog.size());
+        for (std::size_t i = 0; i < shield.size(); ++i) {
+            auto expected = catalog[i];
+            if (covered.contains(expected.id)) {
+                expected.animationId = 77;
+                expected.motionCategory = category;
+                const auto jump = std::ranges::find(jumpingIds, expected.id);
+                if (jump != jumpingIds.end()) expected.animationId += static_cast<int>(jump - jumpingIds.begin());
+            }
+            CHECK(erdo::json::write(shield[i]) == erdo::json::write(expected));
+        }
+        CHECK_FALSE(graph.resolveLightChain(weapons, static_cast<int>(weaponId), MoveId::POWERSTANCE_L1_1));
+        for (const auto id : {MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_RUNNING_L1,
+                MoveId::POWERSTANCE_ROLLING_L1, MoveId::POWERSTANCE_BACKSTEP_L1, MoveId::POWERSTANCE_JUMPING_L1}) {
+            auto invalid = std::vector(catalog.begin(), catalog.end());
+            invalid.push_back({id, "Forbidden pair", 999});
+            REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{weaponId}, invalid));
+        }
+        auto incompleteShield = std::vector(catalog.begin(), catalog.end());
+        incompleteShield.erase(incompleteShield.begin());
+        REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{weaponId}, incompleteShield),
+            Catch::Matchers::ContainsSubstring("absent from the supported catalog"));
+        for (const auto state : {"AttackLeftHeavy3", "AttackRightLightDash", "RideAttack_R_Hard1_Start"}) {
+            auto missingShield = shieldXml;
+            replaceText(missingShield, state, "MissingShieldState");
+            graph.loadXml(missingShield);
+            REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{weaponId}, catalog));
+        }
+    }
+    for (const auto& [weaponId, category, catalog] : {
+            std::tuple{6LL, 22, std::span<const MoveDefinition>(clawCatalog)},
+            std::tuple{7LL, 42, std::span<const MoveDefinition>(fistCatalog)},
+            std::tuple{10LL, 62, std::span<const MoveDefinition>(beastClawCatalog)},
+            std::tuple{13LL, 58, std::span<const MoveDefinition>(backhandBladeCatalog)},
+            std::tuple{16LL, 55, std::span<const MoveDefinition>(martialArtsCatalog)}}) {
+        CAPTURE(category);
+        auto pairedXml = xml;
+        replaceText(pairedXml, "a023_", std::format("a{:03}_", category));
+        graph.loadXml(pairedXml);
+        const auto pairedMoves = graph.resolveSupportedCatalog(weapons, std::array{weaponId}, catalog);
+        REQUIRE(pairedMoves.size() == catalog.size());
+        for (std::size_t i = 0; i < pairedMoves.size(); ++i) {
+            auto expected = catalog[i];
+            if (covered.contains(expected.id)) {
+                expected.animationId = 77;
+                expected.motionCategory = category;
+                const auto jump = std::ranges::find(jumpingIds, expected.id);
+                if (jump != jumpingIds.end()) expected.animationId += static_cast<int>(jump - jumpingIds.begin());
+            }
+            CHECK(erdo::json::write(pairedMoves[i]) == erdo::json::write(expected));
+        }
+        for (const auto state : {"AttackRightLight", "AttackBothLight", "AttackLeftHeavy", "AttackDualLight"}) {
+            auto missingPaired = pairedXml;
+            replaceText(missingPaired, std::format("{}{}", state, category == 62 ? 4 : 6), "MissingPairedState");
+            graph.loadXml(missingPaired);
+            REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{weaponId}, catalog));
+        }
+    }
+    // Special110 uses registrations rather than the representative seed scope.
+    // This fixture deliberately gives every covered state a special clip and
+    // non-arithmetic animation ID, unlike the six native overrides.
+    graph.loadXml(xml);
+    const auto straightSpecial = graph.resolveSupportedCatalog(weapons, std::array{21LL, 22LL}, straightSword110Catalog);
+    REQUIRE(straightSpecial.size() == straightSword110Catalog.size());
+    for (std::size_t i = 0; i < straightSpecial.size(); ++i) {
+        auto expected = straightSword110Catalog[i];
         if (covered.contains(expected.id)) {
             expected.animationId = 77;
-            expected.motionCategory = 57;
+            expected.motionCategory = 110;
             const auto jump = std::ranges::find(jumpingIds, expected.id);
             if (jump != jumpingIds.end()) expected.animationId += static_cast<int>(jump - jumpingIds.begin());
         }
-        CHECK(erdo::json::write(shield[i]) == erdo::json::write(expected));
+        CHECK(erdo::json::write(straightSpecial[i]) == erdo::json::write(expected));
     }
-    CHECK_FALSE(graph.resolveLightChain(weapons, 4, MoveId::POWERSTANCE_L1_1));
-    for (const auto id : {MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_RUNNING_L1,
-            MoveId::POWERSTANCE_ROLLING_L1, MoveId::POWERSTANCE_BACKSTEP_L1, MoveId::POWERSTANCE_JUMPING_L1}) {
-        auto invalid = std::vector(thrustingShieldCatalog.begin(), thrustingShieldCatalog.end());
-        invalid.push_back({id, "Forbidden pair", 999});
-        REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{4LL}, invalid));
+    auto absentSpecial = xml;
+    replaceText(absentSpecial, "a110_", "a109_");
+    graph.loadXml(absentSpecial);
+    const auto baseFallback = graph.resolveSupportedCatalog(weapons, std::array{21LL}, straightSword110Catalog);
+    for (const auto& move : baseFallback)
+        if (covered.contains(move.id)) CHECK(move.motionCategory == 23);
+    auto invalidSpecial = xml;
+    replaceText(invalidSpecial, "a110_000077", "a110_000078");
+    graph.loadXml(invalidSpecial);
+    REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{21LL}, straightSword110Catalog));
+
+    // An audited partial special set selects overrides by graph registration,
+    // including offhand, and retains base clips where the special is absent.
+    auto specialXml = xml;
+    replaceText(specialXml, "a023_", "a055_");
+    replaceText(specialXml, "a110_", "a246_");
+    graph.loadXml(specialXml);
+    const auto specialMoves = graph.resolveSupportedCatalog(weapons, std::array{19LL}, footworkCatalog);
+    REQUIRE(specialMoves.size() == footworkCatalog.size());
+    for (std::size_t i = 0; i < specialMoves.size(); ++i) {
+        auto expected = footworkCatalog[i];
+        if (covered.contains(expected.id)) {
+            expected.animationId = 77;
+            expected.motionCategory = 246;
+            const auto jump = std::ranges::find(jumpingIds, expected.id);
+            if (jump != jumpingIds.end()) expected.animationId += static_cast<int>(jump - jumpingIds.begin());
+        }
+        CHECK(erdo::json::write(specialMoves[i]) == erdo::json::write(expected));
     }
-    auto incompleteShield = std::vector(thrustingShieldCatalog.begin(), thrustingShieldCatalog.end());
-    incompleteShield.erase(incompleteShield.begin());
-    REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{4LL}, incompleteShield),
-        Catch::Matchers::ContainsSubstring("absent from the supported catalog"));
-    for (const auto state : {"AttackLeftHeavy3", "AttackRightLightDash", "RideAttack_R_Hard1_Start"}) {
-        auto missingShield = shieldXml;
-        replaceText(missingShield, state, "MissingShieldState");
-        graph.loadXml(missingShield);
-        REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{4LL}, thrustingShieldCatalog));
+    CHECK_FALSE(offhandOrMatchingPairCategories(weapons, 20, false));
+    CHECK_FALSE(offhandOrMatchingPairCategories(weapons, 20, true));
+    REQUIRE_THROWS(graph.resolveSupportedCatalog(weapons, std::array{20LL}, footworkCatalog));
+    replaceText(specialXml, "a246_", "a245_");
+    graph.loadXml(specialXml);
+    const auto fallbackMoves = graph.resolveSupportedCatalog(weapons, std::array{19LL}, footworkCatalog);
+    for (const auto& move : fallbackMoves)
+        if (covered.contains(move.id)) CHECK(move.motionCategory == 55);
+
+    // Equal motion/behavior fields cannot hide a missing or disabled native
+    // both-hand flag on a second member of a shared paired catalog.
+    for (const auto invalidId : {8LL, 9LL}) {
+        REQUIRE_FALSE(ordinaryWeaponCategories(weapons, static_cast<int>(invalidId), true));
+        REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{7LL, invalidId}, fistCatalog),
+            Catch::Matchers::ContainsSubstring("both-hand availability"));
+    }
+    for (const auto invalidId : {11LL, 12LL}) {
+        REQUIRE_FALSE(ordinaryWeaponCategories(weapons, static_cast<int>(invalidId), true));
+        REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{10LL, invalidId}, beastClawCatalog),
+            Catch::Matchers::ContainsSubstring("both-hand availability"));
+    }
+    for (const auto invalidId : {17LL, 18LL}) {
+        REQUIRE_FALSE(ordinaryWeaponCategories(weapons, static_cast<int>(invalidId), true));
+        REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{16LL, invalidId}, martialArtsCatalog),
+            Catch::Matchers::ContainsSubstring("both-hand availability"));
+    }
+    for (const auto invalidId : {14LL, 15LL}) {
+        REQUIRE_FALSE(ordinaryWeaponCategories(weapons, static_cast<int>(invalidId), true));
+        REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{13LL, invalidId}, backhandBladeCatalog),
+            Catch::Matchers::ContainsSubstring("both-hand availability"));
     }
     graph.loadXml(xml);
     REQUIRE_THROWS_WITH(graph.resolveSupportedCatalog(weapons, std::array{1LL, 3LL}, straightSwordCatalog),
@@ -860,7 +999,7 @@ TEST_CASE("behavior graph - target throws require common supported hit data", "[
     weapons.loadXml(R"(<param><fields><field name="wepmotionCategory" defaultValue="23"/>
       <field name="spAtkcategory" defaultValue="0"/><field name="wepmotionBothHandId" defaultValue="10"/>
       <field name="isWeaponCatalyst" defaultValue="0"/><field name="enableThrow" defaultValue="1"/>
-      </fields><rows><row id="1"/><row id="2" enableThrow="0"/><row id="3" spAtkcategory="110"/>
+      </fields><rows><row id="1"/><row id="2" enableThrow="0"/><row id="3" spAtkcategory="114"/>
       <row id="4" isWeaponCatalyst="1"/><row id="5" wepmotionBothHandId="0"/>
       <row id="6" enableThrow="2"/></rows></param>)");
     const MoveDefinition seed{MoveId::RIPOSTE, "Caller label", -1, {}, {}, 530};
@@ -1011,7 +1150,7 @@ TEST_CASE("behavior graph - backstab whiff audits script and preserves strike ph
     weapons.loadXml(R"(<param><fields><field name="wepmotionCategory" defaultValue="23"/>
       <field name="spAtkcategory" defaultValue="0"/><field name="wepmotionBothHandId" defaultValue="10"/>
       <field name="isWeaponCatalyst" defaultValue="0"/></fields><rows><row id="1"/>
-      <row id="2" spAtkcategory="110"/></rows></param>)");
+      <row id="2" spAtkcategory="114"/></rows></param>)");
     const MoveDefinition seed{MoveId::BACKSTAB_WHIFF, "Whiff", 999, {}, {}, 509};
     const auto result = graph.resolveWeaponBackstabWhiff(seed, weapons, 1);
     REQUIRE(result);
@@ -1106,7 +1245,7 @@ TEST_CASE("behavior graph - mounted sides and explicit heavy phases", "[moveset]
     weapons.loadXml(R"(<param><fields>
       <field name="wepmotionCategory" defaultValue="23"/><field name="spAtkcategory" defaultValue="0"/>
       <field name="wepmotionBothHandId" defaultValue="10"/><field name="isWeaponCatalyst" defaultValue="0"/>
-      </fields><rows><row id="1"/><row id="2" spAtkcategory="110"/>
+      </fields><rows><row id="1"/><row id="2" spAtkcategory="114"/>
       <row id="3" isWeaponCatalyst="1"/><row id="4" wepmotionBothHandId="0"/>
       <row id="5" wepmotionCategory="999"/></rows></param>)");
     BehaviorGraph graph;
@@ -1165,8 +1304,8 @@ TEST_CASE("behavior graph - airborne jump selectors preserve context", "[moveset
         CHECK(resolved->name == seed.name);
         CHECK(resolved->id == seed.id);
         const auto special = graph.resolveWeaponJumpingMove(seed, weapons, 2);
-        if (seed.id == MoveId::POWERSTANCE_JUMPING_L1) CHECK_FALSE(special);
-        else { REQUIRE(special); CHECK(special->motionCategory == 110); }
+        REQUIRE(special);
+        CHECK(special->motionCategory == 110);
         CHECK_FALSE(graph.resolveWeaponJumpingMove(seed, weapons, 4));
         auto route = *jumpingAttackRoute(seed.id);
         route.variables["JumpAttack_Land"] = 1;
@@ -1263,6 +1402,7 @@ TEST_CASE("behavior graph - offhand and matching powerstance contexts", "[movese
       </fields><rows><row id="1"/><row id="2" spAtkcategory="110"/>
       <row id="3" wepmotionCategory="21"/><row id="4" wepmotionCategory="57"/>
       <row id="5" wepmotionCategory="999"/><row id="6" isWeaponCatalyst="1"/>
+      <row id="7" spAtkcategory="114"/>
       </rows></param>)");
     auto xml = fixture.substr(0, fixture.find(" <object"));
     const auto objects = fixture.substr(fixture.find(" <object"), fixture.rfind("</hktagfile>") - fixture.find(" <object"));
@@ -1298,9 +1438,11 @@ TEST_CASE("behavior graph - offhand and matching powerstance contexts", "[movese
             CHECK((*chain)[i].motionCategory == 23);
         }
         const auto special = graph.resolveLightChain(weapons, 2, first);
-        REQUIRE_FALSE(special);
-        CHECK_THAT(special.error(), Catch::Matchers::ContainsSubstring("requires explicit context"));
-        // Inspection can still supply a deliberately verified special context.
+        REQUIRE(special);
+        CHECK(special->front().motionCategory == 110);
+        const auto unaudited = graph.resolveLightChain(weapons, 7, first);
+        REQUIRE_FALSE(unaudited);
+        CHECK_THAT(unaudited.error(), Catch::Matchers::ContainsSubstring("requires explicit context"));
         const auto explicitContext = graph.resolveLightChain(weapons, 2, first, std::array{110, 23});
         REQUIRE(explicitContext);
         CHECK(explicitContext->front().motionCategory == 110);
@@ -1313,7 +1455,10 @@ TEST_CASE("behavior graph - offhand and matching powerstance contexts", "[movese
         REQUIRE(result);
         CHECK(result->animationId == animation);
         CHECK(result->motionCategory == 23);
-        CHECK_FALSE(graph.resolveMatchingPowerstanceMovementMove({id, "Movement", -1}, weapons, 2));
+        const auto special = graph.resolveMatchingPowerstanceMovementMove({id, "Movement", -1}, weapons, 2);
+        REQUIRE(special);
+        CHECK(special->motionCategory == 110);
+        CHECK_FALSE(graph.resolveMatchingPowerstanceMovementMove({id, "Movement", -1}, weapons, 7));
     }
     CHECK_FALSE(graph.resolveMatchingPowerstanceMovementMove({MoveId::POWERSTANCE_JUMPING_L1, "Jump", -1}, weapons, 1));
     replaceText(xml, "AttackLeftHeavy3", "MissingOffhand");
@@ -1409,6 +1554,10 @@ TEST_CASE("behavior graph - selected game throw rows match critical hits", "[mov
         Context{MoveId::SMALL_PVE_BACKSTAB, 11317000, {3170, 1}, 1},
         Context{MoveId::SMALL_PVE_RIPOSTE, 16395000, {3950, 22}, 8},
         Context{MoveId::LARGE_PVE_RIPOSTE, 13212000, {2120, 20}, 1}};
+    for (const auto weaponId : {24000000, 24020000, 24060000, 24070000})
+        for (const auto& context : contexts)
+            CHECK_FALSE(graph.resolveWeaponThrow({context.id, "Disabled torch throw", -1},
+                weapons, weaponId, throws, context.query));
     struct Profile { int category; int variation; int weaponId; std::span<const MoveDefinition> catalog; };
     const std::array profiles{
         Profile{20, 100, 1000000, daggerCatalog}, Profile{23, 200, 2000000, straightSwordCatalog},
@@ -1421,7 +1570,9 @@ TEST_CASE("behavior graph - selected game throw rows match critical hits", "[mov
         Profile{36, 1600, 16020000, spearCatalog}, Profile{37, 1700, 16550000, greatSpearCatalog},
         Profile{27, 500, 5010000, thrustingSwordCatalog}, Profile{28, 700, 7000000, curvedSwordCatalog},
         Profile{61, 6600, 66500000, greatKatanaCatalog}, Profile{60, 6700, 67500000, lightGreatswordCatalog},
-        Profile{57, 6100, 62500000, thrustingShieldCatalog}};
+        Profile{57, 6100, 62500000, thrustingShieldCatalog}, Profile{22, 2200, 22000000, clawCatalog},
+        Profile{42, 2100, 21070000, fistCatalog}, Profile{42, 2121, 21520000, fistCatalog}, Profile{62, 6800, 68500000, beastClawCatalog}, Profile{58, 6400, 64500000, backhandBladeCatalog}, Profile{55, 6300, 60500000, martialArtsCatalog},
+        Profile{55, 6301, 60510000, footworkCatalog}, Profile{23, 201, 2020000, straightSword110Catalog}};
     for (const auto& [category, variation, weaponId, catalog] : profiles) {
         std::vector<MoveDefinition> definitions, expectedDefinitions;
         for (const auto [id, row, query, count] : contexts) {
@@ -1464,7 +1615,7 @@ TEST_CASE("behavior graph - complete GameData import and JSON", "[moveset][game_
     const auto reference = load_game_data(root);
     std::vector<MovesetImportReport> reports;
     const auto actual = load_game_data(root, graph, &reports);
-    REQUIRE(reports.size() == 75);
+    REQUIRE(reports.size() == 87);
     for (const auto& report : reports) {
         CHECK(report.importedMoves == (report.motionCategory == 20 ? 66
             : report.motionCategory == 27 ? 71
@@ -1472,6 +1623,9 @@ TEST_CASE("behavior graph - complete GameData import and JSON", "[moveset][game_
             : report.motionCategory == 61 ? 63
             : report.motionCategory == 60 ? 61
             : report.motionCategory == 57 ? 52
+            : report.motionCategory == 21 ? 46
+            : report.motionCategory == 62 ? 64
+            : report.motionCategory == 22 || report.motionCategory == 42 || report.motionCategory == 55 || report.motionCategory == 58 ? 68
             : report.motionCategory == 43 ? 51
             : report.motionCategory == 26 || report.motionCategory == 31 ? 56
             : report.motionCategory == 50 || report.motionCategory == 37 ? 57 : report.motionCategory == 34 || report.motionCategory == 36 ? 60
@@ -1507,15 +1661,15 @@ TEST_CASE("behavior graph - complete GameData import and JSON", "[moveset][game_
         if (identity) CHECK(identity == loaded.moveset);
         else identity = loaded.moveset;
     }
-    CHECK(supported == 1080);
-    REQUIRE(shared.size() == 75);
+    CHECK(supported == 1260);
+    REQUIRE(shared.size() == 87);
     CHECK(shared.at({20, 100}) != shared.at({23, 200}));
     BehaviorGraph missing;
     missing.loadXml("<hktagfile version='3'/>");
     reports.clear();
     REQUIRE_THROWS_WITH(load_game_data(root, missing, &reports),
         Catch::Matchers::ContainsSubstring("Definition resolution failed"));
-    REQUIRE(reports.size() == 75);
+    REQUIRE(reports.size() == 87);
     for (const auto& report : reports) {
         CHECK(report.importedMoves == 0);
         CHECK(report.failures.size() == report.requestedMoves);
@@ -1530,6 +1684,44 @@ TEST_CASE("behavior graph - complete GameData import and JSON", "[moveset][game_
     BehaviorIndex index;
     index.build(behaviors);
     AnimationCache cache(root);
+    // The partial special category selects registered overrides, then base
+    // clips. Exact variation rows still win over family rows even when their
+    // reference type is unsupported: do not quietly borrow Dryleaf's counter.
+    const auto footworkDefinitions = graph.resolveSupportedCatalog(weapons,
+        std::array{60510000LL}, footworkCatalog);
+    REQUIRE(footworkDefinitions.size() == 68);
+    CHECK(std::ranges::count(footworkDefinitions, 246, &MoveDefinition::motionCategory) == 26);
+    const auto footwork = importMoveset(cache, 55, 6301, footworkDefinitions, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    const auto footworkReference = importMoveset(cache, 55, 6301, footworkCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    CHECK(footwork.report.importedMoves == 67);
+    REQUIRE(footwork.report.failures.size() == 1);
+    const auto& counter = footwork.report.failures.front();
+    CHECK(counter.moveId == MoveId::TWO_HAND_GUARD_COUNTER);
+    CHECK(counter.animationId == 32700);
+    REQUIRE(counter.unresolved.size() == 1);
+    REQUIRE(counter.unresolved.front().candidates.size() == 1);
+    const auto& bullet = counter.unresolved.front().candidates.front();
+    CHECK(bullet.behaviorParamId == 106301311);
+    CHECK(bullet.refType == 1);
+    CHECK(bullet.refId == 200031311);
+    CHECK(erdo::json::write(*footwork.moveset) == erdo::json::write(*footworkReference.moveset));
+    CHECK(erdo::json::write(footwork.report) == erdo::json::write(footworkReference.report));
+    if (std::filesystem::exists(root / BulletParamFile)) {
+        ParamTable bullets;
+        bullets.load((root / BulletParamFile).string().c_str());
+        const auto linked = importMoveset(cache, 55, 6301, footworkDefinitions, index, attacks,
+            std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+        const auto linkedReference = importMoveset(cache, 55, 6301, footworkCatalog, index, attacks,
+            std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+        REQUIRE(linked.report.failures.empty());
+        CHECK(linked.report.importedMoves == 68);
+        CHECK(erdo::json::write(*linked.moveset) == erdo::json::write(*linkedReference.moveset));
+    }
+    // Partial diagnostic imports must not become application weapon data.
+    for (const auto& weapon : actual.weapons)
+        if (weapon.base_name == "Dane's Footwork") CHECK_FALSE(weapon.moveset);
     const auto twinChain = graph.resolveLightChain(weapons, 10000000, MoveId::POWERSTANCE_L1_1, std::array{24});
     REQUIRE(twinChain);
     REQUIRE(twinChain->size() == 4);

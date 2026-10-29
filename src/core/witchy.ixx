@@ -57,6 +57,9 @@ export namespace erdo::witchy
 
     const std::filesystem::path AtkParam_PcFile = "regulation-bin/AtkParam_Pc.param.xml"; //
     const std::filesystem::path BehaviorParam_PcFile = "regulation-bin/BehaviorParam_PC.param.xml";
+    // Optional diagnostic dependency; production admission still requires a
+    // verified projectile calculation policy before this becomes mandatory.
+    const std::filesystem::path BulletParamFile = "regulation-bin/Bullet.param.xml";
 
     const std::filesystem::path WeaponNameFile = "msg/engus/item-msgbnd-dcx/WeaponName.fmg.xml";
     const std::filesystem::path WeaponName_dlc01File = "msg/engus/item_dlc01-msgbnd-dcx/WeaponName_dlc01.fmg.xml";
@@ -413,6 +416,13 @@ export namespace erdo::witchy
         return attack_element_corrects_by_id;
     }
 
+    struct AttackEventSelection {
+        int eventType = -1;
+        std::optional<int> eventJudgeId;
+        std::optional<int> requiredCategory;
+        std::optional<int> requiredBehaviorParamId;
+    };
+
     struct MoveDefinition {
         MoveId id;
         std::string_view name;
@@ -430,6 +440,10 @@ export namespace erdo::witchy
         // Successful criticals target the throw victim (TAE type 304). Ordinary
         // collision attacks in the same clip are a separate target context.
         std::optional<int> eventType = std::nullopt;
+        // Explicit additional event families/phases. Absent preserves the
+        // existing direct-event scope and legacy definition JSON. No automatic
+        // temporal association or projectile/contact-count inference.
+        std::optional<std::vector<AttackEventSelection>> additionalEventSelections;
     };
 
     // Resolves a complete supported catalog before hit import. All listed
@@ -976,7 +990,9 @@ export namespace erdo::witchy
 
     std::vector<AttackEvent> extractAttackEvents(
         const pugi::xml_document& tae,
-        int animationId
+        int animationId,
+        bool includePCBehaviors = false,
+        bool includeBulletBehaviors = false
     ) {
         std::vector<AttackEvent> events;
 
@@ -985,7 +1001,8 @@ export namespace erdo::witchy
         {
             const auto type = xmlInt(event, "type");
 
-            if (!type || (*type != 1 && *type != 304))
+            if (!type || (*type != 1 && *type != 304 && (!includePCBehaviors || *type != 307)
+                && (!includeBulletBehaviors || *type != 2)))
                 continue;
 
             const auto judge =
@@ -1008,6 +1025,42 @@ export namespace erdo::witchy
 
             attack.source =
                 eventParameter(event, "Source").value_or(-1);
+
+            if (*type == 307 || *type == 2) {
+                auto selector = [&](const char* name) {
+                    std::optional<int> parsed;
+                    for (const auto param : event.child("params").children("param")) {
+                        if (std::string_view(param.attribute("name").value()) != name) continue;
+                        const std::string_view value = param.attribute("value").value();
+                        int number{};
+                        const auto [end, ec] = std::from_chars(value.data(), value.data() + value.size(), number);
+                        if (parsed || ec != std::errc{} || end != value.data() + value.size())
+                            throw std::runtime_error(std::format("Invalid or duplicate TAE {} value", name));
+                        parsed = number;
+                    }
+                    if (!parsed) throw std::runtime_error(std::format("Missing TAE {}", name));
+                    return *parsed;
+                };
+                if (*type == 307) {
+                    attack.pcBehaviorType = selector("PCBehaviorType");
+                    attack.pcBehaviorCondition = selector("Condition0x64_GetWeaponData");
+                    attack.pcBehaviorOffset = selector("Offset");
+                } else {
+                    attack.bulletDummyPolyId = selector("DummyPolyID");
+                    attack.bulletAttachmentType = selector("AttachmentType");
+                    attack.bulletOffset = selector("Offset");
+                    attack.bulletUnk12 = selector("Unk12");
+                    for (const auto param : event.child("params").children("param")) {
+                        if (std::string_view(param.attribute("name").value()) != "Enable") continue;
+                        const std::string_view value = param.attribute("value").value();
+                        if (attack.bulletEnable || (value != "False" && value != "false" && value != "0"
+                            && value != "True" && value != "true" && value != "1"))
+                            throw std::runtime_error("Invalid or duplicate TAE Enable value");
+                        attack.bulletEnable = value == "True" || value == "true" || value == "1";
+                    }
+                    if (!attack.bulletEnable) throw std::runtime_error("Missing TAE Enable");
+                }
+            }
 
             for (const auto param : event.child("params").children("param")) {
                 if (std::string_view(param.attribute("name").value()) != "StateInfo")
@@ -1091,6 +1144,29 @@ export namespace erdo::witchy
         return result;
     }
 
+    BulletParameters extractBulletParameters(const ParamTable& bullets, pugi::xml_node row)
+    {
+        BulletParameters result;
+        result.life = bullets.number(row, "life");
+        result.lifeRandomRange = bullets.number(row, "lifeRandomRange");
+        result.dmgHitRecordLifeTime = bullets.number(row, "dmgHitRecordLifeTime");
+        result.dist = bullets.number(row, "dist");
+        constexpr std::array dampingFields{"damageDamp", "spelDamageDamp", "fireDamageDamp", "thunderDamageDamp", "darkDamageDamp"};
+        static_assert(dampingFields.size() == enumerators_of<DamageType>().size());
+        for (std::size_t i = 0; i < dampingFields.size(); ++i)
+            result.damageDamping[i] = bullets.number(row, dampingFields[i]);
+        if (const auto shared = bullets.integer(row, "isUseSharedHitList")) {
+            if (*shared != 0 && *shared != 1)
+                throw std::runtime_error("Invalid Bullet isUseSharedHitList flag");
+            result.isUseSharedHitList = *shared == 1;
+        }
+        result.launchConditionType = bullets.integer(row, "launchConditionType");
+        result.spEffectIDForShooter = bullets.integer(row, "spEffectIDForShooter");
+        for (std::size_t i = 0; i < result.targetSpEffectIds.size(); ++i)
+            result.targetSpEffectIds[i] = bullets.integer(row, std::format("spEffectId{}", i).c_str());
+        return result;
+    }
+
     enum class BehaviorLookup {
         // Diagnostic matching by fields; ordinary collisions remain explicit.
         STRICT_FIELDS,
@@ -1106,7 +1182,8 @@ export namespace erdo::witchy
         const ParamTable& attacks,
         std::optional<int> requiredCategory = std::nullopt,
         std::optional<int> requiredBehaviorParamId = std::nullopt,
-        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS,
+        const ParamTable* bullets = nullptr
     ) {
         ResolutionResult result;
 
@@ -1143,12 +1220,21 @@ export namespace erdo::witchy
                 result.unresolved.push_back(std::move(unresolved));
             };
 
+            if (event.eventType == 307) {
+                const auto source = calculator::pc_behavior_uses_secondary_weapon(event);
+                if (!source) {
+                    fail(source.error());
+                    continue;
+                }
+            }
+
             // Do not silently select one if the behavior mapping
             // is ambiguous or uses an unsupported reference type.
             std::vector<pugi::xml_node> attackBehaviors;
 
             for (const auto row : matches) {
-                if (behaviors.integer(row, "refType") == 0 &&
+                const auto referenceType = behaviors.integer(row, "refType");
+                if (((referenceType == 0 && event.eventType != 2) || (referenceType == 1 && bullets)) &&
                     (!requiredCategory ||
                      behaviors.integer(row, "category") == requiredCategory) &&
                     (!requiredBehaviorParamId ||
@@ -1157,7 +1243,7 @@ export namespace erdo::witchy
             }
 
             if (attackBehaviors.size() != 1) {
-                fail("Unresolved or ambiguous attack behavior");
+                fail(event.eventType == 2 ? "Unresolved or ambiguous BulletBehavior" : "Unresolved or ambiguous attack behavior");
                 continue;
             }
 
@@ -1171,10 +1257,37 @@ export namespace erdo::witchy
                 continue;
             }
 
-            const auto attack = attacks.find(*refId);
+            int attackId = *refId;
+            std::optional<int> bulletId;
+            std::optional<BulletParameters> bulletParameters;
+            if (behaviors.integer(behavior, "refType") == 1) {
+                try {
+                    const auto bullet = bullets->find(*refId);
+                    if (!bullet) throw std::runtime_error("Missing Bullet row " + std::to_string(*refId));
+                    // Diagnostic resolution of one leaf reference only. Do not
+                    // flatten child/interval/continuous/multiple-shot graphs or
+                    // invent per-projectile events and activation windows.
+                    if (bullets->integer(bullet, "numShoot") != 1 ||
+                        bullets->number(bullet, "shootInterval") != 0 ||
+                        bullets->integer(bullet, "HitBulletID") != -1 ||
+                        bullets->integer(bullet, "intervalCreateBulletId") != -1 ||
+                        bullets->integer(bullet, "isEndlessHit") != 0)
+                        throw std::runtime_error("Unsupported Bullet emission or child-reference graph " + std::to_string(*refId));
+                    const auto linkedAttack = bullets->integer(bullet, "atkId_Bullet");
+                    if (!linkedAttack || *linkedAttack < 0)
+                        throw std::runtime_error("Bullet has no valid atkId_Bullet " + std::to_string(*refId));
+                    attackId = *linkedAttack;
+                    bulletId = *refId;
+                    bulletParameters = extractBulletParameters(*bullets, bullet);
+                } catch (const std::runtime_error& error) {
+                    fail(error.what());
+                    continue;
+                }
+            }
+            const auto attack = attacks.find(attackId);
 
             if (!attack) {
-                fail("Missing AtkParam_Pc row " + std::to_string(*refId));
+                fail("Missing AtkParam_Pc row " + std::to_string(attackId));
                 continue;
             }
 
@@ -1182,7 +1295,9 @@ export namespace erdo::witchy
             hit.event = event;
             hit.behaviorParamId = behaviorId.value_or(-1);
             hit.behaviorCategory = behaviors.integer(behavior, "category").value_or(-1);
-            hit.atkParamId = *refId;
+            hit.atkParamId = attackId;
+            hit.bulletParamId = bulletId;
+            hit.bulletParameters = std::move(bulletParameters);
             try {
                 hit.motionValues = extractMotionValues(attacks, attack);
                 if (const auto opposing = attacks.number(attack, "opposeTarget")) {
@@ -1417,9 +1532,21 @@ export namespace erdo::witchy
         MoveId::POWERSTANCE_L1_4, MoveId::POWERSTANCE_RUNNING_L1, MoveId::POWERSTANCE_ROLLING_L1,
         MoveId::POWERSTANCE_BACKSTEP_L1, MoveId::POWERSTANCE_JUMPING_L1});
 
+    // Torches have the same ordinary selected-state vocabulary, but their
+    // weapon parameters disable critical throws and backstab acquisition.
+    inline constexpr auto torchCatalog = omitCatalogMoves(thrustingShieldCatalog, std::array{
+        MoveId::BACKSTAB_WHIFF, MoveId::BACKSTAB, MoveId::RIPOSTE,
+        MoveId::SMALL_PVE_BACKSTAB, MoveId::SMALL_PVE_RIPOSTE, MoveId::LARGE_PVE_RIPOSTE});
+
+    constexpr bool ordinaryWeaponUsesBuiltInPair(int motionCategory) {
+        return motionCategory == 22 || motionCategory == 42 || motionCategory == 55 || motionCategory == 58 || motionCategory == 62;
+    }
+
     // Audited ordinary stance signatures, not arbitrary native pose routing.
     // Attack graph selectors still use the weapon category (offsets 13/16).
     constexpr int ordinaryWeaponMotionPosition(int motionCategory, bool twoHanded) {
+        // Audited built-in pairs retain stance zero in either style.
+        if (ordinaryWeaponUsesBuiltInPair(motionCategory)) return 0;
         // Heavy thrusting swords have asymmetric authored stance positions.
         if (motionCategory == 39 || motionCategory == 60) return twoHanded ? 10 : 3;
         if (motionCategory == 36 || motionCategory == 37 || motionCategory == 38 || motionCategory == 50
@@ -1508,6 +1635,151 @@ export namespace erdo::witchy
         MoveDefinition{MoveId::LARGE_PVE_RIPOSTE, "Large PvE Riposte", 31750}
     };
 
+    // Six-stage ordinary/offhand and matching-pair chains. The two 1H
+    // movement states invoke PCBehavior instead of AttackBehavior.
+    inline constexpr auto clawCatalog = [] {
+        std::array<MoveDefinition, daggerCatalog.size() + 2> catalog;
+        std::ranges::copy(daggerCatalog, catalog.begin());
+        catalog[daggerCatalog.size()] = {MoveId::POWERSTANCE_L1_5, "Powerstance L1 #5", 34040};
+        catalog[daggerCatalog.size() + 1] = {MoveId::POWERSTANCE_L1_6, "Powerstance L1 #6", 34050};
+        for (auto& definition : catalog) {
+            definition.requiredCategory.reset();
+            definition.requiredBehaviorParamId.reset();
+            switch (definition.id) {
+            case MoveId::ONE_HAND_RUNNING_R1: case MoveId::ONE_HAND_ROLLING_R1:
+                definition.eventType = 307; break;
+            case MoveId::BACKSTAB: case MoveId::RIPOSTE:
+            case MoveId::SMALL_PVE_BACKSTAB: case MoveId::SMALL_PVE_RIPOSTE:
+            case MoveId::LARGE_PVE_RIPOSTE:
+                definition.eventType = 304; break;
+            default: break;
+            }
+        }
+        return catalog;
+    }();
+
+    // Fists share the six-stage vocabulary, but running R1 uses type 1.
+    // Only rolling R1 invokes the audited right-weapon PCBehavior selector.
+    inline constexpr auto fistCatalog = [] {
+        auto catalog = clawCatalog;
+        for (auto& definition : catalog)
+            if (definition.id == MoveId::ONE_HAND_RUNNING_R1) definition.eventType = 1;
+        return catalog;
+    }();
+
+    // Four ordinary/offhand and matching-pair stages, four neutral feints.
+    // Both 1H movement R1 states use the audited right-weapon PCBehavior.
+    inline constexpr auto beastClawCatalog = [] {
+        std::array<MoveDefinition, greatKatanaCatalog.size() + 1> catalog;
+        std::ranges::copy(greatKatanaCatalog, catalog.begin());
+        catalog.back() = {MoveId::POWERSTANCE_L1_4, "Powerstance L1 #4", 34030};
+        for (auto& definition : catalog) {
+            definition.requiredCategory.reset();
+            definition.requiredBehaviorParamId.reset();
+            switch (definition.id) {
+            case MoveId::ONE_HAND_RUNNING_R1: case MoveId::ONE_HAND_ROLLING_R1:
+                definition.eventType = 307; break;
+            case MoveId::BACKSTAB: case MoveId::RIPOSTE:
+            case MoveId::SMALL_PVE_BACKSTAB: case MoveId::SMALL_PVE_RIPOSTE:
+            case MoveId::LARGE_PVE_RIPOSTE:
+                definition.eventType = 304; break;
+            default: break;
+            }
+        }
+        return catalog;
+    }();
+
+    // Six-stage built-in-pair vocabulary. Both movement R1 states use type 1;
+    // the mounted right charge/release uses judges 730/735, like the left.
+    inline constexpr auto backhandBladeCatalog = [] {
+        auto catalog = clawCatalog;
+        for (auto& definition : catalog) {
+            if (definition.id == MoveId::ONE_HAND_RUNNING_R1 || definition.id == MoveId::ONE_HAND_ROLLING_R1)
+                definition.eventType = 1;
+            if (definition.id == MoveId::MOUNTED_R2_CHARGING) definition.eventJudgeId = 730;
+            if (definition.id == MoveId::MOUNTED_CHARGED_R2) definition.eventJudgeId = 735;
+        }
+        return catalog;
+    }();
+
+    // Martial arts retain all six stages and standard mounted phases.
+    // Both 1H movement R1 states use ordinary AttackBehavior events.
+    inline constexpr auto martialArtsCatalog = [] {
+        auto catalog = clawCatalog;
+        for (auto& definition : catalog)
+            if (definition.id == MoveId::ONE_HAND_RUNNING_R1 || definition.id == MoveId::ONE_HAND_ROLLING_R1)
+                definition.eventType = 1;
+        return catalog;
+    }();
+
+    // Native special-110/base-23 vocabulary. The special registration changes
+    // four 1H heavy phases and both rolling attacks; other states use base23.
+    // Production graph resolution still selects the actual registered clips.
+    inline constexpr auto straightSword110Catalog = [] {
+        auto catalog = straightSwordCatalog;
+        for (auto& definition : catalog) {
+            switch (definition.id) {
+            case MoveId::ONE_HAND_R2_1: case MoveId::ONE_HAND_CHARGED_R2_1:
+            case MoveId::ONE_HAND_R2_2: case MoveId::ONE_HAND_CHARGED_R2_2:
+            case MoveId::ONE_HAND_ROLLING_R1: case MoveId::TWO_HAND_ROLLING_R1:
+                definition.motionCategory = 110; break;
+            default: break;
+            }
+        }
+        return catalog;
+    }();
+
+    // Native straight-sword special/base-23 heavy vocabulary for categories
+    // 111/112/113/117. Each special registration changes all eight R2 phases;
+    // other states use base23. Production graph resolution still selects the
+    // actual registered clips. Warhawk's Talon (117) carries a second hit event
+    // on most heavies; that data is read from its special clips, not authored here.
+    consteval auto straightSwordHeavySpecialCatalog(int special) {
+        auto catalog = straightSwordCatalog;
+        for (auto& definition : catalog) {
+            switch (definition.id) {
+            case MoveId::ONE_HAND_R2_1: case MoveId::ONE_HAND_CHARGED_R2_1:
+            case MoveId::ONE_HAND_R2_2: case MoveId::ONE_HAND_CHARGED_R2_2:
+            case MoveId::TWO_HAND_R2_1: case MoveId::TWO_HAND_CHARGED_R2_1:
+            case MoveId::TWO_HAND_R2_2: case MoveId::TWO_HAND_CHARGED_R2_2:
+                definition.motionCategory = special; break;
+            default: break;
+            }
+        }
+        return catalog;
+    }
+    inline constexpr auto straightSword111Catalog = straightSwordHeavySpecialCatalog(111);
+    inline constexpr auto straightSword112Catalog = straightSwordHeavySpecialCatalog(112);
+    inline constexpr auto straightSword113Catalog = straightSwordHeavySpecialCatalog(113);
+    inline constexpr auto straightSword117Catalog = straightSwordHeavySpecialCatalog(117);
+
+    // Representative partial override fixture. Production graph resolution
+    // chooses registered special clips and falls back only on absent entries.
+    inline constexpr auto footworkCatalog = [] {
+        auto catalog = martialArtsCatalog;
+        using enum MoveId;
+        for (auto& definition : catalog) {
+            const auto id = definition.id;
+            if ((id >= ONE_HAND_R1_1 && id <= ONE_HAND_CHARGED_R2_2) || id == ONE_HAND_R1_6
+                || (id >= TWO_HAND_R1_1 && id <= TWO_HAND_CHARGED_R2_2) || id == TWO_HAND_R1_6
+                || (id >= OFFHAND_R1_1 && id <= OFFHAND_R1_6))
+                definition.motionCategory = 246;
+        }
+        return catalog;
+    }();
+
+    // Audited special/base category pairs, not weapon-ID exceptions. The scoped
+    // priority policy is inferred from partial overrides, not recovered native
+    // selector code; do not extend it to arbitrary special categories.
+    constexpr bool auditedSpecialWeaponRouting(int motionCategory, int specialCategory) {
+        return (motionCategory == 55 && specialCategory == 246)
+            || (motionCategory == 23 && specialCategory == 110)
+            || (motionCategory == 23 && specialCategory == 111)
+            || (motionCategory == 23 && specialCategory == 112)
+            || (motionCategory == 23 && specialCategory == 113)
+            || (motionCategory == 23 && specialCategory == 117);
+    }
+
     class AnimationCache {
     public:
         explicit AnimationCache(std::filesystem::path tempDir)
@@ -1519,21 +1791,27 @@ export namespace erdo::witchy
 
         const std::vector<AttackEvent>& get(
             int motionCategory,
-            int animationId
+            int animationId,
+            bool includePCBehaviors = false,
+            bool includeBulletBehaviors = false
         ) {
             std::set<std::pair<int, int>> active;
-            return load(motionCategory, animationId, active);
+            return load(motionCategory, animationId, active, includePCBehaviors, includeBulletBehaviors);
         }
 
     private:
         const std::vector<AttackEvent>& load(
-            int motionCategory, int animationId, std::set<std::pair<int, int>>& active
+            int motionCategory, int animationId, std::set<std::pair<int, int>>& active,
+            bool includePCBehaviors, bool includeBulletBehaviors
         ) {
             const auto key = std::pair{
                 motionCategory, animationId
             };
 
-            if (auto it = cache_.find(key); it != cache_.end())
+            auto& cache = includePCBehaviors
+                ? (includeBulletBehaviors ? pcBulletCache_ : pcCache_)
+                : (includeBulletBehaviors ? bulletCache_ : cache_);
+            if (auto it = cache.find(key); it != cache.end())
                 return it->second;
 
             if (!active.insert(key).second)
@@ -1571,14 +1849,14 @@ export namespace erdo::witchy
                 // before assigning TaeAnimation. Never merge the local rows.
                 // The exported full animation ID encodes category * 1,000,000 + local ID.
                 try {
-                    events = load(*target / 1000000, *target % 1000000, active);
+                    events = load(*target / 1000000, *target % 1000000, active, includePCBehaviors, includeBulletBehaviors);
                 } catch (const std::runtime_error& error) {
                     throw std::runtime_error(std::format("TAE alias {} -> {}: {}", path, *target, error.what()));
                 }
                 for (auto& event : events)
                     event.animationId = animationId;
             } else {
-                events = extractAttackEvents(tae, animationId);
+                events = extractAttackEvents(tae, animationId, includePCBehaviors, includeBulletBehaviors);
                 for (auto& event : events) {
                     event.sourceMotionCategory = motionCategory;
                     event.sourceAnimationId = animationId;
@@ -1587,7 +1865,7 @@ export namespace erdo::witchy
 
             active.erase(key);
 
-            return cache_.emplace(
+            return cache.emplace(
                 key, std::move(events)
             ).first->second;
         }
@@ -1599,6 +1877,11 @@ export namespace erdo::witchy
             std::pair<int, int>,
             std::vector<AttackEvent>
         > cache_;
+        // Keep opt-in PCBehavior extraction separate so an earlier ordinary
+        // request cannot hide PC events, or expose them to a later default one.
+        decltype(cache_) pcCache_;
+        decltype(cache_) bulletCache_;
+        decltype(cache_) pcBulletCache_;
     };
 
     struct MoveImportFailure {
@@ -1617,6 +1900,70 @@ export namespace erdo::witchy
         std::vector<MoveImportFailure> failures;
     };
 
+    ResolutionResult resolveSelectedAttackEvents(
+        const std::vector<AttackEvent>& events, const MoveDefinition& definition,
+        int variation, const BehaviorIndex& behaviors, const ParamTable& attacks,
+        std::optional<int> requiredCategory, BehaviorLookup lookup, const ParamTable* bullets)
+    {
+        std::vector<AttackEventSelection> selections{{definition.eventType.value_or(-1),
+            definition.eventJudgeId, definition.requiredCategory, definition.requiredBehaviorParamId}};
+        if (definition.additionalEventSelections) for (const auto& selection : *definition.additionalEventSelections) {
+            if (selection.eventType != 1 && selection.eventType != 2 && selection.eventType != 304 && selection.eventType != 307)
+                throw std::runtime_error("Unsupported additional attack event type filter");
+            if (definition.eventJudgeId && !selection.eventJudgeId)
+                throw std::runtime_error("Additional events for a phased move require an explicit judge filter");
+            selections.push_back(selection);
+        }
+        std::vector<std::vector<AttackEvent>> groups(selections.size());
+        std::vector<std::vector<std::size_t>> positions(selections.size());
+        for (std::size_t position = 0; position < events.size(); ++position) {
+            const auto& event = events[position];
+            std::optional<std::size_t> owner;
+            for (std::size_t i = 0; i < selections.size(); ++i) {
+                const auto& selection = selections[i];
+                const bool typeMatches = selection.eventType == -1
+                    ? event.eventType == 1 || event.eventType == 304 : event.eventType == selection.eventType;
+                if (!typeMatches || (selection.eventJudgeId && event.behaviorJudgeId != *selection.eventJudgeId)) continue;
+                if (owner)
+                    throw std::runtime_error(std::format("Overlapping attack event selections: animation {} type {} judge {}",
+                        event.animationId, event.eventType, event.behaviorJudgeId));
+                owner = i;
+            }
+            if (owner) {
+                groups[*owner].push_back(event);
+                positions[*owner].push_back(position);
+            }
+        }
+        ResolutionResult result;
+        std::map<std::size_t, ResolvedHit> ordered;
+        for (std::size_t i = 0; i < selections.size(); ++i) {
+            const auto& selection = selections[i];
+            if (groups[i].empty()) {
+                result.diagnostics.emplace_back(std::format("No attack events for selection type {} judge {}",
+                    selection.eventType == -1 ? "direct" : std::to_string(selection.eventType),
+                    selection.eventJudgeId ? std::to_string(*selection.eventJudgeId) : "any"));
+                continue;
+            }
+            auto resolved = resolveAttackEvents(groups[i], variation, behaviors, attacks,
+                requiredCategory ? requiredCategory : selection.requiredCategory,
+                selection.requiredBehaviorParamId, lookup, bullets);
+            if (resolved.diagnostics.empty()) {
+                if (resolved.hits.size() != positions[i].size())
+                    throw std::runtime_error("Selected attack event count mismatch");
+                for (std::size_t j = 0; j < resolved.hits.size(); ++j)
+                    ordered.emplace(positions[i][j], std::move(resolved.hits[j]));
+            }
+            result.diagnostics.insert(result.diagnostics.end(), std::make_move_iterator(resolved.diagnostics.begin()), std::make_move_iterator(resolved.diagnostics.end()));
+            result.unresolved.insert(result.unresolved.end(), std::make_move_iterator(resolved.unresolved.begin()), std::make_move_iterator(resolved.unresolved.end()));
+        }
+        // Cache positions retain equal-time and repeated event order without
+        // comparing identities or deduplicating. A failed component publishes
+        // no partial composed hit list; its owned diagnostics still survive.
+        if (result.diagnostics.empty())
+            for (auto& [position, hit] : ordered) result.hits.push_back(std::move(hit));
+        return result;
+    }
+
     template <class AddMove>
         requires std::invocable<AddMove&, const MoveDefinition&, const std::vector<ResolvedHit>&>
     MovesetImportReport importMoveset(
@@ -1628,30 +1975,42 @@ export namespace erdo::witchy
         const ParamTable& attacks,
         AddMove&& addMove,
         std::optional<int> requiredCategory = std::nullopt,
-        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS,
+        const ParamTable* bullets = nullptr
     ) {
         MovesetImportReport report{motionCategory, behaviorVariation, catalog.size()};
         for (const auto& definition : catalog) {
             ResolutionResult result;
             try {
-                const auto& events = animationCache.get(definition.motionCategory.value_or(motionCategory), definition.animationId);
+                const auto extraType = [&](int type) {
+                    return definition.additionalEventSelections && std::ranges::any_of(*definition.additionalEventSelections,
+                        [&](const auto& selection) { return selection.eventType == type; });
+                };
+                const auto& events = animationCache.get(definition.motionCategory.value_or(motionCategory),
+                    definition.animationId, definition.eventType == 307 || extraType(307), definition.eventType == 2 || extraType(2));
                 std::vector<AttackEvent> selectedEvents;
-                if (definition.eventType && *definition.eventType != 1 && *definition.eventType != 304)
+                if (definition.eventType && *definition.eventType != 1 && *definition.eventType != 2 && *definition.eventType != 304
+                    && *definition.eventType != 307)
                     throw std::runtime_error("Unsupported attack event type filter");
-                if (definition.eventJudgeId || definition.eventType) {
-                    std::ranges::copy_if(events, std::back_inserter(selectedEvents), [&](const auto& event) {
-                        return (!definition.eventJudgeId || event.behaviorJudgeId == *definition.eventJudgeId)
-                            && (!definition.eventType || event.eventType == *definition.eventType);
-                    });
-                    if (selectedEvents.empty())
-                        throw std::runtime_error(std::format("No attack events for selected judge {} and event type {}",
-                            definition.eventJudgeId ? std::to_string(*definition.eventJudgeId) : "any",
-                            definition.eventType ? std::to_string(*definition.eventType) : "any"));
+                if (definition.additionalEventSelections && !definition.additionalEventSelections->empty()) {
+                    result = resolveSelectedAttackEvents(events, definition, behaviorVariation, behaviors, attacks,
+                        requiredCategory, lookup, bullets);
+                } else {
+                    if (definition.eventJudgeId || definition.eventType) {
+                        std::ranges::copy_if(events, std::back_inserter(selectedEvents), [&](const auto& event) {
+                            return (!definition.eventJudgeId || event.behaviorJudgeId == *definition.eventJudgeId)
+                                && (!definition.eventType || event.eventType == *definition.eventType);
+                        });
+                        if (selectedEvents.empty())
+                            throw std::runtime_error(std::format("No attack events for selected judge {} and event type {}",
+                                definition.eventJudgeId ? std::to_string(*definition.eventJudgeId) : "any",
+                                definition.eventType ? std::to_string(*definition.eventType) : "any"));
+                    }
+                    result = resolveAttackEvents((definition.eventJudgeId || definition.eventType) ? selectedEvents : events,
+                        behaviorVariation, behaviors, attacks,
+                        requiredCategory ? requiredCategory : definition.requiredCategory,
+                        definition.requiredBehaviorParamId, lookup, bullets);
                 }
-                result = resolveAttackEvents((definition.eventJudgeId || definition.eventType) ? selectedEvents : events,
-                    behaviorVariation, behaviors, attacks,
-                    requiredCategory ? requiredCategory : definition.requiredCategory,
-                    definition.requiredBehaviorParamId, lookup);
             } catch (const std::runtime_error& error) {
                 result.diagnostics.emplace_back(error.what());
             }
@@ -1696,14 +2055,15 @@ export namespace erdo::witchy
         const BehaviorIndex& behaviors,
         const ParamTable& attacks,
         std::optional<int> requiredCategory = std::nullopt,
-        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS
+        BehaviorLookup lookup = BehaviorLookup::STRICT_FIELDS,
+        const ParamTable* bullets = nullptr
     ) {
         auto moveset = std::make_shared<Moveset>(motionCategory, behaviorVariation);
         auto report = importMoveset(animationCache, motionCategory, behaviorVariation,
             catalog, behaviors, attacks,
             [&](const MoveDefinition& definition, const std::vector<ResolvedHit>& hits) {
                 moveset->moves.push_back({definition.id, std::string(definition.name), definition.animationId, hits});
-            }, requiredCategory, lookup);
+            }, requiredCategory, lookup, bullets);
         return {std::move(moveset), std::move(report)};
     }
 
@@ -1719,6 +2079,8 @@ export namespace erdo::witchy
             int baseBehaviorVariation;
             std::span<const MoveDefinition> moves;
             int enableThrow = 1;
+            int paired = 0;
+            int specialCategory = 0;
         };
         const std::array catalogs{
             SupportedCatalog{1, 20, 100, daggerCatalog},
@@ -1742,13 +2104,24 @@ export namespace erdo::witchy
             SupportedCatalog{9, 28, 700, curvedSwordCatalog},
             SupportedCatalog{94, 61, 6600, greatKatanaCatalog},
             SupportedCatalog{93, 60, 6700, lightGreatswordCatalog},
-            SupportedCatalog{90, 57, 6100, thrustingShieldCatalog}
+            SupportedCatalog{90, 57, 6100, thrustingShieldCatalog},
+            SupportedCatalog{87, 21, 2400, torchCatalog, 0},
+            SupportedCatalog{37, 22, 2200, clawCatalog, 1, 1},
+            SupportedCatalog{35, 42, 2100, fistCatalog, 1, 1},
+            SupportedCatalog{95, 62, 6800, beastClawCatalog, 1, 1},
+            SupportedCatalog{92, 58, 6400, backhandBladeCatalog, 1, 1},
+            SupportedCatalog{88, 55, 6300, martialArtsCatalog, 1, 1},
+            SupportedCatalog{3, 23, 200, straightSword110Catalog, 1, 0, 110},
+            SupportedCatalog{3, 23, 200, straightSword111Catalog, 1, 0, 111},
+            SupportedCatalog{3, 23, 200, straightSword112Catalog, 1, 0, 112},
+            SupportedCatalog{3, 23, 200, straightSword113Catalog, 1, 0, 113},
+            SupportedCatalog{3, 23, 200, straightSword117Catalog, 1, 0, 117}
         };
 
         // Share complete validated families only when all routing inputs match.
         // Names/weapon IDs, attack power, scaling and passive status do not select
-        // these animations or behavior rows. Special, paired and catalyst routing
-        // require separate support; never inherit a family by category alone.
+        // these animations or behavior rows. Special, catalyst and other paired
+        // profiles require separate support; never inherit by category alone.
         // The behavior resolver already implements exact -> hundred-family ->
         // common lookup. Different exact variations must never share hit data.
         std::map<std::pair<std::size_t, int>, std::vector<long long>> supportedRows;
@@ -1769,8 +2142,9 @@ export namespace erdo::witchy
                     matches("wepType", catalog.weaponType) &&
                     matches("wepmotionOneHandId", ordinaryWeaponMotionPosition(catalog.motionCategory, false)) &&
                     matches("wepmotionBothHandId", ordinaryWeaponMotionPosition(catalog.motionCategory, true)) &&
-                    matches("spAtkcategory", 0) && matches("isWeaponCatalyst", 0) &&
-                    matches("isDualBlade", 0) && matches("enableThrow", catalog.enableThrow))
+                    matches("spAtkcategory", catalog.specialCategory) && matches("isWeaponCatalyst", 0) &&
+                    matches("isDualBlade", catalog.paired) && matches("enableThrow", catalog.enableThrow) &&
+                    (catalog.paired == 0 || matches("bothHandEquipable", 1)))
                     supportedRows[{i, variation}].push_back(id);
             }
         }

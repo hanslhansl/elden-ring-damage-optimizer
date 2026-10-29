@@ -129,6 +129,10 @@ TEST_CASE("UI moves - stats hits and game data replacement", "[moveset][ui]")
     select_move(moves, MoveId::POWERSTANCE_L1_1);
     REQUIRE(results->rowCount() == 1);
     CHECK(results->item(0, 1)->text() == "Unsupported");
+    hits->setValue(2); // The selected right-hand record needs no second weapon.
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 2)->text().toDouble() == 150);
+    hits->setValue(0);
     pair->setChecked(true);
     REQUIRE(results->rowCount() == 3);
     CHECK(results->item(0, 2)->text().toDouble() == 300);
@@ -141,6 +145,50 @@ TEST_CASE("UI moves - stats hits and game data replacement", "[moveset][ui]")
     tab.set_active_game_data(game_data(false));
     CHECK_FALSE(moves->isEnabled());
     CHECK(results->rowCount() == 0);
+}
+
+TEST_CASE("UI moves - selected direct hit survives an unsupported Bullet sibling", "[moveset][ui]")
+{
+    initialize_gui();
+    auto data = game_data();
+    auto& bullet = data->weapons[0].moveset->moves[0].hits[1];
+    bullet.bulletParamId = 200031311;
+    bullet.bulletParameters.emplace();
+    const auto restored = std::make_shared<GameData>(json::read<GameData>(json::write(*data)));
+    ui::StatsTab stats;
+    stats.set_active_game_data(restored);
+    stats.weapon_table->setCurrentIndex(stats.weapon_table->proxy_model->mapFromSource(
+        stats.weapon_table->model->index(0, 0)));
+    auto* moves = widget<QComboBox>(stats, "moveSelection");
+    auto* hits = widget<QSpinBox>(stats, "moveHitSelection");
+    auto* results = widget<QTableWidget>(stats, "moveResults");
+    select_move(moves, MoveId::ONE_HAND_R1_1);
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 1)->text() == "Unsupported");
+    CHECK(results->item(0, 2)->text().contains("Bullet 200031311"));
+    hits->setValue(1);
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 1)->text() == "Hit 1");
+    CHECK(results->item(0, 2)->text().toDouble() == 150);
+    CHECK(results->item(0, 3)->text().toDouble() == 150);
+    hits->setValue(2);
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 1)->text() == "Hit 2");
+    CHECK(results->item(0, 2)->text().contains("Bullet 200031311"));
+    CHECK(results->item(0, 3) == nullptr);
+    hits->setValue(0);
+    CHECK(results->item(0, 1)->text() == "Unsupported");
+
+    ui::OptimizeTab optimize;
+    optimize.set_active_game_data(restored);
+    select_move(widget<QComboBox>(optimize, "moveSelection"), MoveId::ONE_HAND_R1_1);
+    auto* count = widget<QLabel>(optimize, "weapons_label");
+    CHECK(count->text() == "1"); // Only the other weapon has a complete move.
+    auto* optimizeHits = widget<QSpinBox>(optimize, "moveHitSelection");
+    optimizeHits->setValue(1);
+    CHECK(count->text() == "2");
+    optimizeHits->setValue(2);
+    CHECK(count->text() == "0");
 }
 
 TEST_CASE("UI moves - unknown activation condition", "[moveset][ui]")
@@ -158,6 +206,13 @@ TEST_CASE("UI moves - unknown activation condition", "[moveset][ui]")
     auto* results = widget<QTableWidget>(stats, "moveResults");
     REQUIRE(results->rowCount() == 1);
     CHECK(results->item(0, 1)->text() == "Unsupported");
+    CHECK(results->item(0, 2)->text().contains("StateInfo condition 188"));
+    auto* hits = widget<QSpinBox>(stats, "moveHitSelection");
+    hits->setValue(2);
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 1)->text() == "Hit 2");
+    CHECK(results->item(0, 2)->text().toDouble() == 150);
+    hits->setValue(1);
     CHECK(results->item(0, 2)->text().contains("StateInfo condition 188"));
     ui::OptimizeTab optimize;
     optimize.set_active_game_data(restored);
@@ -336,8 +391,8 @@ TEST_CASE("UI moves - XML through JSON and application", "[moveset][ui][game_xml
         row = 0;
         check_powers(evaluator.evaluate(MoveId::ONE_HAND_R1_1)->hits[0].powers);
     }
-    REQUIRE(supported.size() == 1080);
-    REQUIRE(shared_sets.size() == 75);
+    REQUIRE(supported.size() == 1260);
+    REQUIRE(shared_sets.size() == 87);
     CHECK(shared_sets.at({20, 100}) != shared_sets.at({23, 200}));
 
     widget<QComboBox>(optimize, "starting_class_combobox")->setCurrentText("Wretch");
@@ -356,7 +411,7 @@ TEST_CASE("UI moves - XML through JSON and application", "[moveset][ui][game_xml
         std::vector<std::reference_wrapper<const Weapon>> eligible;
         for (const auto& weapon : supported)
             if (find_move(weapon.get(), id)) eligible.push_back(weapon);
-        REQUIRE(eligible.size() == (id == MoveId::POWERSTANCE_L1_1 ? 1041 : 1080));
+        REQUIRE(eligible.size() == (id == MoveId::POWERSTANCE_L1_1 ? 1217 : 1260));
         select_move(selected_move, id);
         pair->setChecked(id == MoveId::POWERSTANCE_L1_1);
         for (const int hit_number : {0, 1}) {
@@ -403,3 +458,35 @@ TEST_CASE("UI moves - XML through JSON and application", "[moveset][ui][game_xml
     }
 }
 #endif
+
+TEST_CASE("UI moves - explicit offhand source needs no matching pair", "[moveset][ui]")
+{
+    initialize_gui();
+    auto data = game_data();
+    for (auto& weapon : data->weapons) {
+        auto& move = weapon.moveset->moves[0];
+        move.id = MoveId::OFFHAND_R1_1;
+        move.name = "Offhand";
+        for (auto& hit : move.hits) hit.event.source = 2;
+    }
+    const auto restored = std::make_shared<GameData>(json::read<GameData>(json::write(*data)));
+    ui::StatsTab stats;
+    stats.set_active_game_data(restored);
+    stats.weapon_table->setCurrentIndex(stats.weapon_table->proxy_model->mapFromSource(
+        stats.weapon_table->model->index(0, 0)));
+    widget<QCheckBox>(stats, "matchingPowerstance")->setChecked(false);
+    select_move(widget<QComboBox>(stats, "moveSelection"), MoveId::OFFHAND_R1_1);
+    auto* results = widget<QTableWidget>(stats, "moveResults");
+    REQUIRE(results->rowCount() == 3);
+    CHECK(results->item(0, 2)->text().toDouble() == 300);
+    widget<QSpinBox>(stats, "moveHitSelection")->setValue(2);
+    REQUIRE(results->rowCount() == 1);
+    CHECK(results->item(0, 2)->text().toDouble() == 150);
+    ui::OptimizeTab optimize;
+    optimize.set_active_game_data(restored);
+    widget<QCheckBox>(optimize, "matchingPowerstance")->setChecked(false);
+    select_move(widget<QComboBox>(optimize, "moveSelection"), MoveId::OFFHAND_R1_1);
+    CHECK(widget<QLabel>(optimize, "weapons_label")->text() == "2");
+    widget<QSpinBox>(optimize, "moveHitSelection")->setValue(2);
+    CHECK(widget<QLabel>(optimize, "weapons_label")->text() == "1");
+}

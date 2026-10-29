@@ -51,8 +51,23 @@ constexpr const char* taeXml = R"(<anim><events>
         <event><type>1</type><startTime>0.2</startTime><endTime>0.4</endTime><params>
           <param name="BehaviorJudgeID" value="6"/><param name="Source" value="1"/>
           <param name="StateInfo" value="-1"/></params></event>
-        <event><type>307</type></event>
+        <event><type>5</type></event>
         </events></anim>)";
+
+constexpr const char* bulletTaeXml = R"(<anim><events>
+    <event><type>2</type><startTime>0.1</startTime><endTime>0.2</endTime><params>
+      <param name="BehaviorJudgeID" value="3"/><param name="AttackIndex" value="6"/>
+      <param name="Source" value="2"/><param name="StateInfo" value="0"/>
+      <param name="DummyPolyID" value="1"/><param name="AttachmentType" value="0"/>
+      <param name="Enable" value="False"/><param name="Offset" value="-2"/>
+      <param name="Unk12" value="0"/></params></event>
+    <event><type>2</type><startTime>0.1</startTime><endTime>0.2</endTime><params>
+      <param name="BehaviorJudgeID" value="3"/><param name="AttackIndex" value="7"/>
+      <param name="Source" value="1"/><param name="StateInfo" value="187"/>
+      <param name="DummyPolyID" value="2"/><param name="AttachmentType" value="1"/>
+      <param name="Enable" value="True"/><param name="Offset" value="3"/>
+      <param name="Unk12" value="4"/></params></event>
+    </events></anim>)";
 }
 
 TEST_CASE("moveset - IDs and catalogs", "[moveset][unit]")
@@ -65,6 +80,7 @@ TEST_CASE("moveset - IDs and catalogs", "[moveset][unit]")
     }
     for (const auto catalog : {std::span<const MoveDefinition>(daggerCatalog),
                               std::span<const MoveDefinition>(straightSwordCatalog),
+                              std::span<const MoveDefinition>(straightSword110Catalog),
                               std::span<const MoveDefinition>(axeCatalog),
                               std::span<const MoveDefinition>(hammerCatalog),
                               std::span<const MoveDefinition>(flailCatalog),
@@ -84,7 +100,14 @@ TEST_CASE("moveset - IDs and catalogs", "[moveset][unit]")
                               std::span<const MoveDefinition>(curvedSwordCatalog),
                               std::span<const MoveDefinition>(greatKatanaCatalog),
                               std::span<const MoveDefinition>(lightGreatswordCatalog),
-                              std::span<const MoveDefinition>(thrustingShieldCatalog)}) {
+                              std::span<const MoveDefinition>(thrustingShieldCatalog),
+                              std::span<const MoveDefinition>(torchCatalog),
+                              std::span<const MoveDefinition>(clawCatalog),
+                              std::span<const MoveDefinition>(fistCatalog),
+                              std::span<const MoveDefinition>(beastClawCatalog),
+                              std::span<const MoveDefinition>(backhandBladeCatalog),
+                              std::span<const MoveDefinition>(martialArtsCatalog),
+                              std::span<const MoveDefinition>(footworkCatalog)}) {
         std::set<MoveId> ids;
         for (const auto& move : catalog) {
             UNSCOPED_INFO("A weapon catalog must not contain duplicate move IDs");
@@ -92,6 +115,16 @@ TEST_CASE("moveset - IDs and catalogs", "[moveset][unit]")
         }
     }
     CHECK(flailCatalog.size() == 60);
+    CHECK(straightSword110Catalog.size() == straightSwordCatalog.size());
+    CHECK(std::ranges::count(straightSword110Catalog, 110, &MoveDefinition::motionCategory) == 6);
+    for (const auto [catalog, special] : {
+            std::pair{std::span<const MoveDefinition>(straightSword111Catalog), 111},
+            std::pair{std::span<const MoveDefinition>(straightSword112Catalog), 112},
+            std::pair{std::span<const MoveDefinition>(straightSword113Catalog), 113},
+            std::pair{std::span<const MoveDefinition>(straightSword117Catalog), 117}}) {
+        CHECK(catalog.size() == straightSwordCatalog.size());
+        CHECK(std::ranges::count(catalog, special, &MoveDefinition::motionCategory) == 8);
+    }
     for (const auto id : {MoveId::ONE_HAND_R1_5, MoveId::TWO_HAND_R1_5, MoveId::OFFHAND_R1_5})
         CHECK(std::ranges::find(flailCatalog, id, &MoveDefinition::id) == flailCatalog.end());
     CHECK(std::ranges::find(flailCatalog, MoveId::POWERSTANCE_L1_4, &MoveDefinition::id) != flailCatalog.end());
@@ -109,6 +142,18 @@ TEST_CASE("moveset - IDs and catalogs", "[moveset][unit]")
     CHECK(greatKatanaCatalog.size() == 63);
     CHECK(lightGreatswordCatalog.size() == 61);
     CHECK(thrustingShieldCatalog.size() == 52);
+    CHECK(torchCatalog.size() == 46);
+    CHECK(clawCatalog.size() == 68);
+    CHECK(fistCatalog.size() == 68);
+    CHECK(beastClawCatalog.size() == 64);
+    CHECK(backhandBladeCatalog.size() == 68);
+    CHECK(martialArtsCatalog.size() == 68);
+    CHECK(footworkCatalog.size() == 68);
+    CHECK(std::ranges::count(footworkCatalog, 246, &MoveDefinition::motionCategory) == 26);
+    for (const auto id : {MoveId::BACKSTAB_WHIFF, MoveId::BACKSTAB, MoveId::RIPOSTE,
+            MoveId::SMALL_PVE_BACKSTAB, MoveId::SMALL_PVE_RIPOSTE, MoveId::LARGE_PVE_RIPOSTE,
+            MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_JUMPING_L1})
+        CHECK(std::ranges::find(torchCatalog, id, &MoveDefinition::id) == torchCatalog.end());
     for (const auto id : {MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_L1_2, MoveId::POWERSTANCE_L1_3,
             MoveId::POWERSTANCE_L1_4, MoveId::POWERSTANCE_L1_5, MoveId::POWERSTANCE_L1_6,
             MoveId::POWERSTANCE_RUNNING_L1, MoveId::POWERSTANCE_ROLLING_L1,
@@ -222,6 +267,253 @@ TEST_CASE_METHOD(ImporterFixture, "moveset - behavior resolution", "[moveset][un
     UNSCOPED_INFO("Absent fields must remain unknown");
     REQUIRE((std::ranges::none_of(extractMotionValues(attacks, attacks.find(99)).known,
             [](bool known) { return known; })));
+}
+
+TEST_CASE_METHOD(ImporterFixture, "moveset - Bullet attack references", "[moveset][unit]")
+{
+    ParamTable bullets;
+    const std::string fields = R"(<fields>
+        <field name="numShoot" defaultValue="1"/>
+        <field name="shootInterval" defaultValue="0"/>
+        <field name="HitBulletID" defaultValue="-1"/>
+        <field name="intervalCreateBulletId" defaultValue="-1"/>
+        <field name="isEndlessHit" defaultValue="0"/>
+        </fields>)";
+    const auto loadBullet = [&](std::string_view attributes) {
+        bullets.loadXml(std::format("<param>{}<rows><row id='200100' {}/></rows></param>", fields, attributes).c_str());
+    };
+    loadBullet("atkId_Bullet='600200100'");
+    const std::vector<AttackEvent> events{{30000, 1, 3, 0, 0, .1, .2}};
+    const auto resolve = [&] {
+        return resolveAttackEvents(events, 200, index, attacks, 1, std::nullopt,
+            BehaviorLookup::STRICT_FIELDS, &bullets);
+    };
+    // Supplying Bullet data is explicit. An overlapping AtkParam ID must not
+    // be mistaken for the Bullet's actual, different linked attack ID.
+    CHECK(resolveAttackEvents(events, 200, index, attacks, 1).hits.empty());
+    const auto linked = resolve();
+    REQUIRE(linked.diagnostics.empty());
+    REQUIRE(linked.hits.size() == 1);
+    const auto& hit = linked.hits.front();
+    CHECK(hit.bulletParamId == 200100);
+    CHECK(hit.atkParamId == 600200100);
+    CHECK(hit.behaviorParamId == 3);
+    CHECK(hit.event.behaviorJudgeId == 3);
+    CHECK(hit.event.startTime == .1);
+    CHECK(hit.event.endTime == .2);
+    CHECK(hit.motionValues.values[0] == 151);
+    CHECK(erdo::json::write(erdo::json::read<ResolvedHit>(erdo::json::write(hit))) == erdo::json::write(hit));
+    auto directEvents = events;
+    directEvents.front().behaviorJudgeId = 6;
+    const auto direct = resolveAttackEvents(directEvents, 200, index, attacks, 1, std::nullopt,
+        BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(direct.hits.size() == 1);
+    CHECK_FALSE(direct.hits.front().bulletParamId);
+    const auto directJson = erdo::json::write(direct.hits.front());
+    CHECK_FALSE(directJson.contains("bulletParamId"));
+    CHECK_FALSE(erdo::json::read<ResolvedHit>(directJson).bulletParamId);
+    for (const auto attributes : {"atkId_Bullet='404'", "atkId_Bullet='7'", "atkId_Bullet='bad'", "atkId_Bullet='-1'", "",
+            "atkId_Bullet='600200100' numShoot='2'", "atkId_Bullet='600200100' shootInterval='0.1'",
+            "atkId_Bullet='600200100' HitBulletID='7'", "atkId_Bullet='600200100' intervalCreateBulletId='8'",
+            "atkId_Bullet='600200100' isEndlessHit='1'", "atkId_Bullet='600200100' shootInterval='bad'"}) {
+        CAPTURE(attributes);
+        loadBullet(attributes);
+        const auto failure = resolve();
+        CHECK(failure.hits.empty());
+        REQUIRE(failure.diagnostics.size() == 1);
+        REQUIRE(failure.unresolved.size() == 1);
+        REQUIRE(failure.unresolved.front().candidates.size() == 1);
+        CHECK(failure.unresolved.front().candidates.front().refType == 1);
+        CHECK(failure.unresolved.front().candidates.front().refId == 200100);
+    }
+    bullets.loadXml("<param><rows/></param>");
+    const auto missing = resolve();
+    REQUIRE(missing.diagnostics.size() == 1);
+    CHECK_THAT(missing.diagnostics.front(), Catch::Matchers::ContainsSubstring("Missing Bullet row 200100"));
+    bullets.loadXml("<param><rows><row id='200100' atkId_Bullet='600200100'/></rows></param>");
+    CHECK(resolve().hits.empty()); // Missing emission context must not assume defaults.
+    loadBullet("atkId_Bullet='600200100'");
+    behaviors.loadXml(R"(<param><rows>
+        <row id='3' variationId='200' behaviorJudgeId='3' category='1' refType='1' refId='200100'/>
+        <row id='4' variationId='200' behaviorJudgeId='3' category='1' refType='0' refId='200100'/>
+        </rows></param>)");
+    index.build(behaviors);
+    const auto ambiguous = resolve();
+    CHECK(ambiguous.hits.empty());
+    REQUIRE(ambiguous.unresolved.size() == 1);
+    CHECK(ambiguous.unresolved.front().candidates.size() == 2);
+    const auto explicitBullet = resolveAttackEvents(events, 200, index, attacks, 1, 3,
+        BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(explicitBullet.hits.size() == 1);
+    CHECK(explicitBullet.hits.front().bulletParamId == 200100);
+    CHECK(resolveAttackEvents(events, 200, index, attacks, 12, 3,
+        BehaviorLookup::STRICT_FIELDS, &bullets).hits.empty());
+}
+
+TEST_CASE_METHOD(ImporterFixture, "moveset - Bullet parameter ownership and serialization", "[moveset][unit]")
+{
+    ParamTable bullets;
+    const std::string fields = R"(<fields>
+        <field name='numShoot' defaultValue='1'/><field name='shootInterval' defaultValue='0'/>
+        <field name='HitBulletID' defaultValue='-1'/><field name='intervalCreateBulletId' defaultValue='-1'/>
+        <field name='isEndlessHit' defaultValue='0'/><field name='life' defaultValue='-1'/>
+        <field name='isUseSharedHitList' defaultValue='1'/><field name='damageDamp' defaultValue='100'/>
+        </fields>)";
+    const auto load = [&](std::string_view attributes) {
+        bullets.loadXml(std::format("<param>{}<rows><row id='200100' atkId_Bullet='600200100' {}/></rows></param>",
+            fields, attributes).c_str());
+    };
+    const std::vector<AttackEvent> events{{30000, 1, 3, 0, 0, .1, .2}};
+    const auto resolve = [&] {
+        return resolveAttackEvents(events, 200, index, attacks, 1, std::nullopt,
+            BehaviorLookup::STRICT_FIELDS, &bullets);
+    };
+    load("life='1.25' lifeRandomRange='0' dmgHitRecordLifeTime='0' dist='2.5' damageDamp='90' "
+        "spelDamageDamp='80' fireDamageDamp='70' thunderDamageDamp='60' darkDamageDamp='50' "
+        "isUseSharedHitList='0' launchConditionType='2' spEffectIDForShooter='101' "
+        "spEffectId0='201' spEffectId1='0' spEffectId2='-1' spEffectId3='204' spEffectId4='205'");
+    auto linked = resolve();
+    REQUIRE(linked.diagnostics.empty());
+    REQUIRE(linked.hits.size() == 1);
+    REQUIRE(linked.hits[0].bulletParameters);
+    const auto parameters = *linked.hits[0].bulletParameters;
+    CHECK(parameters.life == 1.25f);
+    CHECK(parameters.lifeRandomRange == 0.f);
+    CHECK(parameters.dmgHitRecordLifeTime == 0.f);
+    CHECK(parameters.dist == 2.5f);
+    for (std::size_t i = 0; i < parameters.damageDamping.size(); ++i)
+        CHECK(parameters.damageDamping[i] == 90.f - 10.f * i);
+    CHECK(parameters.isUseSharedHitList == false);
+    CHECK(parameters.launchConditionType == 2);
+    CHECK(parameters.spEffectIDForShooter == 101);
+    const std::array<int, 5> effects{201, 0, -1, 204, 205};
+    for (std::size_t i = 0; i < effects.size(); ++i) CHECK(parameters.targetSpEffectIds[i] == effects[i]);
+
+    // Metadata owns its values after the source table is reloaded/destroyed.
+    bullets.loadXml("<param><rows/></param>");
+    auto moveset = std::make_shared<erdo::calculator::Moveset>(23, 200);
+    moveset->moves.push_back({MoveId::ONE_HAND_R1_1, "Bullet metadata", 30000, linked.hits});
+    erdo::calculator::GameData data{"test", 0, {erdo::calculator::Weapon::dummy, erdo::calculator::Weapon::dummy}};
+    for (auto& weapon : data.weapons) weapon.moveset = moveset;
+    const auto restored = erdo::json::read<erdo::calculator::GameData>(erdo::json::write(data));
+    REQUIRE(restored.weapons[0].moveset);
+    CHECK(restored.weapons[0].moveset == restored.weapons[1].moveset);
+    const auto& hit = restored.weapons[0].moveset->moves[0].hits[0];
+    REQUIRE(hit.bulletParameters);
+    CHECK(erdo::json::write(*hit.bulletParameters) == erdo::json::write(parameters));
+    CHECK_FALSE(erdo::calculator::hit_uses_secondary_weapon(hit));
+
+    auto legacy = hit;
+    legacy.bulletParameters.reset();
+    const auto legacyJson = erdo::json::write(legacy);
+    CHECK_FALSE(legacyJson.contains("bulletParameters"));
+    CHECK_FALSE(erdo::json::read<ResolvedHit>(legacyJson).bulletParameters);
+    CHECK_FALSE(erdo::calculator::hit_uses_secondary_weapon(legacy));
+
+    load("");
+    linked = resolve();
+    REQUIRE(linked.diagnostics.empty());
+    REQUIRE(linked.hits[0].bulletParameters);
+    const auto& partial = *linked.hits[0].bulletParameters;
+    CHECK(partial.life == -1.f); // Native infinite-lifetime sentinel stays raw.
+    CHECK(partial.isUseSharedHitList == true);
+    CHECK(partial.damageDamping[0] == 100.f);
+    CHECK_FALSE(partial.lifeRandomRange);
+    CHECK_FALSE(partial.dmgHitRecordLifeTime);
+    CHECK_FALSE(partial.dist);
+    CHECK_FALSE(partial.damageDamping[1]);
+    CHECK_FALSE(partial.launchConditionType);
+    CHECK_FALSE(partial.spEffectIDForShooter);
+    CHECK(std::ranges::none_of(partial.targetSpEffectIds, [](const auto& value) { return value.has_value(); }));
+    CHECK(erdo::json::write(erdo::json::read<ResolvedHit>(erdo::json::write(linked.hits[0])))
+        == erdo::json::write(linked.hits[0]));
+    for (const auto name : {"life", "lifeRandomRange", "dmgHitRecordLifeTime", "dist", "damageDamp",
+            "spelDamageDamp", "fireDamageDamp", "thunderDamageDamp", "darkDamageDamp",
+            "isUseSharedHitList", "launchConditionType", "spEffectIDForShooter", "spEffectId0",
+            "spEffectId1", "spEffectId2", "spEffectId3", "spEffectId4"}) {
+        for (const auto value : {"bad", "nan", "1e999"}) {
+            CAPTURE(name, value);
+            load(std::format("{}='{}'", name, value));
+            const auto invalid = resolve();
+            CHECK(invalid.hits.empty());
+            REQUIRE(invalid.unresolved.size() == 1);
+            REQUIRE(invalid.unresolved[0].candidates.size() == 1);
+            CHECK(invalid.unresolved[0].candidates[0].refId == 200100);
+        }
+    }
+    for (const auto value : {"2", "-1", "0.5"}) {
+        load(std::format("isUseSharedHitList='{}'", value));
+        CHECK_FALSE(resolve().diagnostics.empty());
+    }
+}
+
+TEST_CASE_METHOD(ImporterFixture, "moveset - BulletBehavior controls", "[moveset][unit]")
+{
+    xml_document tae;
+    REQUIRE(tae.load_string(bulletTaeXml));
+    CHECK(extractAttackEvents(tae, 30000).empty());
+    CHECK(extractAttackEvents(tae, 30000, true).empty());
+    const auto events = extractAttackEvents(tae, 30000, false, true);
+    REQUIRE(events.size() == 2);
+    CHECK(events[0].eventType == 2);
+    CHECK(events[0].source == 2);
+    CHECK(events[0].attackIndex == 6);
+    CHECK(events[0].bulletDummyPolyId == 1);
+    CHECK(events[0].bulletAttachmentType == 0);
+    CHECK(events[0].bulletEnable == false);
+    CHECK(events[0].bulletOffset == -2);
+    CHECK(events[0].bulletUnk12 == 0);
+    CHECK(events[1].source == 1);
+    CHECK(events[1].attackIndex == 7);
+    CHECK(events[1].bulletEnable == true);
+    CHECK(events[1].bulletDummyPolyId == 2);
+    CHECK(events[1].bulletAttachmentType == 1);
+    CHECK(events[1].bulletOffset == 3);
+    CHECK(events[1].bulletUnk12 == 4);
+    CHECK(events[1].stateInfo == 187);
+    CHECK(events[0].startTime == events[1].startTime);
+    const auto restored = erdo::json::read<AttackEvent>(erdo::json::write(events[0]));
+    CHECK(restored.bulletEnable == false);
+    CHECK(restored.bulletUnk12 == 0);
+    CHECK(restored.bulletAttachmentType == 0);
+    CHECK(erdo::json::write(restored) == erdo::json::write(events[0]));
+    ParamTable bullets;
+    bullets.loadXml(R"(<param><rows><row id='200100' atkId_Bullet='600200100'
+        numShoot='1' shootInterval='0' HitBulletID='-1' intervalCreateBulletId='-1' isEndlessHit='0'/></rows></param>)");
+    const auto linked = resolveAttackEvents(events, 200, index, attacks, 1, std::nullopt,
+        BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(linked.diagnostics.empty());
+    REQUIRE(linked.hits.size() == 2);
+    CHECK(linked.hits[0].bulletParamId == 200100);
+    CHECK(linked.hits[0].event.bulletEnable == false); // False is raw, not a guessed inactive flag.
+    CHECK(*erdo::calculator::attack_hit_active(linked.hits[0], {}));
+    CHECK_FALSE(erdo::calculator::hit_uses_secondary_weapon(linked.hits[0]));
+    auto direct = events;
+    direct[0].behaviorJudgeId = direct[1].behaviorJudgeId = 6;
+    const auto wrongType = resolveAttackEvents(direct, 200, index, attacks, 1, std::nullopt,
+        BehaviorLookup::STRICT_FIELDS, &bullets);
+    CHECK(wrongType.hits.empty());
+    REQUIRE(wrongType.unresolved.size() == 2);
+    CHECK(wrongType.unresolved[0].candidates[0].refType == 0);
+    erdo::calculator::ResolvedHit missingProvenance;
+    missingProvenance.event = events[0];
+    CHECK_FALSE(erdo::calculator::hit_uses_secondary_weapon(missingProvenance));
+    const auto mutate = [&](std::string_view from, std::string_view to) {
+        auto xml = std::string(bulletTaeXml);
+        const auto at = xml.find(from);
+        REQUIRE(at != std::string::npos);
+        xml.replace(at, from.size(), to);
+        REQUIRE(tae.load_string(xml.c_str()));
+        CHECK(extractAttackEvents(tae, 30000).empty());
+        CHECK_THROWS_AS(extractAttackEvents(tae, 30000, false, true), std::runtime_error);
+    };
+    for (const auto [name, value] : {std::pair{"DummyPolyID", "1"}, std::pair{"AttachmentType", "0"},
+            std::pair{"Offset", "-2"}, std::pair{"Unk12", "0"}, std::pair{"Enable", "False"}}) {
+        const auto field = std::format("<param name=\"{}\" value=\"{}\"/>", name, value);
+        mutate(field, "");
+        mutate(field, field + field);
+        mutate(field, std::format("<param name=\"{}\" value=\"bad\"/>", name));
+    }
 }
 
 TEST_CASE("moveset - opposing target flags", "[moveset][unit]")
@@ -374,6 +666,65 @@ TEST_CASE("moveset - ordinary player weapon lookup and fallback", "[moveset][uni
     CHECK(index.findPlayerWeapon(201, 100).empty());
 }
 
+TEST_CASE_METHOD(ImporterFixture, "moveset - PCBehavior selectors", "[moveset][unit]")
+{
+    const std::string xml = R"(<anim><events><event><type>307</type>
+      <startTime>0.25</startTime><endTime>0.5</endTime><params>
+      <param name="BehaviorJudgeID" value="100"/><param name="PCBehaviorType" value="16"/>
+      <param name="Condition0x64_GetWeaponData" value="0"/><param name="Offset" value="0"/>
+      </params></event></events></anim>)";
+    xml_document tae;
+    REQUIRE(tae.load_string(xml.c_str()));
+    const auto events = extractAttackEvents(tae, 30200, true);
+    REQUIRE(events.size() == 1);
+    CHECK(events[0].eventType == 307);
+    CHECK(events[0].source == -1);
+    CHECK(events[0].attackIndex == -1);
+    CHECK_FALSE(events[0].stateInfo);
+    CHECK(events[0].pcBehaviorType == 16);
+    CHECK(events[0].pcBehaviorCondition == 0);
+    CHECK(events[0].pcBehaviorOffset == 0);
+    // Category-aware field matching remains ambiguous; selected player lookup
+    // uses the existing exact -> family -> common encoded address.
+    CHECK_FALSE(resolveAttackEvents(events, 200, index, attacks).diagnostics.empty());
+    const auto resolved = resolveAttackEvents(events, 200, index, attacks,
+        std::nullopt, std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(resolved.diagnostics.empty());
+    REQUIRE(resolved.hits.size() == 1);
+    CHECK(resolved.hits[0].behaviorParamId == 100200100);
+    CHECK(resolved.hits[0].motionValues.values[0] == 125);
+    const auto restored = erdo::json::read<ResolvedHit>(erdo::json::write(resolved.hits[0]));
+    CHECK(erdo::json::write(restored) == erdo::json::write(resolved.hits[0]));
+    for (const auto member : {&AttackEvent::pcBehaviorType, &AttackEvent::pcBehaviorCondition,
+            &AttackEvent::pcBehaviorOffset}) {
+        auto invalid = events;
+        invalid[0].*member = 999;
+        const auto failure = resolveAttackEvents(invalid, 200, index, attacks,
+            std::nullopt, std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+        CHECK(failure.hits.empty());
+        REQUIRE(failure.unresolved.size() == 1);
+        CHECK_THAT(failure.diagnostics[0], Catch::Matchers::ContainsSubstring("PCBehavior"));
+        invalid[0].*member = std::nullopt;
+        CHECK_FALSE(resolveAttackEvents(invalid, 200, index, attacks).diagnostics.empty());
+    }
+    for (const auto field : {"PCBehaviorType", "Condition0x64_GetWeaponData", "Offset"}) {
+        const auto value = std::string_view(field) == "PCBehaviorType" ? "16" : "0";
+        const auto parameter = std::format("<param name=\"{}\" value=\"{}\"/>", field, value);
+        for (const auto replacement : {std::string{}, std::format("<param name=\"{}\" value=\"bad\"/>", field),
+                std::format("<param name=\"{}\" value=\"2147483648\"/>", field), parameter + parameter}) {
+            auto malformed = xml;
+            malformed.replace(malformed.find(parameter), parameter.size(), replacement);
+            REQUIRE(tae.load_string(malformed.c_str()));
+            REQUIRE_THROWS(extractAttackEvents(tae, 30200, true));
+        }
+    }
+    const auto legacy = erdo::json::read<AttackEvent>(R"({"animationId":30000,"eventType":1,
+        "behaviorJudgeId":6,"attackIndex":0,"source":0,"startTime":0.1,"endTime":0.2})");
+    CHECK_FALSE(legacy.pcBehaviorType);
+    CHECK_FALSE(legacy.pcBehaviorCondition);
+    CHECK_FALSE(legacy.pcBehaviorOffset);
+}
+
 TEST_CASE_METHOD(ImporterFixture, "moveset - attack events", "[moveset][unit]")
 {
     xml_document tae;
@@ -480,6 +831,107 @@ TEST_CASE_METHOD(ImporterFixture, "moveset - import and serialization", "[movese
         MoveDefinition{MoveId::ONE_HAND_R1_4, "malformed", 30030}
     };
     AnimationCache cache(scratch.root);
+    write(30045, R"(<anim><events>
+      <event><type>307</type><startTime>0.1</startTime><endTime>0.2</endTime><params>
+        <param name="BehaviorJudgeID" value="6"/><param name="PCBehaviorType" value="16"/>
+        <param name="Condition0x64_GetWeaponData" value="0"/><param name="Offset" value="0"/>
+      </params></event>
+      <event><type>1</type><startTime>0.3</startTime><endTime>0.4</endTime><params>
+        <param name="BehaviorJudgeID" value="6"/><param name="Source" value="0"/>
+      </params></event></events></anim>)");
+    REQUIRE(cache.get(23, 30045, true).size() == 2);
+    REQUIRE(cache.get(23, 30045).size() == 1);
+    auto combined = std::string(bulletTaeXml);
+    combined.insert(combined.find("</events>"), R"(
+      <event><type>307</type><startTime>0.3</startTime><endTime>0.4</endTime><params>
+        <param name="BehaviorJudgeID" value="6"/><param name="PCBehaviorType" value="16"/>
+        <param name="Condition0x64_GetWeaponData" value="0"/><param name="Offset" value="0"/>
+      </params></event>
+      <event><type>1</type><startTime>0.5</startTime><endTime>0.6</endTime><params>
+        <param name="BehaviorJudgeID" value="6"/><param name="Source" value="0"/>
+      </params></event>)");
+    write(30046, combined);
+    REQUIRE(cache.get(23, 30046).size() == 1);
+    REQUIRE(cache.get(23, 30046, true).size() == 2);
+    REQUIRE(cache.get(23, 30046, false, true).size() == 3);
+    REQUIRE(cache.get(23, 30046, true, true).size() == 4);
+    CHECK(cache.get(23, 30046).front().eventType == 1);
+    ParamTable bullets;
+    bullets.loadXml(R"(<param><rows><row id='200100' atkId_Bullet='600200100'
+        numShoot='1' shootInterval='0' HitBulletID='-1' intervalCreateBulletId='-1' isEndlessHit='0'/></rows></param>)");
+    MoveDefinition bulletDefinition{MoveId::TWO_HAND_GUARD_COUNTER, "Bullet component", 30046};
+    bulletDefinition.eventType = 2;
+    const auto missingBulletTable = importMoveset(cache, 23, 200, std::array{bulletDefinition}, index, attacks);
+    REQUIRE(missingBulletTable.report.failures.size() == 1);
+    CHECK(missingBulletTable.moveset->moves.empty());
+    CHECK(missingBulletTable.report.failures[0].unresolved.size() == 2);
+    const auto bulletComponent = importMoveset(cache, 23, 200, std::array{bulletDefinition}, index, attacks,
+        std::nullopt, BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(bulletComponent.report.failures.empty());
+    REQUIRE(bulletComponent.moveset->moves.size() == 1);
+    CHECK(bulletComponent.moveset->moves[0].hits.size() == 2);
+    CHECK(bulletComponent.moveset->moves[0].hits[0].event.bulletEnable == false);
+    MoveDefinition composed{MoveId::TWO_HAND_GUARD_COUNTER, "Explicit components", 30046};
+    composed.additionalEventSelections = std::vector{AttackEventSelection{2, 3, 1, 3}, AttackEventSelection{307, 6, 1, 6}};
+    const auto combinedImport = importMoveset(cache, 23, 200, std::array{composed}, index, attacks,
+        std::nullopt, BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(combinedImport.report.failures.empty());
+    REQUIRE(combinedImport.moveset->moves.size() == 1);
+    const auto& composedHits = combinedImport.moveset->moves[0].hits;
+    REQUIRE(composedHits.size() == 4);
+    const auto& allEvents = cache.get(23, 30046, true, true);
+    for (std::size_t i = 0; i < composedHits.size(); ++i)
+        CHECK(erdo::json::write(composedHits[i].event) == erdo::json::write(allEvents[i]));
+    CHECK(erdo::json::write(erdo::json::read<std::vector<AttackEventSelection>>(
+        erdo::json::write(*composed.additionalEventSelections))) == erdo::json::write(*composed.additionalEventSelections));
+    auto ordinary = composed;
+    ordinary.additionalEventSelections.reset();
+    CHECK_FALSE(erdo::json::write(ordinary).contains("additionalEventSelections"));
+    const auto composedWithoutBullets = importMoveset(cache, 23, 200, std::array{composed}, index, attacks);
+    REQUIRE(composedWithoutBullets.report.failures.size() == 1);
+    CHECK(composedWithoutBullets.moveset->moves.empty());
+    CHECK(composedWithoutBullets.report.failures[0].unresolved.size() == 2);
+    auto missingAndUnresolved = composed;
+    missingAndUnresolved.additionalEventSelections->push_back({304, 99});
+    const auto combinedFailures = importMoveset(cache, 23, 200, std::array{missingAndUnresolved}, index, attacks);
+    REQUIRE(combinedFailures.report.failures.size() == 1);
+    CHECK(combinedFailures.moveset->moves.empty());
+    CHECK(combinedFailures.report.failures[0].unresolved.size() == 2);
+    CHECK(combinedFailures.report.failures[0].diagnostics.size() == 3);
+    CHECK_THAT(combinedFailures.report.failures[0].diagnostics.back(), Catch::Matchers::ContainsSubstring("judge 99"));
+    for (const auto& extra : {std::vector{AttackEventSelection{2, 3}, AttackEventSelection{2, 3}},
+            std::vector{AttackEventSelection{1, 6}}, std::vector{AttackEventSelection{2, 99}},
+            std::vector{AttackEventSelection{999, 3}}, std::vector{AttackEventSelection{2, 3, 12}},
+            std::vector{AttackEventSelection{2, 3, 1, 99}}}) {
+        auto invalid = composed;
+        invalid.additionalEventSelections = extra;
+        std::size_t published = 0;
+        const auto failed = importMoveset(cache, 23, 200, std::array{invalid}, index, attacks,
+            [&](const auto&, const auto&) { ++published; }, std::nullopt, BehaviorLookup::STRICT_FIELDS, &bullets);
+        REQUIRE(failed.failures.size() == 1);
+        CHECK(published == 0);
+        CHECK(failed.importedMoves == 0);
+    }
+    const auto forcedCategory = importMoveset(cache, 23, 200, std::array{composed}, index, attacks,
+        std::optional{12}, BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(forcedCategory.report.failures.size() == 1);
+    CHECK(forcedCategory.report.failures[0].unresolved.size() == 4);
+    CHECK(forcedCategory.moveset->moves.empty());
+    auto phased = composed;
+    phased.eventJudgeId = 6;
+    phased.additionalEventSelections = std::vector{AttackEventSelection{2}};
+    const auto unfilteredPhase = importMoveset(cache, 23, 200, std::array{phased}, index, attacks,
+        std::nullopt, BehaviorLookup::STRICT_FIELDS, &bullets);
+    REQUIRE(unfilteredPhase.report.failures.size() == 1);
+    CHECK_THAT(unfilteredPhase.report.failures[0].diagnostics[0], Catch::Matchers::ContainsSubstring("phased move"));
+    for (const std::optional<int> type : {std::optional<int>{}, std::optional<int>{307}}) {
+        MoveDefinition selected{MoveId::ONE_HAND_RUNNING_R1, "Selected event family", 30045};
+        selected.eventType = type;
+        const auto pcImport = importMoveset(cache, 23, 200, std::array{selected}, index, attacks);
+        REQUIRE(pcImport.report.failures.empty());
+        REQUIRE(pcImport.moveset->moves[0].hits.size() == 1);
+        CHECK(pcImport.moveset->moves[0].hits[0].event.eventType == type.value_or(1));
+    }
     UNSCOPED_INFO("Cache must load valid events");
     REQUIRE((cache.get(23, 30000).size() == 3));
     UNSCOPED_INFO("Animation cache must distinguish motion categories");
@@ -493,6 +945,17 @@ TEST_CASE_METHOD(ImporterFixture, "moveset - import and serialization", "[movese
         UNSCOPED_INFO("Cannot write alias fixture");
         REQUIRE((static_cast<bool>(file)));
     };
+    writeAlias(20, 40008, R"(<anim><header><type>ImportOtherAnim</type><animId>23030046</animId></header>
+        <events><event><type>2</type></event></events></anim>)");
+    CHECK(cache.get(20, 40008).size() == 1);
+    CHECK(cache.get(20, 40008, true, true).size() == 4);
+    const auto& aliasBullets = cache.get(20, 40008, false, true);
+    REQUIRE(aliasBullets.size() == 3);
+    CHECK(aliasBullets[0].animationId == 40008);
+    CHECK(aliasBullets[0].sourceMotionCategory == 23);
+    CHECK(aliasBullets[0].sourceAnimationId == 30046);
+    CHECK(aliasBullets[0].bulletDummyPolyId == 1);
+    CHECK(cache.get(23, 30046, false, true)[0].animationId == 30046);
     writeAlias(20, 31750, R"(<anim><header><type>ImportOtherAnim</type><animId>21031751</animId></header>
         <events><event><type>129</type></event></events></anim>)");
     writeAlias(21, 31751, R"(<anim><header><type>ImportOtherAnim</type><animId>23030000</animId></header>
@@ -704,6 +1167,68 @@ TEST_CASE_METHOD(ImporterFixture, "moveset - import and serialization", "[movese
     CHECK(failures[0].behaviorVariation == 100);
     CHECK(failures[1].behaviorVariation == 104);
     CHECK(failures[2].behaviorVariation == 200);
+    // Special routing membership is parameter-based too. Arbitrary IDs with a
+    // complete signature share a group; the same variation with special0 must
+    // remain a separate context. An invalid graph result cannot use seed clips.
+    auto specialRow = supportedWeapons.at(2000000);
+    specialRow.at("spAtkcategory") = 110;
+    specialRow.at("behaviorVariationId") = 201;
+    auto baseRow = specialRow;
+    baseRow.at("spAtkcategory") = 0;
+    groups.clear();
+    failures.clear();
+    REQUIRE_THROWS(importWeaponMovesets(scratch.root,
+        {{1111111, baseRow}, {1234567, specialRow}, {7654321, specialRow}}, &failures,
+        [&](auto ids, auto definitions) {
+            groups.emplace_back(ids.begin(), ids.end());
+            const auto expected = ids.front() == 1111111 ? 0 : 6;
+            CHECK(std::ranges::count(definitions, 110, &MoveDefinition::motionCategory) == expected);
+            return std::vector<MoveDefinition>(definitions.begin(), definitions.end() - 1);
+        }));
+    CHECK(groups == std::vector<std::vector<long long>>{{1111111}, {1234567, 7654321}});
+    REQUIRE(failures.size() == 2);
+    for (const auto& failure : failures) {
+        CHECK(failure.motionCategory == 23);
+        CHECK(failure.behaviorVariation == 201);
+        CHECK(failure.requestedMoves == 63);
+        CHECK(failure.importedMoves == 0);
+    }
+    for (const auto& [field, value] : specialRow) {
+        CAPTURE(field);
+        auto changed = specialRow;
+        // spAtkcategory uses +4 (110 -> 114) so the mutation stays outside the
+        // audited straight-sword specials 110/111/112/113/117.
+        changed.at(field) = value + (field == "behaviorVariationId" ? 100 : field == "spAtkcategory" ? 4 : 1);
+        CHECK(importWeaponMovesets(scratch.root, {{1234567, changed}}, nullptr).empty());
+        changed.erase(field);
+        CHECK(importWeaponMovesets(scratch.root, {{1234567, changed}}, nullptr).empty());
+    }
+    // A selected special clip is mandatory even when a valid base clip exists.
+    const std::string validHeavy = R"(<anim><events><event><type>1</type>
+        <startTime>0</startTime><endTime>1</endTime><params>
+        <param name="BehaviorJudgeID" value="100"/><param name="Source" value="0"/>
+        </params></event></events></anim>)";
+    write(30505, validHeavy);
+    const auto baseHeavy = *std::ranges::find(straightSwordCatalog, MoveId::ONE_HAND_R2_1, &MoveDefinition::id);
+    const auto specialHeavy = *std::ranges::find(straightSword110Catalog, MoveId::ONE_HAND_R2_1, &MoveDefinition::id);
+    AnimationCache missingSpecial(scratch.root);
+    REQUIRE(importMoveset(missingSpecial, 23, 201, std::array{baseHeavy}, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON).report.failures.empty());
+    CHECK_FALSE(importMoveset(missingSpecial, 23, 201, std::array{specialHeavy}, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON).report.failures.empty());
+    const auto specialDirectory = directory.parent_path() / "a110-tae";
+    std::filesystem::create_directories(specialDirectory);
+    {
+        std::ofstream file(specialDirectory / "anim-030505.xml");
+        file << "<anim><events><event><type>1</type><startTime>bad</startTime></event></events></anim>";
+        REQUIRE(static_cast<bool>(file));
+    }
+    AnimationCache brokenSpecial(scratch.root);
+    const auto broken = importMoveset(brokenSpecial, 23, 201, std::array{specialHeavy}, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(broken.report.failures.size() == 1);
+    CHECK(broken.moveset->moves.empty());
+
     // Hammer membership is also parameter-based, including non-base variations.
     auto hammerRow = supportedWeapons.at(2000000);
     hammerRow.at("wepType") = 21;
@@ -741,14 +1266,16 @@ TEST_CASE_METHOD(ImporterFixture, "moveset - import and serialization", "[movese
         {13, 29, 905, 0, 63}, {11, 40, 804, 2, 59}, {7, 26, 408, 2, 56}, {41, 31, 2312, 2, 56},
         {29, 38, 1800, 3, 59}, {31, 50, 1906, 3, 57}, {25, 36, 1615, 3, 60}, {28, 37, 1708, 3, 57},
         {39, 43, 2003, 0, 51}, {15, 27, 500, 0, 71}, {9, 28, 703, 0, 70}, {94, 61, 6600, 2, 63},
-        {93, 60, 6700, 3, 61}, {90, 57, 6100, 3, 52}}) {
+        {93, 60, 6700, 3, 61}, {90, 57, 6100, 3, 52}, {87, 21, 2400, 0, 46}, {37, 22, 2200, 0, 68}, {35, 42, 2121, 0, 68}, {95, 62, 6800, 0, 64}, {92, 58, 6400, 0, 68}, {88, 55, 6300, 0, 68}}) {
         auto heavyRow = hammerRow;
         heavyRow.at("wepType") = type;
         heavyRow.at("wepmotionCategory") = category;
         heavyRow.at("behaviorVariationId") = variation;
         heavyRow.at("wepmotionOneHandId") = position;
-        heavyRow.at("wepmotionBothHandId") = category == 60 ? 10 : position + 10;
-        heavyRow.at("enableThrow") = category == 43 ? 0 : 1;
+        heavyRow.at("wepmotionBothHandId") = category == 22 || category == 42 || category == 55 || category == 58 || category == 62 ? 0 : category == 60 ? 10 : position + 10;
+        heavyRow.at("isDualBlade") = category == 22 || category == 42 || category == 55 || category == 58 || category == 62 ? 1 : 0;
+        heavyRow.at("enableThrow") = category == 43 || category == 21 ? 0 : 1;
+        if (category == 22 || category == 42 || category == 55 || category == 58 || category == 62) heavyRow.emplace("bothHandEquipable", 1);
         failures.clear();
         REQUIRE_THROWS(importWeaponMovesets(scratch.root, {{1234567, heavyRow}}, &failures,
             [](auto, auto definitions) {
@@ -988,7 +1515,7 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
                     hit.behaviorParamId == (check.behaviorId >= 0 ? check.behaviorId
                         : 100000000 + moveset.behaviorVariation * 1000 + check.judge) &&
                     hit.event.animationId == expected.animation &&
-                    hit.event.eventType == (critical && expected.id != MoveId::BACKSTAB_WHIFF ? 304 : 1)));
+                    hit.event.eventType == (((moveset.motionCategory == 22 || moveset.motionCategory == 62) && expected.id == MoveId::ONE_HAND_RUNNING_R1) || ((moveset.motionCategory == 22 || moveset.motionCategory == 42 || moveset.motionCategory == 62) && expected.id == MoveId::ONE_HAND_ROLLING_R1) ? 307 : critical && expected.id != MoveId::BACKSTAB_WHIFF ? 304 : 1)));
             UNSCOPED_INFO("Physical MV or known flags mismatch");
             REQUIRE((hit.motionValues.values[0] == check.physical &&
                     std::ranges::all_of(hit.motionValues.known, [](bool known) { return known; })));
@@ -1016,6 +1543,47 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
     const auto daggerHits = checkMoves(*dagger.moveset, expectedDaggerMoves);
     UNSCOPED_INFO("Expected 77 ordered Dagger hits");
     REQUIRE((daggerHits == 77));
+    const std::array<ExpectedMove, 63> expectedStraight110{{
+        #include "expected_straight_110_201_moves.inc"
+    }};
+    const auto straight110 = importMoveset(cache, 23, 201, straightSword110Catalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(straight110.report.failures.empty());
+    CHECK(checkMoves(*straight110.moveset, expectedStraight110) == 72);
+    const auto base201 = importMoveset(cache, 23, 201, straightSwordCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(base201.report.failures.empty());
+    CHECK(erdo::json::write(*straight110.moveset) != erdo::json::write(*base201.moveset));
+    // The four remaining straight-sword specials override all eight R2 phases;
+    // Warhawk's Talon (117) carries a second hit on most heavies (78 records).
+    const std::array<ExpectedMove, 63> expectedStraight111{{
+        #include "expected_straight_111_209_moves.inc"
+    }};
+    const std::array<ExpectedMove, 63> expectedStraight112{{
+        #include "expected_straight_112_210_moves.inc"
+    }};
+    const std::array<ExpectedMove, 63> expectedStraight113{{
+        #include "expected_straight_113_202_moves.inc"
+    }};
+    const std::array<ExpectedMove, 63> expectedStraight117{{
+        #include "expected_straight_117_208_moves.inc"
+    }};
+    const auto straight111 = importMoveset(cache, 23, 209, straightSword111Catalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(straight111.report.failures.empty());
+    CHECK(checkMoves(*straight111.moveset, expectedStraight111) == 72);
+    const auto straight112 = importMoveset(cache, 23, 210, straightSword112Catalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(straight112.report.failures.empty());
+    CHECK(checkMoves(*straight112.moveset, expectedStraight112) == 72);
+    const auto straight113 = importMoveset(cache, 23, 202, straightSword113Catalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(straight113.report.failures.empty());
+    CHECK(checkMoves(*straight113.moveset, expectedStraight113) == 72);
+    const auto straight117 = importMoveset(cache, 23, 208, straightSword117Catalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(straight117.report.failures.empty());
+    CHECK(checkMoves(*straight117.moveset, expectedStraight117) == 78);
     const std::array<ExpectedMove, 29> expectedLongswordAdditions{{
         #include "expected_longsword_extended_moves.inc"
     }};
@@ -1234,6 +1802,332 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
         std::nullopt, BehaviorLookup::PLAYER_WEAPON);
     REQUIRE(thrustingShield.report.failures.empty());
     CHECK(checkMoves(*thrustingShield.moveset, expectedThrustingShieldMoves) == 55);
+    const std::array<ExpectedMove, 46> expectedTorchMoves{{
+        #include "expected_torch_2400_moves.inc"
+    }};
+    const auto torch = importMoveset(cache, 21, 2400, torchCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(torch.report.failures.empty());
+    CHECK(checkMoves(*torch.moveset, expectedTorchMoves) == 46);
+    const std::array<ExpectedMove, 68> expectedClawMoves{{
+        #include "expected_claw_2200_moves.inc"
+    }};
+    const auto claws = importMoveset(cache, 22, 2200, clawCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(claws.report.failures.empty());
+    CHECK(checkMoves(*claws.moveset, expectedClawMoves) == 98);
+    for (const auto& move : claws.moveset->moves) {
+        for (const auto& hit : move.hits) {
+            if (hit.event.eventType != 307) continue;
+            CHECK(hit.event.pcBehaviorType == 16);
+            CHECK(hit.event.pcBehaviorCondition == 0);
+            CHECK(hit.event.pcBehaviorOffset == 0);
+            CHECK(hit.event.source == -1);
+            CHECK(hit.event.attackIndex == -1);
+        }
+    }
+
+    const std::array<ExpectedMove, 68> expectedFist2100Moves{{
+        #include "expected_fist_2100_moves.inc"
+    }};
+    const std::array<ExpectedMove, 68> expectedFist2121Moves{{
+        #include "expected_fist_2121_moves.inc"
+    }};
+    const auto fists2100 = importMoveset(cache, 42, 2100, fistCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    const auto fists2121 = importMoveset(cache, 42, 2121, fistCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    for (const auto& [imported, expected] : {
+            std::pair{&fists2100, std::span<const ExpectedMove>(expectedFist2100Moves)},
+            std::pair{&fists2121, std::span<const ExpectedMove>(expectedFist2121Moves)}}) {
+        REQUIRE(imported->report.failures.empty());
+        CHECK(checkMoves(*imported->moveset, expected) == 96);
+        for (const auto& move : imported->moveset->moves) {
+            for (const auto& hit : move.hits) {
+                if (hit.event.eventType != 307) continue;
+                CHECK(move.id == MoveId::ONE_HAND_ROLLING_R1);
+                CHECK(hit.event.pcBehaviorType == 16);
+                CHECK(hit.event.pcBehaviorCondition == 0);
+                CHECK(hit.event.pcBehaviorOffset == 0);
+                CHECK(hit.event.source == -1);
+                CHECK(hit.event.attackIndex == -1);
+            }
+        }
+    }
+
+    const std::array<ExpectedMove, 68> expectedMartialArtsMoves{{
+        #include "expected_martial_6300_moves.inc"
+    }};
+    const auto martialArts = importMoveset(cache, 55, 6300, martialArtsCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(martialArts.report.failures.empty());
+    CHECK(checkMoves(*martialArts.moveset, expectedMartialArtsMoves) == 134);
+    for (const auto& move : martialArts.moveset->moves) {
+        for (const auto& hit : move.hits) {
+            CHECK_FALSE(hit.event.pcBehaviorType);
+            CHECK_FALSE(hit.event.pcBehaviorCondition);
+            CHECK_FALSE(hit.event.pcBehaviorOffset);
+        }
+    }
+
+    const std::array<ExpectedMove, 67> expectedFootworkMoves{{
+        #include "expected_footwork_6301_moves.inc"
+    }};
+    const auto footwork = importMoveset(cache, 55, 6301, footworkCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(footwork.report.failures.size() == 1);
+    CHECK(footwork.report.importedMoves == 67);
+    CHECK(checkMoves(*footwork.moveset, expectedFootworkMoves) == 136);
+    const auto& failedCounter = footwork.report.failures.front();
+    CHECK(failedCounter.moveId == MoveId::TWO_HAND_GUARD_COUNTER);
+    REQUIRE(failedCounter.unresolved.size() == 1);
+    REQUIRE(failedCounter.unresolved[0].candidates.size() == 1);
+    const auto& bullet = failedCounter.unresolved[0].candidates[0];
+    CHECK(bullet.behaviorParamId == 106301311);
+    CHECK(bullet.refType == 1);
+    CHECK(bullet.refId == 200031311);
+    CHECK(std::ranges::find(footwork.moveset->moves, MoveId::TWO_HAND_GUARD_COUNTER,
+        &erdo::calculator::Move::id) == footwork.moveset->moves.end());
+
+    if (std::filesystem::exists(root / BulletParamFile)) {
+        ParamTable bullets;
+        bullets.load((root / BulletParamFile).string().c_str());
+        struct ExpectedBulletParameters {
+            int id;
+            float life, lifeRandomRange, dmgHitRecordLifeTime, dist;
+            std::array<float, 5> damageDamping;
+            bool shared;
+            int launch, shooter;
+            std::array<int, 5> targetEffects;
+        };
+        const std::array<ExpectedBulletParameters, 37> expectedBulletParameters{{
+            #include "expected_martial_bullet_parameters.inc"
+        }};
+        std::set<int> inspectedBulletParameters;
+        const auto checkBulletParameters = [&](const ResolvedHit& hit) {
+            REQUIRE(hit.bulletParamId);
+            REQUIRE(hit.bulletParameters);
+            const auto expected = std::ranges::find(expectedBulletParameters, *hit.bulletParamId, &ExpectedBulletParameters::id);
+            REQUIRE(expected != expectedBulletParameters.end());
+            const auto& actual = *hit.bulletParameters;
+            CHECK(actual.life == expected->life);
+            CHECK(actual.lifeRandomRange == expected->lifeRandomRange);
+            CHECK(actual.dmgHitRecordLifeTime == expected->dmgHitRecordLifeTime);
+            CHECK(actual.dist == expected->dist);
+            for (std::size_t i = 0; i < expected->damageDamping.size(); ++i)
+                CHECK(actual.damageDamping[i] == expected->damageDamping[i]);
+            CHECK(actual.isUseSharedHitList == expected->shared);
+            CHECK(actual.launchConditionType == expected->launch);
+            CHECK(actual.spEffectIDForShooter == expected->shooter);
+            for (std::size_t i = 0; i < expected->targetEffects.size(); ++i)
+                CHECK(actual.targetSpEffectIds[i] == expected->targetEffects[i]);
+            inspectedBulletParameters.insert(*hit.bulletParamId);
+        };
+        struct ExpectedBulletEvent {
+            int variation, category, animation;
+            std::size_t index;
+            int originCategory, originAnimation;
+            double start, end;
+            int judge, behavior, behaviorCategory, bullet, attack, source, attackIndex, dummy, attachment;
+            bool enable;
+            int offset, unk12, stateInfo;
+            bool opposing;
+            std::array<float, 5> damage;
+            float status;
+        };
+        const std::array<ExpectedBulletEvent, 54> expectedBulletEvents{{
+            #include "expected_martial_bullet_events.inc"
+        }};
+        std::map<std::tuple<int, int, int>, std::vector<ResolvedHit>> bulletRecords;
+        for (const auto& expected : expectedBulletEvents) {
+            const auto key = std::tuple{expected.variation, expected.category, expected.animation};
+            auto [entry, inserted] = bulletRecords.try_emplace(key);
+            if (inserted) {
+                std::vector<AttackEvent> type2;
+                std::ranges::copy_if(cache.get(expected.category, expected.animation, false, true),
+                    std::back_inserter(type2), [](const auto& event) { return event.eventType == 2; });
+                const auto resolved = resolveAttackEvents(type2, expected.variation, index, attacks,
+                    std::nullopt, std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+                REQUIRE(resolved.diagnostics.empty());
+                entry->second = resolved.hits;
+            }
+            REQUIRE(expected.index < entry->second.size());
+            const auto& hit = entry->second[expected.index];
+            CAPTURE(expected.variation, expected.category, expected.animation, expected.index);
+            CHECK(hit.event.eventType == 2);
+            CHECK(hit.event.animationId == expected.animation);
+            CHECK(hit.event.sourceMotionCategory == expected.originCategory);
+            CHECK(hit.event.sourceAnimationId == expected.originAnimation);
+            CHECK(std::abs(hit.event.startTime - expected.start) < .000001);
+            CHECK(std::abs(hit.event.endTime - expected.end) < .000001);
+            CHECK(hit.event.behaviorJudgeId == expected.judge);
+            CHECK(hit.behaviorParamId == expected.behavior);
+            CHECK(hit.behaviorCategory == expected.behaviorCategory);
+            CHECK(hit.bulletParamId == expected.bullet);
+            checkBulletParameters(hit);
+            CHECK(hit.atkParamId == expected.attack);
+            CHECK(hit.event.source == expected.source);
+            CHECK(hit.event.attackIndex == expected.attackIndex);
+            CHECK(hit.event.bulletDummyPolyId == expected.dummy);
+            CHECK(hit.event.bulletAttachmentType == expected.attachment);
+            CHECK(hit.event.bulletEnable == expected.enable);
+            CHECK(hit.event.bulletOffset == expected.offset);
+            CHECK(hit.event.bulletUnk12 == expected.unk12);
+            CHECK(hit.event.stateInfo == expected.stateInfo);
+            CHECK(hit.opposeTarget == expected.opposing);
+            CHECK(std::ranges::all_of(hit.motionValues.known, [](bool known) { return known; }));
+            for (std::size_t channel = 0; channel < 5; ++channel) CHECK(hit.motionValues.values[channel] == expected.damage[channel]);
+            for (std::size_t channel = 5; channel < 12; ++channel) CHECK(hit.motionValues.values[channel] == expected.status);
+        }
+        std::size_t inspected = 0;
+        for (const auto& [key, records] : bulletRecords) inspected += records.size();
+        CHECK(inspected == 54);
+        const auto linked = importMoveset(cache, 55, 6301, footworkCatalog, index, attacks,
+            std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+        REQUIRE(linked.report.failures.empty());
+        CHECK(linked.report.importedMoves == 68);
+        CHECK(checkMoves(*linked.moveset, expectedFootworkMoves) == 136);
+        const auto counter = std::ranges::find(linked.moveset->moves, MoveId::TWO_HAND_GUARD_COUNTER,
+            &erdo::calculator::Move::id);
+        REQUIRE(counter != linked.moveset->moves.end());
+        REQUIRE(counter->hits.size() == 4);
+        const std::array judges{380, 381, 311, 314};
+        const std::array attackIds{6300380, 6300381, 6301311, 6301314};
+        const std::array behaviorIds{106300380, 106300381, 106301311, 106301314};
+        const std::array attackIndices{0, 1, 6, 7};
+        const std::array physical{113.f, 113.f, 94.f, 126.f};
+        for (std::size_t i = 0; i < counter->hits.size(); ++i) {
+            const auto& hit = counter->hits[i];
+            CHECK(hit.event.behaviorJudgeId == judges[i]);
+            CHECK(hit.event.attackIndex == attackIndices[i]);
+            CHECK(hit.atkParamId == attackIds[i]);
+            CHECK(hit.behaviorParamId == behaviorIds[i]);
+            CHECK(hit.behaviorCategory == 12);
+            CHECK(hit.event.source == 0);
+            CHECK(hit.opposeTarget == true);
+            CHECK(std::abs(hit.event.startTime - .56666666) < .000001);
+            CHECK(std::abs(hit.event.endTime - .6666667) < .000001);
+            CHECK(std::ranges::all_of(hit.motionValues.known, [](bool known) { return known; }));
+            for (std::size_t channel = 0; channel < 5; ++channel)
+                CHECK(hit.motionValues.values[channel] == physical[i]);
+            for (std::size_t channel = 5; channel < hit.motionValues.values.size(); ++channel)
+                CHECK(hit.motionValues.values[channel] == 65);
+            CHECK(hit.bulletParamId == (i == 2 ? std::optional{200031311} : std::nullopt));
+            if (hit.bulletParamId) checkBulletParameters(hit);
+            else CHECK_FALSE(hit.bulletParameters);
+        }
+        CHECK(inspectedBulletParameters.size() == expectedBulletParameters.size());
+        const auto restored = erdo::json::read<erdo::calculator::Moveset>(erdo::json::write(*linked.moveset));
+        CHECK(erdo::json::write(restored) == erdo::json::write(*linked.moveset));
+        const auto unsupported = erdo::calculator::calculate_move(*counter, erdo::calculator::AttackRating{});
+        REQUIRE_FALSE(unsupported);
+        CHECK_THAT(unsupported.error(), Catch::Matchers::ContainsSubstring("Bullet 200031311"));
+        auto bulletCounter = *std::ranges::find(footworkCatalog, MoveId::TWO_HAND_GUARD_COUNTER, &MoveDefinition::id);
+        bulletCounter.eventType = 2;
+        for (const int variation : {6300, 6301}) {
+            const auto projectile = importMoveset(cache, 55, variation, std::array{bulletCounter}, index, attacks,
+                std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+            REQUIRE(projectile.report.failures.empty());
+            REQUIRE(projectile.moveset->moves.size() == 1);
+            const auto& records = projectile.moveset->moves.front().hits;
+            REQUIRE(records.size() == 2);
+            for (std::size_t i = 0; i < records.size(); ++i) {
+                const auto& hit = records[i];
+                CHECK(hit.event.eventType == 2);
+                CHECK(hit.event.behaviorJudgeId == 382 + i);
+                CHECK(hit.behaviorParamId == 106300382 + i);
+                CHECK(hit.bulletParamId == 200030382 + i);
+                CHECK(hit.atkParamId == 6300382 + i);
+                CHECK(hit.event.bulletDummyPolyId == 1 + i);
+                CHECK(hit.event.attackIndex == 0);
+                CHECK(hit.event.source == 0);
+                CHECK(hit.event.bulletEnable == false);
+                CHECK(hit.event.bulletAttachmentType == 0);
+                CHECK(hit.event.bulletOffset == 0);
+                CHECK(hit.event.bulletUnk12 == 0);
+                CHECK(hit.event.stateInfo == 0);
+                CHECK(std::abs(hit.event.startTime - .6666667) < .000001);
+                CHECK(std::abs(hit.event.endTime - .7) < .000001);
+                CHECK(hit.opposeTarget == true);
+                CHECK(std::ranges::all_of(hit.motionValues.known, [](bool known) { return known; }));
+                for (std::size_t channel = 0; channel < 5; ++channel) CHECK(hit.motionValues.values[channel] == 160);
+                for (std::size_t channel = 5; channel < 12; ++channel) CHECK(hit.motionValues.values[channel] == 65);
+            }
+            CHECK(erdo::json::write(erdo::json::read<erdo::calculator::Moveset>(erdo::json::write(*projectile.moveset)))
+                == erdo::json::write(*projectile.moveset));
+            CHECK_FALSE(erdo::calculator::calculate_move(projectile.moveset->moves.front(), erdo::calculator::AttackRating{}));
+            auto wholeCounter = *std::ranges::find(footworkCatalog, MoveId::TWO_HAND_GUARD_COUNTER, &MoveDefinition::id);
+            wholeCounter.additionalEventSelections = std::vector{AttackEventSelection{2, 383}, AttackEventSelection{2, 382}};
+            const auto combined = importMoveset(cache, 55, variation, std::array{wholeCounter}, index, attacks,
+                std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+            REQUIRE(combined.report.failures.empty());
+            REQUIRE(combined.moveset->moves.size() == 1);
+            REQUIRE(combined.moveset->moves[0].hits.size() == 6);
+            const std::array counterJudges{380, 381, 311, 314, 382, 383};
+            for (std::size_t i = 0; i < counterJudges.size(); ++i)
+                CHECK(combined.moveset->moves[0].hits[i].event.behaviorJudgeId == counterJudges[i]);
+            CHECK_FALSE(erdo::calculator::calculate_move(combined.moveset->moves[0], erdo::calculator::AttackRating{}));
+            for (const auto [releaseId, chargeId, releaseJudge, chargeJudge, bulletJudge] : {
+                    std::tuple{MoveId::MOUNTED_CHARGED_R2, MoveId::MOUNTED_R2_CHARGING, 635, 630, 636},
+                    std::tuple{MoveId::MOUNTED_CHARGED_L2, MoveId::MOUNTED_L2_CHARGING, 735, 730, 736}}) {
+                auto release = *std::ranges::find(footworkCatalog, releaseId, &MoveDefinition::id);
+                release.additionalEventSelections = std::vector{AttackEventSelection{2, bulletJudge}};
+                const auto released = importMoveset(cache, 55, variation, std::array{release}, index, attacks,
+                    std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+                REQUIRE(released.report.failures.empty());
+                REQUIRE(released.moveset->moves[0].hits.size() == 2);
+                CHECK(released.moveset->moves[0].hits[0].event.behaviorJudgeId == releaseJudge);
+                CHECK(released.moveset->moves[0].hits[1].event.behaviorJudgeId == bulletJudge);
+                CHECK(released.moveset->moves[0].hits[1].motionValues.values[0] == 150);
+                auto charge = *std::ranges::find(footworkCatalog, chargeId, &MoveDefinition::id);
+                const auto charging = importMoveset(cache, 55, variation, std::array{charge}, index, attacks,
+                    std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+                REQUIRE(charging.report.failures.empty());
+                REQUIRE(charging.moveset->moves[0].hits.size() == 1);
+                CHECK(charging.moveset->moves[0].hits[0].event.behaviorJudgeId == chargeJudge);
+                CHECK_FALSE(charging.moveset->moves[0].hits[0].bulletParamId);
+                charge.additionalEventSelections = std::vector{AttackEventSelection{2, chargeJudge + 1}};
+                const auto missingPhase = importMoveset(cache, 55, variation, std::array{charge}, index, attacks,
+                    std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+                REQUIRE(missingPhase.report.failures.size() == 1);
+                CHECK(missingPhase.moveset->moves.empty());
+            }
+        }
+    }
+
+    const std::array<ExpectedMove, 68> expectedBackhandBladeMoves{{
+        #include "expected_backhand_6400_moves.inc"
+    }};
+    const auto backhandBlades = importMoveset(cache, 58, 6400, backhandBladeCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(backhandBlades.report.failures.empty());
+    CHECK(checkMoves(*backhandBlades.moveset, expectedBackhandBladeMoves) == 105);
+    for (const auto& move : backhandBlades.moveset->moves) {
+        for (const auto& hit : move.hits) {
+            CHECK_FALSE(hit.event.pcBehaviorType);
+            CHECK_FALSE(hit.event.pcBehaviorCondition);
+            CHECK_FALSE(hit.event.pcBehaviorOffset);
+        }
+    }
+
+    const std::array<ExpectedMove, 64> expectedBeastClawMoves{{
+        #include "expected_beast_claw_6800_moves.inc"
+    }};
+    const auto beastClaws = importMoveset(cache, 62, 6800, beastClawCatalog, index, attacks,
+        std::nullopt, BehaviorLookup::PLAYER_WEAPON);
+    REQUIRE(beastClaws.report.failures.empty());
+    CHECK(checkMoves(*beastClaws.moveset, expectedBeastClawMoves) == 99);
+    for (const auto& move : beastClaws.moveset->moves) {
+        for (const auto& hit : move.hits) {
+            if (hit.event.eventType != 307) continue;
+            CHECK(hit.event.pcBehaviorType == 16);
+            CHECK(hit.event.pcBehaviorCondition == 0);
+            CHECK(hit.event.pcBehaviorOffset == 0);
+            CHECK(hit.event.source == -1);
+            CHECK(hit.event.attackIndex == -1);
+        }
+    }
+
     for (const auto [animation, judge] : {std::pair{38100, 638}, std::pair{39100, 738}}) {
         const auto& raw = cache.get(60, animation);
         REQUIRE(raw.size() == 2);
@@ -1325,7 +2219,7 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
     std::vector<MovesetImportReport> reports;
     auto gameData = load_game_data(root, &reports);
     UNSCOPED_INFO("Game-data importer must report every exported behavior group, excluding unused parameter rows");
-    REQUIRE(reports.size() == 75);
+    REQUIRE(reports.size() == 87);
     for (const auto& report : reports) REQUIRE(report.failures.empty());
     std::shared_ptr<erdo::calculator::Moveset> sharedLongsword;
     std::shared_ptr<erdo::calculator::Moveset> sharedDagger;
@@ -1334,6 +2228,11 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
     const std::set<std::string> daggerNames{"Dagger", "Parrying Dagger", "Crystal Knife", "Cinquedea", "Bloodstained Dagger"};
     const std::set<std::string> swordNames{"Longsword", "Lordsworn's Straight Sword", "Weathered Straight Sword",
         "Crystal Sword", "Noble's Slender Sword", "Velvet Sword of St. Trina", "Sword of Light", "Sword of Darkness"};
+    const std::set<std::string> straight110Names{"Broadsword", "Cane Sword", "Stone-Sheathed Sword"};
+    const std::map<std::string, int> straightSpecialVariations{
+        {"Short Sword", 209}, {"Miquellan Knight's Sword", 210},
+        {"Carian Knight's Sword", 202}, {"Lazuli Glintstone Sword", 202},
+        {"Warhawk's Talon", 208}};
     const std::map<std::string, int> uniqueVariations{{"Reduvia", 104}, {"Coded Sword", 204},
         {"Sword of St. Trina", 205}, {"Rotten Crystal Sword", 206}, {"Golden Epitaph", 207},
         {"Sword of Night and Flame", 214}, {"Regalia of Eochaid", 215}};
@@ -1394,6 +2293,12 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
     const std::set<std::string> greatKatanaNames{"Great Katana", "Dragon-Hunter's Great Katana", "Reed Great Katana"};
     const std::set<std::string> lightGreatswordNames{"Milady", "Leda's Sword", "Idus Sword"};
     const std::set<std::string> thrustingShieldNames{"Dueling Shield", "Carian Thrusting Shield", "Ritual Thrusting Shield"};
+    const std::map<std::string, int> fistVariations{{"Iron Ball", 2100}, {"Star Fist", 2100},
+        {"Poisoned Hand", 2121}, {"Madding Hand", 2121}};
+    const std::set<std::string> backhandBladeNames{"Backhand Blade", "Reverse-Bladed Sword"};
+    const std::set<std::string> beastClawNames{"Beast Claw", "Red Bear's Claw"};
+    const std::set<std::string> clawNames{"Hookclaws", "Venomous Fang", "Bloodhound Claws"};
+    const std::set<std::string> torchNames{"Torch", "Steel-Wire Torch", "Beast-Repellent Torch", "Sentry's Torch"};
     erdo::calculator::GameData supportedData{gameData.erdo_version, gameData.game_version};
     for (const auto& weapon : gameData.weapons) {
         if (swordNames.contains(weapon.base_name)) {
@@ -1494,6 +2399,59 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
             CHECK(weapon.moveset->behaviorVariation == 6100);
             CHECK(weapon.moveset->motionCategory == 57);
             CHECK(weapon.moveset->moves.size() == 52);
+        } else if (clawNames.contains(weapon.base_name) || fistVariations.contains(weapon.base_name)) {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.paired);
+            CHECK(weapon.moveset->behaviorVariation == (clawNames.contains(weapon.base_name) ? 2200 : fistVariations.at(weapon.base_name)));
+            CHECK(weapon.moveset->motionCategory == (clawNames.contains(weapon.base_name) ? 22 : 42));
+            CHECK(weapon.moveset->moves.size() == 68);
+            const erdo::calculator::MoveEvaluator single(weapon,
+                erdo::calculator::get_character_starting_class_attributes("Wretch"), {25,25,10});
+            for (const auto& move : weapon.moveset->moves) {
+                if (erdo::calculator::move_uses_two_hands(move.id)) REQUIRE(single.evaluate(move.id));
+            }
+            REQUIRE_FALSE(single.evaluate(MoveId::POWERSTANCE_L1_1));
+        } else if (backhandBladeNames.contains(weapon.base_name) || weapon.base_name == "Dryleaf Arts") {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.paired);
+            CHECK(weapon.moveset->behaviorVariation == (weapon.base_name == "Dryleaf Arts" ? 6300 : 6400));
+            CHECK(weapon.moveset->motionCategory == (weapon.base_name == "Dryleaf Arts" ? 55 : 58));
+            CHECK(weapon.moveset->moves.size() == 68);
+            const erdo::calculator::MoveEvaluator single(weapon,
+                erdo::calculator::get_character_starting_class_attributes("Wretch"), {25,25,10});
+            for (const auto& move : weapon.moveset->moves) {
+                if (erdo::calculator::move_uses_two_hands(move.id) || erdo::calculator::move_is_offhand(move.id))
+                    REQUIRE(single.evaluate(move.id));
+            }
+            REQUIRE_FALSE(single.evaluate(MoveId::POWERSTANCE_L1_1));
+        } else if (beastClawNames.contains(weapon.base_name)) {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.paired);
+            CHECK(weapon.moveset->behaviorVariation == 6800);
+            CHECK(weapon.moveset->motionCategory == 62);
+            CHECK(weapon.moveset->moves.size() == 64);
+            const erdo::calculator::MoveEvaluator single(weapon,
+                erdo::calculator::get_character_starting_class_attributes("Wretch"), {25,25,10});
+            for (const auto& move : weapon.moveset->moves) {
+                if (erdo::calculator::move_uses_two_hands(move.id) || erdo::calculator::move_is_offhand(move.id))
+                    REQUIRE(single.evaluate(move.id));
+            }
+            REQUIRE_FALSE(single.evaluate(MoveId::POWERSTANCE_L1_1));
+        } else if (straight110Names.contains(weapon.base_name)) {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.moveset->motionCategory == 23);
+            CHECK(weapon.moveset->behaviorVariation == 201);
+            CHECK(erdo::json::write(*weapon.moveset) == erdo::json::write(*straight110.moveset));
+        } else if (const auto variation = straightSpecialVariations.find(weapon.base_name); variation != straightSpecialVariations.end()) {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.moveset->motionCategory == 23);
+            CHECK(weapon.moveset->behaviorVariation == variation->second);
+            CHECK(weapon.moveset->moves.size() == 63);
+        } else if (torchNames.contains(weapon.base_name)) {
+            REQUIRE(weapon.moveset);
+            CHECK(weapon.moveset->behaviorVariation == 2400);
+            CHECK(weapon.moveset->motionCategory == 21);
+            CHECK(weapon.moveset->moves.size() == 46);
         } else {
             UNSCOPED_INFO("Unvalidated weapons must not inherit a supported weapon's catalog");
             REQUIRE((!weapon.moveset));
@@ -1503,7 +2461,7 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
     }
     UNSCOPED_INFO("Base behavior groups retain sharing alongside seven exact variations");
     REQUIRE((longswords == 56 && daggers == 41 && sharedLongsword != sharedDagger));
-    REQUIRE(supportedData.weapons.size() == 1080);
+    REQUIRE(supportedData.weapons.size() == 1260);
     const auto roundTrip = erdo::json::read<erdo::calculator::GameData>(erdo::json::write(supportedData));
     std::map<std::string, std::shared_ptr<erdo::calculator::Moveset>> restoredSets;
     for (const auto& weapon : roundTrip.weapons) {
@@ -1515,7 +2473,7 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
         restored = weapon.moveset;
     }
     UNSCOPED_INFO("Distinct weapon movesets must remain distinct through JSON");
-    REQUIRE((restoredSets.size() == 156 && restoredSets.at("Dagger") != restoredSets.at("Longsword")));
+    REQUIRE((restoredSets.size() == 180 && restoredSets.at("Dagger") != restoredSets.at("Longsword")));
     for (const auto& name : daggerNames) CHECK(restoredSets.at(name) == restoredSets.at("Dagger"));
     for (const auto& name : swordNames) CHECK(restoredSets.at(name) == restoredSets.at("Longsword"));
     std::set<const erdo::calculator::Moveset*> distinctSets{
@@ -1749,7 +2707,65 @@ TEST_CASE("moveset - game XML", "[moveset][game_xml]")
         CHECK(actual == sharedThrustingShield);
         CHECK(erdo::json::write(*actual) == erdo::json::write(*thrustingShield.moveset));
     }
-    CHECK(distinctSets.size() == 75);
+    const auto& sharedTorch = restoredSets.at("Torch");
+    CHECK(distinctSets.insert(sharedTorch.get()).second);
+    for (const auto& name : torchNames) {
+        const auto& actual = restoredSets.at(name);
+        CHECK(actual == sharedTorch);
+        CHECK(erdo::json::write(*actual) == erdo::json::write(*torch.moveset));
+        for (const auto id : {MoveId::BACKSTAB_WHIFF, MoveId::BACKSTAB, MoveId::RIPOSTE,
+                MoveId::SMALL_PVE_BACKSTAB, MoveId::SMALL_PVE_RIPOSTE, MoveId::LARGE_PVE_RIPOSTE,
+                MoveId::POWERSTANCE_L1_1, MoveId::POWERSTANCE_JUMPING_L1})
+            CHECK(std::ranges::find(actual->moves, id, &erdo::calculator::Move::id) == actual->moves.end());
+    }
+    const auto& sharedClaw = restoredSets.at("Hookclaws");
+    CHECK(distinctSets.insert(sharedClaw.get()).second);
+    for (const auto& name : clawNames) {
+        const auto& actual = restoredSets.at(name);
+        CHECK(actual == sharedClaw);
+        CHECK(erdo::json::write(*actual) == erdo::json::write(*claws.moveset));
+    }
+    CHECK(distinctSets.insert(restoredSets.at("Iron Ball").get()).second);
+    CHECK(distinctSets.insert(restoredSets.at("Poisoned Hand").get()).second);
+    for (const auto& [name, variation] : fistVariations) {
+        const auto& actual = restoredSets.at(name);
+        CHECK(actual == restoredSets.at(variation == 2100 ? "Iron Ball" : "Poisoned Hand"));
+        CHECK(erdo::json::write(*actual) == erdo::json::write(*(variation == 2100 ? fists2100 : fists2121).moveset));
+    }
+    CHECK(distinctSets.insert(restoredSets.at("Beast Claw").get()).second);
+    for (const auto& name : beastClawNames) {
+        const auto& actual = restoredSets.at(name);
+        CHECK(actual == restoredSets.at("Beast Claw"));
+        CHECK(erdo::json::write(*actual) == erdo::json::write(*beastClaws.moveset));
+    }
+    CHECK(distinctSets.insert(restoredSets.at("Backhand Blade").get()).second);
+    for (const auto& name : backhandBladeNames) {
+        const auto& actual = restoredSets.at(name);
+        CHECK(actual == restoredSets.at("Backhand Blade"));
+        CHECK(erdo::json::write(*actual) == erdo::json::write(*backhandBlades.moveset));
+    }
+    CHECK(distinctSets.insert(restoredSets.at("Dryleaf Arts").get()).second);
+    CHECK(erdo::json::write(*restoredSets.at("Dryleaf Arts")) == erdo::json::write(*martialArts.moveset));
+    const auto& sharedStraight110 = restoredSets.at("Broadsword");
+    CHECK(distinctSets.insert(sharedStraight110.get()).second);
+    for (const auto& name : straight110Names) {
+        CHECK(restoredSets.at(name) == sharedStraight110);
+        CHECK(erdo::json::write(*restoredSets.at(name)) == erdo::json::write(*straight110.moveset));
+    }
+    const auto& sharedStraight111 = restoredSets.at("Short Sword");
+    CHECK(distinctSets.insert(sharedStraight111.get()).second);
+    CHECK(erdo::json::write(*sharedStraight111) == erdo::json::write(*straight111.moveset));
+    const auto& sharedStraight112 = restoredSets.at("Miquellan Knight's Sword");
+    CHECK(distinctSets.insert(sharedStraight112.get()).second);
+    CHECK(erdo::json::write(*sharedStraight112) == erdo::json::write(*straight112.moveset));
+    const auto& sharedStraight113 = restoredSets.at("Carian Knight's Sword");
+    CHECK(distinctSets.insert(sharedStraight113.get()).second);
+    for (const auto name : {"Carian Knight's Sword", "Lazuli Glintstone Sword"})
+        CHECK(erdo::json::write(*restoredSets.at(name)) == erdo::json::write(*straight113.moveset));
+    const auto& sharedStraight117 = restoredSets.at("Warhawk's Talon");
+    CHECK(distinctSets.insert(sharedStraight117.get()).second);
+    CHECK(erdo::json::write(*sharedStraight117) == erdo::json::write(*straight117.moveset));
+    CHECK(distinctSets.size() == 87);
     const auto crit = std::ranges::find(restoredSets.at("Dagger")->moves,
         MoveId::LARGE_PVE_RIPOSTE, &erdo::calculator::Move::id);
     UNSCOPED_INFO("Real-data JSON must preserve Dagger's aliased critical attack");

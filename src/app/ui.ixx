@@ -656,23 +656,23 @@ namespace erdo::ui
                 if (selected && selected->id != move.id)
                     continue;
                 const auto name = QString::fromStdString(move.name);
+                const int hit_number = move_selector->hit->value();
+                if (hit_number > 0) {
+                    const auto result = evaluator.evaluate_hit(move.id, static_cast<std::size_t>(hit_number - 1));
+                    if (!result)
+                        append(name, QString("Hit %1").arg(hit_number), nullptr, QString::fromStdString(result.error()));
+                    else
+                        append(name, QString("Hit %1%2").arg(hit_number).arg(result->active ? "" : " (inactive)"), &result->powers);
+                    continue;
+                }
                 const auto result = evaluator.evaluate(move.id);
                 if (!result) {
                     append(name, "Unsupported", nullptr, QString::fromStdString(result.error()));
                     continue;
                 }
-                const int hit_number = move_selector->hit->value();
-                if (hit_number > 0) {
-                    if (std::cmp_greater(hit_number, result->hits.size()))
-                        append(name, QString("Hit %1").arg(hit_number), nullptr, "This move has no such hit.");
-                    else
-                        append(name, QString("Hit %1%2").arg(hit_number).arg(result->hits[hit_number - 1].active ? "" : " (inactive)"),
-                            &result->hits[hit_number - 1].powers);
-                } else {
-                    append(name, "All hits", &result->total);
-                    for (std::size_t hit = 0; hit < result->hits.size(); ++hit)
-                        append(name, QString("Hit %1%2").arg(hit + 1).arg(result->hits[hit].active ? "" : " (inactive)"), &result->hits[hit].powers);
-                }
+                append(name, "All hits", &result->total);
+                for (std::size_t hit = 0; hit < result->hits.size(); ++hit)
+                    append(name, QString("Hit %1%2").arg(hit + 1).arg(result->hits[hit].active ? "" : " (inactive)"), &result->hits[hit].powers);
             }
             move_results->resizeColumnsToContents();
         }

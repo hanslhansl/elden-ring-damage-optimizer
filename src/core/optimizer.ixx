@@ -910,7 +910,7 @@ namespace erdo::optimizer
                 return std::unexpected(active.error());
             if (!*active)
                 continue;
-            const auto secondary = hit_uses_secondary_weapon(hit);
+            const auto secondary = hit_uses_secondary_weapon(hit, move->id);
             if (!secondary)
                 return std::unexpected(secondary.error());
             if (*secondary && !objective.matching_powerstance)

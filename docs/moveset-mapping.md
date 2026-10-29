@@ -382,7 +382,8 @@ $weapons = 'C:/Users/Paul/AppData/Local/Temp/elden-ring-damage-optimizer/unpacke
 ```
 
 Offhand and matching powerstance can omit categories when the special category
-is zero; nonzero special categories still require explicit arguments. The generic state/heavy
+is zero or for the scoped audited 55/246 category pair described below. Other
+nonzero special categories still require explicit arguments. The generic state/heavy
 commands retain their explicit context rather than adopting this limited policy.
 
 ## Graph-backed development GameData import (2026-09-29)
@@ -479,9 +480,10 @@ chain checks: torches/dueling shields are excluded. This does not generalize to
 mixed weapons or special dagger/katana/thrusting-sword combinations.
 
 `offhandOrMatchingPairCategories` validates the selected weapon and allows
-automatic left/dual category selection only when `spAtkcategory` is zero. With
-one base category there is no unverified special/base ordering to infer.
-Nonzero special categories fail with an explicit-context diagnostic; the
+automatic left/dual category selection when `spAtkcategory` is zero or for the
+audited 55/246 category pair. That exception uses an inferred special/base
+policy; the native selector implementation has not been recovered. Other
+nonzero special categories fail with an explicit-context diagnostic; the
 existing explicit-priority inspection overload remains available.
 `resolveMatchingPowerstanceMovementMove` applies this rule to the three movement
 IDs; `resolveLightChain` uses it for offhand and matching-powerstance chains.
@@ -1730,6 +1732,321 @@ comparison removes only new57assignments and preserves all previous data,
 including target metadata (`build/thrusting-shield-data-comparison.log`).
 Previous outputs, user edits, installed files and retained inputs are preserved.
 
+## Ordinary torches
+
+The complete ordinary profile **type87/motion21/behavior2400–2499/stances0,10**,
+special0/catalyst0/built-in-pair0/**enableThrow0**, admits Torch, Steel-Wire
+Torch, Beast-Repellent Torch and Sentry's Torch. These four bases/four variants
+share one exact-2400 moveset. Names and IDs are independent regression
+expectations; production selects the parameter signature. Special torches,
+including Ghostflame, St. Trina's, Nanaya's and Lamenting Visage, remain excluded.
+
+`torchCatalog` derives from the ordinary thrusting-shield vocabulary and removes
+backstab-whiff and all five representative critical definitions. Its **46 moves
+and 46 raw ordered events** are all graph-derived. Native HKS gives four
+ordinary/offhand stages and no torch branch in `IsEnableDualWielding`, whose
+default is -1. Existing category21 paired exclusion is reused. Graph registrations
+confirm stage-four clips30030/32030/35030 at offsets13/16/14. All four mounted
+charging/release phases contain selected events630/635 and730/735. No paired,
+feint, shieldpoke or critical definitions are admitted; enableThrow0 also rejects
+all five tested target-context throw queries for every ordinary torch.
+
+This models selected normal attack states. Native left L1 guards with torches;
+an offhand attack assumes a selected left-heavy request, such as a skill-disabled
+L2 fallback. Input/equipment/skill availability is not simulated. Native Torch
+Attack and Firebreather skills use separate selected SwordArts category routing
+and are outside this catalog. Raw default skill IDs117/223 do not change the
+ordinary profile. Retained SwordArtsParam XML is absent; no skill extraction is
+required for these normal states.
+
+Independent raw audits (`audit_torches.py`, `audit_torch_graph.py`,
+`build/torch-audit.log`, `build/torch-graph-audit.log`) resolve aliases and
+default-merged params without importer output. Exact2400 has78 namespace1 rows.
+Tracked `tests/expected_torch_2400_moves.inc` checks every move/event, all12 MV
+channels, timing/order/source and alias/behavior/attack provenance. All selected
+events have StateInfo0 and opposing-target eligibility. Portable synthetic21
+tests use non-arithmetic clips and missing paired states, preserving strict
+ordinary completeness and rejecting forbidden or missing mappings. Signature
+mutations, raw import, shared JSON identity, UI powers and both optimizers are
+covered. Optimization eligibility is **1084 ordinary/1041 powerstance**.
+
+Baseline **81/81 passed in131.27s**; final **81/81 passed in119.12s**
+(`build/torch-tests.log`). Existing app/core/Catch2 build passes, with coverage
+and benchmarks OFF. Current **642-TAE view/cache `build/development-xml/torches`**
+preserves prior targets and links empty retaineda21 to101 clips from the already
+recovered full archive. No new archive was copied/unpacked; never unpack into or
+recursively delete through junction views. The production unpack list already
+contains `chr/c0000.anibnd.dcx`.
+
+Coverage is **160 bases/1084 variants/76 shared sets**, twenty-three vocabularies
+with **1373 definitions/1831 raw ordered hits**, **1268 graph-derived/105
+representative critical mappings**. Existing CLI semantic JSON round-trip
+generated **`build/development-game-data/11711000.graph-torches.json`**
+(14417868 bytes/3296 weapons/1084 with movesets). Full previous-value and
+shared-identity comparison removes only new21 assignments and preserves all
+earlier data (`build/torch-data-comparison.log`). Previous outputs and retained
+inputs are preserved.
+
+## Ordinary paired claws and explicit PCBehavior events
+
+The audited complete profile **type37/motion22/behavior2200–2299/stances0,0**,
+special0/catalyst0/**built-in-pair1**/enableThrow1 admits Hookclaws, Venomous Fang
+and Bloodhound Claws: three bases/39 affinities sharing exact2200. Parameter
+signatures select membership; names/IDs remain independent test expectations.
+Raptor Talons and Claws of Night have special categories and remain excluded.
+SupportedCatalog now records its required paired flag, default0 for earlier
+families; the claw profile uses1. The stance helper admits22's0/0 and the graph
+category policy requires its built-in-pair flag.
+
+Native HKS gives six ordinary/offhand and six matching-powerstance light stages.
+`IsEnableDualWielding` enables a matching equipped claw pair. Both-hand requests
+follow ordinary Both states, while matching-equipped-pair requests follow Dual
+states. Independent graph audit verifies sixth ordinary clips30050/32050/35050
+and paired34040/34050. The dagger-derived vocabulary adds paired stages5/6,
+clears inherited diagnostic constraints and selects type304 victim-directed
+criticals: **68 moves/98 selected ordered events**, **63 graph-derived/five
+representative critical definitions**. Mounted phases630/635 and730/735 are
+present; no feints or shieldpoke enabled.
+
+Running and rolling one-handed R1 contain **TAE307 PCBehavior**, rather than
+type1 attack windows. Their raw signature is **PCBehaviorType16 /
+Condition0x64_GetWeaponData0 / Offset0**, with judges120/130. The pinned
+[DSAnimStudio template](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/Res/TAE.Template.ER.xml#L1004-L1010)
+defines the raw fields. Its
+[attack-source simulation](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs#L523-L535)
+selects right-weapon behavior for16, and its
+[behavior and attack lookup](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs#L1818-L1933)
+uses the existing player address/fallback/refType0 path. Selector16 is not a
+row namespace: rows102200120/130 reference attacks2200120/130.
+
+AttackEvent retains three optional selector fields through the existing
+reflection serializer; Source/index remain raw-1, StateInfo remains absent.
+Strict extraction rejects malformed, missing, duplicate or overflowed selectors.
+The shared source helper admits only the audited16/0/0 signature; other contexts
+reject explicitly. `extractAttackEvents` and `AnimationCache::get` default to
+type1/304, with an `includePCBehaviors` option and separate cache modes preserving
+aliases. The importer opts in only when a definition explicitly selects307.
+This preserves all earlier event queries and catalogs. Claw jumping clips also
+contain type4/judge550 body behaviors; body powers/contact are outside this
+selected weapon-event scope, as for the existing families.
+
+All claw two-handed weapon hits use rawDEFAULT0 and the selected paired weapon.
+They need no second equipped weapon rating. Existing Weapon::paired suppresses
+the two-handing Strength bonus; the ordered events supply their own multipliers.
+Powerstance remains a separate matching-equipped-pair request, with Source2
+requiring an explicit second weapon and matching behavior context. This keeps
+equipment semantics separate from animation presence.
+
+Independent audits `audit_claws.py` / `audit_claw_graph.py`
+(`build/claw-audit.log`, `build/claw-graph-audit.log`) read aliases and
+default-merged params without importer output. Exact2200 has126 namespace1 rows.
+Tracked `tests/expected_claw_2200_moves.inc` checks all68/98 events, all12MVs,
+timing/order/source and alias/behavior/attack IDs. Selected flags are all
+nonpositive/absent StateInfo and opposing-target true. Portable tests cover
+selectors, old JSON, cache modes, explicit filters, paired scaling and both
+optimizer scores. Synthetic graph tests use non-arithmetic clips and reject
+missing sixth stages. Five representative throw queries and the full real
+XML/JSON/UI regression cover every new affinity.
+
+Baseline **81/81 passed in118.98s**; final **83/83 passed in128.92s**
+(`build/claw-final-tests.log`), existing app/core/Catch2 build passes. Counts are
+83both inputs/75XML-only/71portable; optimizer eligibility1123ordinary/1080paired.
+Initial failures exposed missing alias input, PC extraction leaking into default
+queries and a reused fixture filename; all were corrected before the final run.
+
+Current **642-TAE view/cache `build/development-xml/claws-complete`** preserves
+prior targets and links empty retaineda22/a42 to156/151 clips from the existing
+full extraction. a42 supplies critical alias targets. The earlier incomplete
+claws view remains unused. No archive copied/unpacked; never unpack into or
+recursively delete through junctions. Coverage is **163 bases/1123 variants/
+77 shared sets**, twenty-four vocabularies with **1441 definitions/1929 selected
+ordered events**, **1331 graph-derived/110 representative critical mappings**.
+Existing CLI semantic JSON round-trip generated
+**`build/development-game-data/11711000.graph-claws-checked.json`**
+(14469442bytes/3296weapons/1123with movesets). Full previous-value/shared-identity
+comparison removes only new22 assignments and absent/null optional PC fields;
+every previous value and shared identity is preserved
+(`build/claw-data-comparison.log`). Previous outputs and retained inputs remain.
+
+## Ordinary paired fists and native both-hand availability
+
+The audited complete fist signature is **type35/motion42/behavior2100–2199/
+stances0,0/special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1**.
+Iron Ball and Star Fist share exact2100; Poisoned Hand and Madding Hand share
+exact2121. These add **four bases/28 variants/two exact shared sets**. Production
+selects parameters rather than weapon IDs or names. Unarmed and special fist
+categories220/221/259 remain outside this ordinary profile.
+
+The pinned local Smithbox EquipParamWeapon annotation describes
+`bothHandEquipable` as whether equipping with both hands is possible
+([field annotations](https://github.com/vawser/Smithbox/blob/3411b8bb03a8e7ca20e04a11939d1e577d392d4f/src/Smithbox.Data/Assets/PARAM/ER/Param%20Annotations/English/EQUIP_PARAM_WEAPON_ST.json)).
+**Grafted Dragon has0**, despite sharing the other ordinary signature fields.
+It therefore does not receive a complete catalog containing Both-state moves.
+Paired claw/fist profile admission now requires this flag1, and graph resolution
+checks every member of each paired group, rejecting missing/non-1 values even on
+a later otherwise-identical member. Availability is derived from XML; no named
+weapon exception was introduced. The current policy audits complete catalogs;
+a future partial-catalog policy must preserve native availability rather than
+filling unavailable states merely because graph clips exist.
+
+Exact HKS GetAttackMaxNumber/GetDualAttackMaxNumber gives six ordinary/offhand
+and matching-powerstance light stages. IsEnableDualWielding accepts matching
+fists. Both and Dual requests use separate native states. The independent graph
+audit verifies sixth ordinary/offhand clips30050/32050/35050 at offsets13/16/14,
+paired stages34040/34050 at13, and both mounted start registrations. The shared
+stance helper admits42's0/0, with the audited built-in-pair requirement.
+
+`fistCatalog` reuses the 68-move claw vocabulary, restoring **running R1 to
+type1**. Only **rolling R1 uses307/PCBehavior16/Condition0/Offset0**. Its raw
+Source/index stay-1 and resolution selects player behavior102100130 and
+attack2100130. PCBehavior16 is a hand/source selector, not namespace16.
+Existing opt-in extraction, separate caches, strict selector validation,
+calculator and reflection JSON fields are reused. Five jumping states also
+contain PCBehavior4/judge550 body events; these remain outside the selected
+weapon-event scope, as in previous families.
+
+Each exact group imports **68 moves/96 ordered selected weapon events**,
+**63 graph-derived/five representative critical mappings**. No feints or
+shieldpoke are admitted. Mounted charging/release630/635 and730/735 have actual
+selected events. All selected StateInfo are zero/absent and opposing-target
+flags are true. Both-hand weapon events use DEFAULT0 with the selected paired
+weapon; existing Weapon::paired prevents a Strength bonus, and no additional
+multiplier or second rating is needed. Matching-equipped powerstance still uses
+Sources1/2 and requires explicit secondary equipment.
+
+Independent `audit_fists.py` and `audit_fist_graph.py`
+(`build/fist-audit.log`, `build/fist-graph-audit.log`) read raw XML and native
+registrations without importer output. Exact2100 has127 namespace1 rows;
+2121 has24 overrides affecting16 offhand/powerstance moves. Tracked
+`tests/expected_fist_2100_moves.inc` and `expected_fist_2121_moves.inc` preserve
+both resolved contexts, all12MVs, timing/order/source, alias/behavior/attack IDs
+and flags. Existing portable tests verify arbitrary profile IDs, every admission
+field mutation/deletion, paired group availability, non-arithmetic graph clips
+and missing-sixth-stage rejection. Real cases verify both groups' five target
+critical queries, every affinity, JSON sharing and every move/hit in calculator,
+UI and both optimizers.
+
+The **642-TAE read-only input view `build/development-xml/fists`** preserves all
+claws-complete targets and replaces empty retaineda48 with100 existing fresh
+clips. Six a42 mounted light aliases reference a48. Initial full tests/import
+reported exactly this missing dependency; no fallback or clip omission was used.
+No archive copied/unpacked, no retained/installed input or bundled JSON modified,
+and no production extraction dependency added. Never unpack into or recursively
+delete through junctions; never invoke generate_game_data for this cache.
+
+Baseline **83/83 passed in126.75s**; final **83/83 passed in133.48s**
+(`build/fist-final-tests.log`). Existing app/core/Catch2 build passes, coverage/
+benchmarks OFF. Test counts remain83both-input/75XML-only/71portable. No semantic
+source/test edits followed successful checks.
+
+Coverage is **167 bases/1151 variants/79 shared sets**, twenty-five vocabularies
+with **1509 definitions/2025 ordered selected events**, **1394 graph-derived/
+115 representative critical mappings**. Optimizer eligibility is1151ordinary/
+1108powerstance. Existing CLI semantic JSON save/load generated
+**`build/development-game-data/11711000.graph-fists-checked.json`**
+(14568906bytes/3296weapons/1151with movesets; `build/fist-final-import.log`).
+Full previous-value/shared-pointer identity comparison, removing ONLY new42
+assignments, passes (`compare_fist_data.py`, `build/fist-data-comparison.log`),
+preserving previous PC metadata and every other value/identity.
+
+## Ordinary paired beast claws and explicit offhand sources
+
+The audited ordinary profile is **type95/motion62/behavior6800–6899/stances0,0/
+special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1**. Beast Claw
+68500000 and Red Bear’s Claw68510000 add **two bases/14 affinities/one exact6800
+shared set**. Names/IDs are independent expectations only; production uses the
+full parameter signature and native graph. The audited paired category/stance
+policy is shared through `ordinaryWeaponUsesBuiltInPair` for22/42/62; every
+member of a complete paired group still requires native both-hand availability.
+No replacement model, serializer, calculator or weapon-specific exception.
+
+Exact native HKS gives four ordinary/offhand and four matching-powerstance
+light stages and explicitly admits matching beast claws. IsEnableSpecialAttack
+includes the class. Four heavy-start callbacks enter the existing Special1/2
+feint states during the R2/evasion + effect100290 window. The independent graph
+audit verifies ordinary/offhand fourth clips30030/32030/35030 at offsets13/16/14,
+paired34030 at13 and feints30950/30955/32950/32955 at13/13/16/16. Neutral feint
+resolution now admits62 with the same strict special/context guards as earlier
+families, without seed fallback. Importing selected states is not simulation
+of native input/equipment or effect availability.
+
+`beastClawCatalog` derives from the great-katana vocabulary, restores paired
+stage4 and selects **type307/PCBehavior16/Condition0/Offset0** for both one-handed
+running/rolling R1. Player rows106800120/130 resolve attacks6800120/130; raw
+Source/index stay-1. Existing opt-in extraction/caches and strict PC selector
+validation are reused. Other five jumping PCBehavior4/judge550 body events
+remain outside the selected weapon-event scope. All64 moves resolve
+**99 ordered weapon events**, **59 graph-derived/five representative critical
+mappings**. No shieldpoke enabled. Mounted charging/release630/635 and730/735
+contain actual events. All selected StateInfo zero/absent; opposing-target true.
+
+Beast-claw offhand clips contain **five Source2 events over four moves**, whose
+raw behavior category is2. The pinned primary
+[DSAnimStudio source selection](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs#L503-L535)
+identifies explicit1/2 as right/left weapon; its
+[behavior lookup](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs#L1833-L1888)
+selects the corresponding equipped weapon’s variation. Thus an offhand query’s
+selected primary rating is already the left weapon. Requiring a second rating
+for Source2 in that query was incorrect. This is a MoveId/context rule, not a
+weapon-category/ID/index or MV exception.
+
+`move_is_offhand` identifies the six existing offhand IDs. Shared
+`hit_uses_secondary_weapon(hit, MoveId)` keeps DEFAULT0 primary, interprets
+explicit1/2 against the selected role, and validates the existing PC selector
+before choosing its hand. Source-less304 stays primary; unknown sources remain
+errors. `calculate_move`, MoveEvaluator’s secondary-context validation and
+both optimizer preflights use the same helper. Explicit right sources in an
+offhand move require a supplied right rating and matching imported context;
+explicit left sources need no extra rating. Inactive opposing-target/condition
+events still bypass source requirements. No raw source normalization or JSON
+schema change. Existing mounted/default-source scope remains unchanged.
+
+Both-hand weapon events here all use DEFAULT0 and selected paired weapon;
+existing Weapon::paired suppresses the Strength bonus. Powerstance has explicit
+right/left and DEFAULT0 events: preserve their ordered multipliers and source
+semantics, without inferring a hand from AttackIndex. Explicit other-hand events
+need secondary equipment; this catalog does not simulate native request
+availability or extend arbitrary mixed-weapon behavior.
+
+Independent `audit_beast_claws.py` / `audit_beast_claw_graph.py`
+(`build/beast-claw-audit.log`, `build/beast-claw-graph-audit.log`) read raw aliases,
+default-merged params and native registrations without C++ importer output.
+Exact6800 has116 namespace1 rows. Tracked
+`tests/expected_beast_claw_6800_moves.inc` verifies all64/99 events, all12MVs,
+flags, order/timing/source/index and alias/attack/behavior provenance. Existing
+portable bridge tests cover67 graph-derived IDs in the union of claw and
+beast-claw vocabularies, non-arithmetic clips and missing stage-four rejection.
+Strict profile mutation/deletion and every paired group member’s native flag
+are tested. New portable calculation/optimizer tests distinguish left/right
+powers, cover all six offhand IDs, DEFAULT/explicit/PC source roles, secondary
+context, whole/selected-hit scores in both optimizers. New UI case verifies
+both tabs accept explicit-left offhand attacks without a matching-pair checkbox.
+Real tests exercise every new variant, Both/offhand without a second rating,
+all moves/hits, JSON sharing and five target-critical queries.
+
+Current **642-TAE read-only input view `build/development-xml/beast-claws`**
+preserves641 old targets and replaces empty retaineda62 with**148clips** from
+existing full extraction (`stage_beast_claw_view.ps1`). Prior alias inputs are
+sufficient. No archive copy/unpack, retained/installed file or bundled JSON
+change, no production archive dependency added. Never unpack or recursively
+delete through junctions; never invoke generate_game_data for this cache.
+
+Baseline **83/83 passed in124.15s**; final **85/85 passed in117.57s**
+(`build/beast-claw-tests.log`). Existing app/core/Catch2 build passes; coverage/
+benchmarks OFF. Counts85both-input/77XML-only/73portable. No semantic source/
+test changes after successful checks.
+
+Coverage **169 bases/1165 variants/80 shared sets**, twenty-six vocabularies
+**1573 definitions/2124 ordered selected events**, **1453 graph-derived/
+120 representative critical mappings**. Optimizer eligibility1165ordinary/
+1122powerstance. Existing CLI semantic JSON save/load generated
+**`build/development-game-data/11711000.graph-beast-claws.json`**
+(14619668bytes/3296weapons/1165with movesets; `build/beast-claw-import.log`).
+Complete previous-value/shared-pointer identity comparison passes
+(`compare_beast_claw_data.py`, `build/beast-claw-data-comparison.log`), removing
+ONLY new62 assignments. No previous imported offhand event has explicit1/2;
+previous imported data and powers keep their semantics.
+
 ## Remaining work
 
 Trace `MoveId` semantics to named attack states, then follow the game's behavior
@@ -1772,3 +2089,551 @@ Input SHA-256 hashes for reproducing the local investigation:
 BB8E5E9DF8E73182C029C507FB0A01C2F9AC8F31AB9E5C26675AB5084927CDCA  c0000.game.hks
 A9B8A86B760DC4D1B33001DA161AC34302707A7B612A2FA68707FEB0FA7A3737  common_define.game.hks
 ```
+
+## Ordinary paired backhand blades
+
+The complete profile is **type92/motion58/behavior6400–6499/stances0,0/
+special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1**. Backhand Blade
+64500000 and Reverse-Bladed Sword64530000 add **two bases/26 affinities/one
+exact6400 shared set**. Production admission uses the complete native signature,
+including both-hand availability for every member; names and IDs occur only in
+independent expectations. Smithscript Cirque (special251) and Curseblade’s
+Cirque (265) remain excluded. No per-weapon production exception is introduced.
+
+The local native HKS GetAttackMaxNumber/GetDualAttackMaxNumber both select six
+stages for BACKHAND_SWORD58. IsEnableDualWielding admits matching category58
+weapons. IsEnableSpecialAttack does not admit ordinary backhand blades; its
+special251 override is outside this profile. Native graph registrations give
+sixth-stage30050/32050/35050 at offsets13/16/14, paired34040/34050 at13 and
+mounted38100/39100 at16. The audit asserts these raw registrations and guards
+(`audit_backhand_graph.py`, `build/backhand-graph-audit.log`). Existing strict
+graph routing supplies every noncritical mapping and rejects missing stages.
+
+`backhandBladeCatalog` reuses the claw68 vocabulary, restoring both 1H movement
+R1 events to type1 and setting **right mounted charge/release judges730/735**.
+Raw a58/38100 contains730 at0.73333335–1.6666666 and735 at2.1333334–2.3;
+a58/39100 contains730 at0.6666667–1.6666666 and735 at2.0333333–2.1666667.
+No phases are omitted or invented. All requested clips and their aliases stay
+within a58; small-PvE riposte31730 references31720. The six-stage catalog has
+**68moves/105ordered selected weapon events**, **63graph-derived/five
+representative critical mappings**. Both/offhand events use DEFAULT0, matching
+powerstance preserves explicit right1/left2 and DEFAULT0. All selected StateInfo
+values are zero/absent and all opposing-target flags true. Four jumping
+PCBehavior4/judge550 body events remain outside selected weapon scope. There
+are no selected PCBehavior events, feints or shieldpoke. Existing classes,
+reflection JSON, calculator and UI/both optimizers require no replacements.
+
+Independent raw `audit_backhand_blades.py` (`build/backhand-audit.log`) reads
+default-merged parameters and raw aliases, not importer output; exact6400 has
+113 namespace1 rows. Tracked `tests/expected_backhand_6400_moves.inc` verifies
+all68/105, all12 MV channels, timing/order/source/index/alias/behavior/attack
+provenance and flags. Portable cases validate arbitrary-ID profile signatures,
+all graph mappings with non-arithmetic clips, missing sixth stages and missing/
+disabled both-hand flags on later shared members. Real regressions cover every
+new affinity, Both/offhand single-rating queries, matching powerstance, all
+moves/hits, JSON identity and both application optimizers. Target-critical
+coverage is now130 queries over26 exact profiles.
+
+Current **642-TAE read-only view `build/development-xml/backhand-blades`**
+preserves641 previous targets and replaces empty retaineda58 with **131fresh
+clips** from the same already recovered archive (`stage_backhand_view.ps1`).
+No archive was copied/unpacked, installed/retained inputs altered, or bundled
+JSON modified. Do not unpack/delete through junction views or call
+generate_game_data. No production archive dependency changed.
+
+Coverage **171bases/1191variants/81shared exact sets**, twenty-seven vocabularies
+**1641definitions/2229ordered selected events**, **1516graph-derived/
+125representative critical mappings**. Ordinary/powerstance optimizer
+eligibility1191/1148. Existing CLI semantic save/load produced
+**`build/development-game-data/11711000.graph-backhand-blades.json`**
+(14673723bytes/3296weapons/1191with movesets; `build/backhand-import.log`).
+Complete prior-value/shared-identity comparison passes
+(`compare_backhand_data.py`, `build/backhand-data-comparison.log`), removing ONLY
+new58 assignments and preserving every prior source/PC/value/sharing.
+
+Baseline **85/85 in116.99s** (`build/backhand-baseline.log`); final **85/85 in127.05s** (`build/backhand-final-tests.log`), raw XML84.01s, complete graph/JSON53.61s and full UI/both optimizers127.01s. Existing app/core/Catch2 builds pass; coverage/benchmarks OFF, existing Qt warnings only. No semantic source/test changes after final checks. Case counts remain85both-input/77XML-only/73portable.
+
+## Ordinary paired martial arts
+
+The complete profile is **type88/motion55/behavior6300–6399/stances0,0/
+special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1**. Dryleaf Arts
+60500000 adds **one base/13 affinities/one exact6300 shared set**. Admission
+uses the complete native signature and checks both-hand availability on every
+member. Names/IDs appear only in independent expectations. Dane’s Footwork
+60510000 uses special246 and requires separate special-category routing.
+No per-weapon production exception or model/serialization replacement is used.
+
+Native HKS GetAttackMaxNumber/GetDualAttackMaxNumber give six stages for
+MARTIAL_ARTS55; IsEnableDualWielding admits matching55 pairs, and
+IsEnableSpecialAttack excludes ordinary martial arts. Raw graph registrations
+give sixth-stage30050/32050/35050 at offsets13/16/14, paired34040/34050 at13,
+and mounted38100/39100 at16. Independent `audit_martial_graph.py` asserts these
+registrations and native guards (`build/martial-graph-audit.log`). Existing
+strict graph resolution supplies every noncritical mapping without fallbacks.
+
+`martialArtsCatalog` derives from claw68, restoring both 1H movement R1 events
+to type1; standard mounted phases630/635 and730/735 remain. All68 requested
+moves contain hits: **134ordered selected weapon events**, **63graph-derived/
+five representative critical mappings**. All selected StateInfo values are
+zero/absent and opposeTarget flags true. Five jumping PCBehavior4/judge550
+body events remain outside selected weapon scope. There are no selected
+PCBehavior events, feints or shieldpoke. Both and offhand DEFAULT0 hits use
+the selected primary paired weapon; powerstance preserves explicit right1/
+left2 events. No AttackIndex hand inference or arbitrary mixed-pair support
+is introduced. Existing calculator, reflection JSON, UI and both optimizers
+consume these moves without new implementation paths.
+
+The requested critical and backstab-whiff clips aliasa42. Small-PvE
+riposte31730 aliases31720, ultimately usinga42/31720’s two events. Alias
+provenance is preserved, while behavior lookup stays variation6300; namespace1
+rows106300530/531 resolve attacks6300530/531 with60/420 physical MVs.
+All alias dependencies already exist in the previous view. Independent raw
+`audit_martial_arts.py` reads default-merged parameters and raw aliases only
+(`build/martial-audit.log`); exact6300 has165 namespace1 rows. Tracked
+`tests/expected_martial_6300_moves.inc` verifies every68/134, all12 MV channels,
+timing/order/source/index/alias/behavior/attack IDs and flags.
+
+Portable Catch2 cases check every complete profile-field mutation/deletion on
+arbitrary IDs, all63 graph-derived mappings using non-arithmetic clips,
+missing sixth stages and later-member unavailable/missing both-hand flags.
+Five native target-critical contexts add135queries over27exact profiles in
+total. Real regressions cover every13variant, Both/offhand single-rating
+queries, all moves/hits, JSON identity, and the application/both optimizers.
+
+Current **642-TAE read-only view `build/development-xml/martial-arts`**
+preserves641 targets and replaces empty retaineda55 with **148fresh clips**
+from the same already recovered archive (`stage_martial_view.ps1`). Previous
+a42 alias inputs suffice. No archive copied/unpacked, installed/retained
+inputs changed or bundled JSON regenerated; production archive dependencies
+unchanged. Do not unpack/delete through junction views or run generate_game_data.
+
+Coverage **172bases/1204variants/82shared exact sets**, twenty-eight vocabularies
+**1709definitions/2363ordered selected events**, **1579graph-derived/
+130representative critical mappings**. Ordinary/powerstance optimizer
+eligibility1204/1161. Existing CLI semantic save/load generated
+**`build/development-game-data/11711000.graph-martial-arts.json`**
+(14740384bytes/3296weapons/1204with movesets; `build/martial-import.log`).
+Complete prior-value/shared-identity comparison passes (`compare_martial_data.py`,
+`build/martial-data-comparison.log`), removing ONLY new55 assignments and
+preserving every previous source/PC/value/sharing.
+
+Full baseline **85/85 in102.44s** (`build/martial-baseline.log`); final **85/85 in124.60s** (`build/martial-tests.log`), raw XML83.79s, complete graph/JSON50.55s and full UI/both optimizers124.57s. Existing app/core/Catch2 build passes; coverage/benchmarks OFF, existing Qt warnings only. No semantic source/test changes after checks. Case counts remain85both-input/77XML-only/73portable.
+
+## Scoped special martial-art routing and the Bullet boundary
+
+Dane's Footwork uses base motion55, special246 and behavior6301. The native
+graph registers246 for26 entries: all six ordinary/Both/offhand light stages
+and eight ordinary/Both heavy release/charged stages. Movement, jumping,
+matching-powerstance, mounted and critical/whiff selectors have no246 entries;
+they use55, with critical hit-data aliases42. The local HKS retains six ordinary/
+offhand and matching-pair stages, no ordinary feints and no246-specific redirect.
+Names and weapon IDs appear only in independent regression expectations.
+
+`auditedSpecialWeaponRouting` admits this category pair for automatic left/dual,
+mounted, whiff and explicit target-critical queries. The policy tries special
+registrations before base registrations, using the existing strict resolver.
+It falls back only if a registration is absent, never after a selected clip or
+event fails. Other nonzero specials remain outside that automatic policy.
+**This order is an inference consistent with the inspected inputs, not recovered
+native CMSG selector code.** The [ERClipGeneratorTool author](https://github.com/The12thAvenger/ERClipGeneratorTool/blob/main/README.md)
+describes registration and selection using active TAEs; the [partial-override
+mod author's account](https://www.nexusmods.com/eldenring/mods/7222) describes the
+special-motion mechanism. Neither establishes a universal engine priority rule.
+
+`footworkCatalog` is a representative diagnostic fixture. There is deliberately
+no production SupportedCatalog admission. Independent raw auditing selects140
+events over68 requested moves:139 direct attacks and one Bullet reference.
+The existing importer returns **67 complete moves/136 direct events**, with the
+entire Both guard counter rejected. Its four simultaneous events are judges
+380/381/311/314 at0.56666666–0.6666667 in a55/32700. Exact variation6301 selects
+Behavior106301311/refType1/refId200031311. The6300 family has a direct zero-MV
+helper for311, but fallback must not replace an exact unsupported reference.
+Exact judge314 instead resolvesAtk6301314 with126damage/65status.
+
+The raw snapshot `expected_footwork_6301_moves.inc` checks all67 complete moves,
+all12 MV channels, timing/order/source/index, alias provenance, attack/behavior
+IDs and flags. All139 direct attacks can target opponents, and selected StateInfo
+is zero/absent. Five jumping PCBehavior4/judge550 body events remain outside
+weapon-event scope. The native graph produces the same complete moves and owned
+failure report as the diagnostic fixture. Portable tests use non-arithmetic
+special/base clips, absent-registration fallback and rejection of unaudited
+specials. Explicit target-critical checks now total140 across28 profiles.
+
+The retained directory lacked Bullet.param/XML. A physical workspace copy of
+the installed regulation.bin was unpacked in
+`build/mapping-research/footwork-bullet-audit`, with no installed/retained writes.
+All default-merged weapon3636/behavior13865/attack11017 rows match retained data.
+The recovered Bullet200031311 explicitly links `atkId_Bullet=6301311` (all five
+damage MVs94/status65). It has numShoot1, shootInterval0, life0.1,
+dmgHitRecordLifeTime0.1, sharedHitList1, no continuous-hit flag or hit/interval
+child bullets, zero velocity/gravity, falloff90 and dist0. These fields require
+an emission/shared-hit audit before treating it as an ordinary calculator hit.
+The [Smithbox Elden Ring annotations](https://raw.githubusercontent.com/vawser/Smithbox/main/src/Smithbox.Data/Assets/PARAM/ER/Param%20Annotations/English/BULLET_PARAM_ST.json)
+and [libER definitions](https://dasaav-dsv.github.io/libER/d3/df5/BULLET__PARAM__ST_8hpp_source.html)
+identify falloff as time/range attenuation and hit history as a separate control;
+falloff is **not** a repeated-hit damage multiplier. The static table link is
+established, but emission count, hand/source and contact behavior are not yet
+implemented. Never infer attacks from numerically similar IDs or ignore the
+Bullet to export a partial counter.
+
+Independent scripts/logs: `audit_footwork.py`, `survey_footwork.py`,
+`audit_footwork_bullet.py`; `build/footwork-audit.log`,
+`build/footwork-survey.log`, `build/footwork-bullet-audit.log`.
+Recovered input SHA-256:
+
+```text
+766521f9508de3a3532df61c45a1c2d93340f1ff7ed8306ab20df761712ca2ab  regulation.bin
+fa0bbfcbd1a2c13141a66a547a6bacd55e2af9a8c504793c17e595cf8ab094ce  Bullet.param.xml
+```
+
+Current642TAE read-only view `build/development-xml/footwork-audit` preserves641
+prior targets and replaces empty retaineda246 with28 clips from the existing
+full animation extraction. No animation archive was unpacked again. Never run
+generate_game_data or unpack/delete through these junctions.
+
+Exported coverage remains172bases/1204variants/82sharedsets. All thirteen Dane's
+Footwork affinities remain without movesets; existing calculator/UI/optimizers
+and reflection serialization retain prior behavior. The graph CLI artifact
+`11711000.graph-footwork-audit.json` preserves every prior value/shared identity
+after normalizing pointer IDs (`build/footwork-data-comparison.log`).
+Final **85/85 in130.63s** (`build/footwork-final-tests.log`); app/core/Catch2
+build passes, coverage/benchmarks OFF. Next add narrowly validated generic
+BulletParam resolution/provenance through the existing hit model and calculator,
+then enable the full246 profile only after all68 moves pass.
+
+## Opt-in Bullet reference resolution
+
+The optional trailing `const ParamTable* bullets` argument on `resolveAttackEvents`
+and both existing `importMoveset` overloads follows the actual Behavior refType1
+link through Bullet.atkId_Bullet into AtkParam_Pc. It preserves category and
+explicit-row constraints; supplying a Bullet table does not choose between
+ambiguous direct/Bullet candidates. Missing rows/links or malformed MVs retain
+owned diagnostic candidates. Only single-shot leaf records (default-merged
+numShoot1, shootInterval0, HitBulletID-1, intervalCreateBulletId-1, isEndlessHit0)
+are resolved. Child, interval, multiple-shot and continuous paths fail explicitly.
+No child graph flattening, guessed IDs or invented emission/contact timestamps.
+
+`ResolvedHit::bulletParamId` is optional provenance on the existing model. Direct
+records omit it, preserving old JSON values. Existing reflection serialization
+round-trips linked records and legacy direct records without customization.
+This is a diagnostic linked attack, not proof of an ordinary calculator hit.
+
+The shared calculation preflight rejects **all active Bullet records** with their
+Bullet ID and the missing projectile emission/contact context. This covers
+calculate_move, MoveEvaluator and both optimizer implementations. Inactive
+opponent/StateInfo records retain zero contributions; optimizer objectives for
+only a direct record remain available. Emission/source/shared-hit and projectile
+power semantics still need verification before production admission.
+
+Explicit diagnostic use:
+
+```cpp
+ParamTable bullets;
+bullets.load((root / BulletParamFile).string().c_str());
+auto linked = importMoveset(cache, motionCategory, variation, definitions,
+    behaviors, attacks, std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+```
+
+With recovered Bullet data, Dane's Footwork resolves68 moves/140 ordered linked
+records, including139 direct records and Bullet200031311 -> Atk6301311. The
+independent67-move/136-record snapshot remains unchanged. Both-counter judges
+380/381/311/314 link attacks6300380/6300381/6301311/6301314 with physical
+113/113/94/126 and status65. Original event windows and Source0 are preserved;
+the calculation boundary refuses the active Bullet record. No Bullet table
+retains the original whole-counter failure and67 complete moves.
+
+No SupportedCatalog admission or mandatory Bullet extraction dependency was
+added. Exported coverage stays172bases/1204variants/82sets, all thirteen Dane's
+Footwork affinities excluded. Current `footwork-bullets` view preserves642 TAE
+and message targets and uses the physically recovered regulation directory;
+all nine consumed tables match retained XML and both wrapper versions11711000.
+Never unpack/delete through junctions or run generate_game_data.
+
+**87/87 full regressions in 145.78s**, plus three targeted Bullet/raw-XML cases after
+final fixture assertions. App/core/Catch2 build passes, coverage/benchmarks OFF.
+CLI `11711000.graph-footwork-bullets.json` preserves every previous value and
+shared identity after pointer-ID normalization (`build/bullet-reference-data-comparison.log`).
+Next verify native type1 emission/source/shared-hit rules and initial raw power
+scope, then add calculator support and the246 full profile.
+
+## BulletBehavior events and projectile coverage
+
+The martial-art guard-counter clip also contains type2 BulletBehavior events;
+the earlier type1/refType1 94-MV linked record is not a complete projectile audit.
+In a55/32700, judges382/383 occur at0.6666667–0.7 and select Behaviors106300382/383
+for both6300/6301. Their Bullets200030382/383 explicitly link Atks6300382/383,
+with160 for all five damage channels and65 for status. DummyPoly IDs1/2,
+Source0/index0 and Attachment0/EnableFalse/Offset0/Unk12zero/StateInfozero remain
+raw controls. EnableFalse must not be treated as an inactive attack flag.
+Native emission and contact/shared-hit behavior remain unverified.
+
+Independent raw auditing of66 unique vocabulary animations, aliases and the
+partial246 registrations finds **27 type2 records in each6300/6301 vocabulary**.
+Every record has the same control signature and a single-shot leaf Bullet;
+MVs and windows vary, including status100/65. The tracked54-record snapshot
+`expected_martial_bullet_events.inc` checks every12 MV channel, ordered identity,
+behavior/Bullet/attack link, source/index, timing/alias provenance and controls
+against the C++ resolver without consuming importer output.
+
+The [community motion-value sheet](https://docs.google.com/spreadsheets/d/1j4bpTbsnp5Xsgw9TP2xv6d8R4qk0ErpE9r_5LGIDraU/edit?gid=0#gid=0)
+separates guard-counter113+113 from160+160 Bullet values. This is a cross-check,
+not proof of simultaneous contacts or a runtime emission rule. The pinned
+[DSAnimStudio simulator](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs)
+uses distinct Attack and Bullet reference paths for type1/304/307 and type2.
+It does not establish the game's treatment of a type1/refType1 combination.
+The [pinned ER TAE template](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/Res/TAE.Template.ER.xml)
+defines the raw type2 layout; undocumented emission meaning stays explicit.
+
+Existing `AttackEvent` stores optional bulletDummyPolyId, bulletAttachmentType,
+bulletEnable, bulletOffset and bulletUnk12. Type2 parsing strictly rejects
+missing/duplicate/invalid controls; False and zero are retained through the
+existing reflection serializer. Source/index/StateInfo and scheduled windows
+are preserved. No emission/contact timestamps, shot counts or activation gates
+are inferred from these fields.
+
+The optional fourth `includeBulletBehaviors` argument on extractAttackEvents
+and AnimationCache::get enables type2 extraction. The third argument remains
+includePCBehaviors. Ordinary, PC, Bullet and combined caches remain isolated,
+including aliases whose local rows are replaced by target events.
+For existing importMoveset, request **definition.eventType=2** and pass the
+Bullet table. Supplying a table alone keeps the previous event-family selection.
+Type2 must resolve refType1; direct references and missing/unsupported Bullet
+links retain owned failures and cannot publish partial components.
+
+All active Bullet records still fail calculation/optimizer preflight; type2
+objects missing Bullet provenance also fail. No production admission, UI flow,
+mandatory dependency or damage formula changed. Default GameData therefore
+preserves every previous value and shared identity, with172bases/1204variants/
+82sets. **Those coverage counts refer to direct/critical/verified PC catalogs,
+not full projectile-inclusive martial-art totals.** Dryleaf's134 direct records
+omit27 type2 records, and Footwork's diagnostic68/140 linked records also omit27.
+Per-move projectile phases and overlap/shared-hit/type1 rules must be verified
+before merging; mounted charging/release projectiles must not be mixed by clip ID.
+
+Baseline87/87 in135.95s; full **88/88 in180.41s**
+(`build/bullet-behavior-tests.log`), plus five targeted importer/raw-XML cases
+after the54-record snapshot and final false/zero JSON test. App/core/Catch2 build
+passes, coverage/benchmarks OFF. CLI `11711000.graph-bullet-behavior.json`
+preserves all previous data/sharing (`build/bullet-behavior-data-comparison.log`).
+Current root remains `build/development-xml/footwork-bullets`; no archive or input
+changes. Never generate_game_data or unpack/delete through junctions.
+
+## Explicit composition of attack-event phases
+
+`MoveDefinition::additionalEventSelections` optionally adds explicit event-type
+and judge/category/behavior-row selections to the existing base selection. It
+composes records into the existing Move/ResolvedHit model and uses the existing
+serializer. Absent extras preserve legacy definition JSON; absent/empty extras
+retain the old import path.
+
+For an inspected mounted release with direct judge 635 and Bullet judge 636:
+
+```cpp
+auto release = definition; // Graph-resolved release with eventJudgeId=635.
+release.additionalEventSelections = std::vector{AttackEventSelection{2, 636}};
+auto imported = importMoveset(cache, category, variation, std::array{release},
+    behaviors, attacks, std::nullopt, BehaviorLookup::PLAYER_WEAPON, &bullets);
+```
+
+The default base family remains types 1/304 even if extras expose 2/307. Extra
+selections require a supported explicit type. Phased bases require explicit
+extra judge filters. Global requiredCategory applies to every component;
+individual category/behavior restrictions belong to their selection.
+
+Overlapping selections, missing phases or unresolved references reject the
+entire move before publication. Reports retain reference failures even when a
+later phase is missing. Original cache positions restore record order, including
+equal-time/repeated records and reversed selector declarations. The existing
+graph bridge retains selection metadata while deriving actual clips.
+
+Raw XML regressions for variations 6300/6301 combine six Both-counter records:
+base judges 380/381/311/314 and explicit BulletBehavior judges 382/383. Mounted
+right release 635+636 and left release 735+736 each combine two records.
+Charging 630/730 remains separate, with one direct record; absent charge Bullet
+requests 631/731 fail without borrowing release events. These are diagnostic
+linked records, not verified native emission/contact counts or production
+weapon exceptions. Active Bullet records still fail calculation preflight.
+
+The independent audit `build/mapping-research/mounted-martial-phase-events.json`
+records the charge, release and Bullet windows. In a55/38100: judge 630 at
+0.7–1.7333333, 635 at 2.1666667–2.3, 636 at 2.2–2.2333333. In a55/39100:
+730 at 0.7–1.6333333, 735 at 2.1666667–2.3, 736 at 2.2333333–2.2666667.
+No universal temporal assignment rule is inferred from these windows.
+The [current ER TAE template](https://github.com/Meowmaritus/DSAnimStudio/blob/master/DSAnimStudioNETCore/Res/TAE.Template.ER.xml)
+supplies no runtime meaning for Enable/AttachmentType. Their semantics,
+type1/refType1 behavior and source/shared-hit rules remain unresolved.
+
+Validation uses the existing Catch2 executable, full suite and real XML inputs;
+see the latest handoff for logs. CLI `11711000.graph-bullet-phases.json` preserves
+all prior GameData values/shared identities: 172 bases / 1204 variants / 82 sets.
+Exports retain direct/critical/verified-PC scope. Projectile calculation and
+Dane's Footwork admission remain pending policy validation. No archive/input/
+bundled JSON changes; never generate_game_data or unpack/delete through junctions.
+
+Final full regression suite: **88/88 in 129.10s**
+(`build/bullet-phase-report-tests.log`); final app/core/Catch2 build passed
+(`build/bullet-phase-report-build.log`). Diff and UTF-8 checks pass.
+
+## Bullet parameters retained after import
+
+`ResolvedHit::bulletParameters` is optional owned metadata, serialized by the
+existing reflection system. It retains native lifetime/random lifetime, hit
+history duration, attenuation start distance, five DamageType-ordered damping
+values, shared-hit flag, launch condition, shooter SpEffect ID and five target
+SpEffect IDs. This is a selected subset of Bullet parameters; the existing
+single-leaf reference constraints remain in place.
+
+Each field is optional. ParamTable defaults and row overrides are merged as
+usual; missing fields stay unknown. Raw zero, false and -1 values survive
+serialization without interpretation. Malformed/non-finite numbers and invalid
+shared-hit flags fail resolution with the existing owned candidate diagnostics.
+Direct-hit JSON and old Bullet records without metadata remain compatible.
+No new serializer or replacement move/hit model is used.
+
+The [Smithbox ER Bullet annotations](https://github.com/vawser/Smithbox/blob/main/src/Smithbox.Data/Assets/PARAM/ER/Param%20Annotations/English/BULLET_PARAM_ST.json)
+describe lifetime, hit history, shared-hit controls and damping beyond a distance.
+They do not establish a native emission/contact count or a complete damping
+formula. Values are retained without converting them into contact multipliers.
+
+An independent default-merged XML snapshot covers 37 distinct Bullet rows from
+the existing 54 type2 events and the exact 6301 type1/refType1 link. All inspected
+rows have life/history 0.1 seconds, zero random lifetime/distance, damping values
+90 for all five damage types, shared-hit enabled and zero launch/effect IDs.
+These are parameter facts, not evidence that each linked record should score.
+See `tests/expected_martial_bullet_parameters.inc` and
+`build/bullet-parameter-audit.log`.
+
+Portable regressions verify varied channels, defaults/overrides, unknown fields,
+raw sentinels, strict errors, ownership after table reload and complete GameData
+JSON/shared-pointer round-trips. Metadata without its Bullet ID cannot fall
+through to direct weapon calculation; MoveEvaluator and both optimizers reject
+it through their existing shared preflight. All active Bullet records remain
+unsupported for calculation.
+
+Final full suite **89/89 in 176.98s**, app/core/Catch2 build passes; coverage/
+benchmarks OFF. CLI `11711000.graph-bullet-parameters.json` preserves all previous
+values/shared identities (`build/bullet-parameter-data-comparison.log`). Production
+coverage remains 172 bases / 1204 variants / 82 shared sets, with direct/critical/
+verified-PC scope. No archives, inputs or bundled JSON changed.
+
+## Independent selected-hit calculation
+
+`MoveEvaluator::evaluate_hit(id, hit_index)` evaluates exactly one original
+imported record and returns the existing HitAttack. Indices are zero-based in
+C++ and displayed as Hit 1, Hit 2, etc. in the UI. Missing moves or out-of-range
+indices return an error. Unsupported siblings do not affect the selected hit.
+
+```cpp
+MoveEvaluator evaluator(weapon, stats, upgrades);
+auto hit = evaluator.evaluate_hit(MoveId::TWO_HAND_GUARD_COUNTER, 0);
+if (hit) {
+    const auto& powers = hit->powers; // Existing base/full per-type and total powers.
+}
+auto whole = evaluator.evaluate(MoveId::TWO_HAND_GUARD_COUNTER);
+// The whole result still fails if any required record is unsupported.
+```
+
+The low-level calculate_hit helper contains the existing activation, source and
+MV arithmetic; calculate_move reuses it and retains strict whole-move totals.
+The evaluator reuses its cached stance ratings and validates only the selected
+source span. A selected secondary-weapon hit still requires a validated explicit
+second weapon; an unrelated secondary-weapon sibling does not block a primary
+hit. Inactive records retain identity and zero power without source/MV decisions.
+
+StatsTab calls this API when a hit number is selected. This fixes a disagreement
+with the existing optimizer, which already prepares only the selected hit.
+Selecting a direct hit can show its powers while a sibling Bullet, unknown
+condition/source/MV or missing second weapon keeps the full move unsupported.
+Selecting the unsupported hit still displays its diagnostic and no numeric
+power cells. All hits retains the previous strict behavior.
+
+New portable core/UI regressions verify both index orders, original indices,
+source/pair/stance validation, activation, errors and agreement with both
+optimizers. Full **91/91 in 128.66s**, app/core/Catch2 build passes, coverage/
+benchmarks OFF. The existing XML/GameData/JSON/application tests also pass.
+No models, serialization schema, importer catalogs or exported coverage changed.
+Projectile power/contact rules remain unresolved; active Bullet records remain
+unsupported, and no partial whole-move total is returned.
+
+## Special straight-sword family 110
+
+The native type3/base23/special110/behavior200–299/stance0,10 signature now
+admits Broadsword, Cane Sword and Stone-Sheathed Sword: 27 variants using exact
+variation201. Production uses parameter fields and the existing catalog/graph
+pipeline; weapon names and IDs occur only in independent expectations.
+SupportedCatalog now has specialCategory, defaulting to zero. Grouping keeps
+base and special contexts separate even when their behavior variations match.
+
+Native graph registrations select special110 for four 1H R2 phases and 1H/2H
+rolling attacks. The other requested states select base23. The existing
+63-move vocabulary therefore resolves 72 ordered direct records, six sourced
+from110 and66 from23. All are opposing-target eligible and have no positive
+StateInfo. The inspected clips contain no Bullet events; five jumping body
+PCBehavior records retain their previous excluded scope.
+
+The representative straightSword110Catalog records those six override scopes;
+the graph bridge derives actual registered clips. Portable graph tests give
+additional states a special registration and non-arithmetic clip77, proving
+that representative seeds do not control graph resolution. Missing special
+registrations may use base; a selected malformed or missing special clip fails
+rather than falling back. Full native snapshots verify all MV channels, event
+order/windows, aliases, behavior/attack IDs and source/index.
+
+Scoped category pair23/110 now uses the audited offhand/matching-pair/mounted/
+whiff/target-critical priority policy already used by55/246. This policy is
+consistent with inspected registrations; it is not a recovered native selector
+algorithm or permission to admit arbitrary special categories. Other special
+straight-sword profiles remain excluded pending their complete audits.
+
+Coverage is now175 bases /1231 variants /83 shared sets; matching-powerstance
+eligibility1188. CLI `11711000.graph-straight-110.json` preserves every prior
+value/shared identity after removing only the27 new assignments
+(`build/straight-110-data-comparison.log`). Full **91/91 in 121.35s** and
+app/core/Catch2 builds pass; coverage/benchmarks OFF.
+
+Current input view is `build/development-xml/straight-special-110`, reusing seven
+already-recovered special clips and all other existing junction targets. No
+archive/input/bundled JSON changes; never generate_game_data or unpack/delete
+through junctions. Independent audits and the preliminary remaining-family
+survey are recorded in the latest handoff. Projectile calculation remains
+unresolved and is not enabled by this expansion.
+
+## Remaining straight-sword specials 111/112/113/117
+
+The same type3/base23/behavior200�299/stance0,10 signature now admits the four
+remaining straight-sword specials: Short Sword (111/209), Miquellan Knight's
+Sword (112/210), Carian Knight's Sword and Lazuli Glintstone Sword (113/202,
+shared), and Warhawk's Talon (117/208). That adds 29 variants; production uses
+parameter fields and the existing catalog/graph pipeline. Names/IDs appear only
+in independent expectations.
+
+Native graph registrations select each special for all eight R2 phases (1H
+30500/30505/30510/30515 and 2H 32500/32505/32510/32515); the empty SubStart
+30501/32501 clips carry no events. Other requested states select base23. HKS
+keeps ordinary straight-sword limits (five light/four dual) and matching-pair
+eligibility; none of these specials reduces a chain or enables feints. The
+63-move vocabulary therefore resolves 72 ordered direct records for 111/112/113
+and 78 for 117: Warhawk's Talon's clips carry a second hit on six heavies
+(judges 106/101/116/306/301/316), its double-slash R2. All records are
+opposing-target eligible with no positive StateInfo; no Bullet events.
+
+A shared consteval factory straightSwordHeavySpecialCatalog(special) sets the
+eight heavy overrides; the graph bridge still derives actual registered clips.
+Portable tests verify eight overrides, full-signature admission with arbitrary
+IDs, grouping by special context, field mutation/deletion and strict selected-
+clip failures. Real-data snapshots 	ests/expected_straight_{s}_{v}_moves.inc
+verify all MV channels, event order/windows, aliases, behavior/attack IDs and
+source/index. GameData/JSON/UI/both-optimizer regressions include all29 variants
+and preserve every previous value/shared identity after removing only the new
+assignments.
+
+Coverage is now180 bases /1260 variants /87 shared sets; matching-powerstance
+eligibility1217. CLI 11711000.graph-straight-specials.json (14934521 bytes)
+preserves every prior value/shared identity. Full **91/91 in 310.83s** and
+app/core/Catch2 builds pass; coverage/benchmarks OFF.
+
+Current input view is uild/development-xml/straight-specials, which
+re-junctions a110/a111/a112/a113/a117-tae to the already-recovered archive. No
+archive/input/bundled JSON changes; never generate_game_data or unpack/delete
+through junctions. Projectile calculation remains unresolved and is not enabled
+by this expansion.

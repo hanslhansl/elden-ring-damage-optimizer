@@ -43,7 +43,7 @@ and `erdo_core_with_coverage` targets are removed. CTest's `normal.` prefix stay
 the same in every mode, so existing test filters continue to work.
 
 Moveset regressions use the same Catch2 executable and CTest discovery;
-there is no separate runner. The eight portable `[moveset][unit]` importer cases cover
+there is no separate runner. The portable `[moveset][unit]` importer cases cover
 IDs/catalogs, behavior resolution, encoded player behavior namespaces, ordinary
 player-weapon lookup/fallback, attack events, StateInfo/legacy JSON, opposing-target flags, and import/serialization.
 They use synthetic Witchy XML and run without game files. Their checks include
@@ -57,8 +57,8 @@ To also run the four original animation regressions, the 63-entry Longsword
 catalog (including a snapshot of its 29 added moves), and the 66-entry/77-hit
 Dagger snapshot, configure the directory containing
 `regulation-bin` and `chr`. The tests also check automatic assignment and shared
-identity for 1080 variants of 156 weapons using twenty-two animation families and
-seventy-five exact behavior variations. The axe and hammer snapshots each cover all
+identity for 1260 variants of 180 weapons using thirty-three animation families and
+eighty-seven exact behavior variations. The axe and hammer snapshots each cover all
 63 moves / 77 hits; the flail snapshot covers 60 moves / 78 hits. Greatswords,
 greataxes and great hammers have 59 moves and 67/71/81 hits respectively. Separate
 Alabaster Lord's Sword and Beastclaw Greathammer snapshots verify their ordinary
@@ -96,7 +96,9 @@ all twelve MV channels and target eligibility: 127 events can affect opposing
 targets, while 26 remain ordered but inactive for calculation.
 Thrusting shields cover 52 moves/55 ordered events, four ordinary/offhand lights
 and both mounted charging/release phases; their native request rules exclude
-powerstance despite a paired combo limit in the script:
+powerstance despite a paired combo limit in the script. Ordinary torches cover
+46 moves/46 events; their parameters disable throws and native rules forbid
+powerstance:
 
 ```powershell
 cmake --preset 'clang-24 Debug' '-DERDO_MOVESET_XML_ROOT=C:/path/to/unpacked_data'
@@ -150,14 +152,14 @@ them with CTest's `-R '^normal.UI moves'` or Catch2's `'[ui]'` filter.
 With `ERDO_MOVESET_XML_ROOT` set, a fifth UI case imports the complete game data,
 saves it with the existing serializer, and activates the JSON through the real
 MainWindow game-data menu action. It checks every move/hit and all 12 power
-channels for all 1080 supported variants against the original XML-derived
+channels for all 1204 supported variants against the original XML-derived
 calculator values. It also checks shared moveset identity, DLC IDs, and both
 optimizer buttons against direct optimization for whole moves/first hits,
 one-handed/two-handed/powerstance attacks, and total-power/bleed targets.
-Ordinary objectives include all 1080 variants; powerstance excludes the 39
-thrusting-shield variants according to native class eligibility.
-Including the graph tests described below, there are **81 tests with both local
-inputs**, **73 with only game XML**, or **69 without local inputs**. Tests create only
+Ordinary objectives include all 1204 variants; powerstance excludes 39 thrusting-shield variants and four torches (1161
+eligible), according to native class rules.
+Including the graph tests described below, there are **85 tests with both local
+inputs**, **77 with only game XML**, or **73 without local inputs**. Tests create only
 temporary JSON/settings and do not change the bundled game data or user settings.
 
 In Stats, selecting a weapon shows its imported moves, per-hit powers and status
@@ -175,8 +177,8 @@ produce diagnostics. Totals assume all active hits connect and are before critic
 enemy defenses.
 
 The bundled JSON files currently have no imported movesets. Load newly generated
-game data through the existing UI workflow to use the move controls; 156
-weapons matching the twenty-two validated ordinary families are supported. Existing JSON without
+game data through the existing UI workflow to use the move controls; 172
+weapons matching the twenty-four validated ordinary families are supported. Existing JSON without
 movesets still supports ordinary attack power and spell scaling.
 
 # Development JSON from retained XML
@@ -187,7 +189,7 @@ arguments still runs the existing exploration code in `src/core/main.cpp`.
 ```powershell
 cmake --build --preset 'clang-24 Debug' --target erdo_core_exe -j 4
 & './build/clang-24 Debug/src/core/erdo_core_exe.exe' --import `
-    'build/development-xml/thrusting-shields' `
+    'build/development-xml/straight-specials' `
     'build/development-game-data/11711000.json'
 ```
 
@@ -195,7 +197,7 @@ The command calls `witchy::load_game_data`, saves through `json::save`, reloads
 through `json::load<GameData>`, and verifies weapon names and moveset contents.
 It refuses to overwrite an existing output; choose another path for a later run.
 It does not unpack archives or modify the XML. The current retained data produces
-version 11711000 with 3,296 weapons and 1080 weapons sharing seventy-five imported movesets.
+version 11711000 with 3,296 weapons and 1204 weapons sharing eighty-two imported movesets.
 The development output is ignored under `build/`.
 
 To use graph-derived ordinary, offhand and matching-powerstance mappings while retaining the complete
@@ -203,15 +205,15 @@ validated catalog for other moves, use the opt-in development import:
 
 ```powershell
 & './build/clang-24 Debug/src/core/erdo_core_exe.exe' --import-graph `
-    'build/development-xml/thrusting-shields' `
+    'build/development-xml/straight-specials' `
     'build/mapping-research/c0000-behbnd-dcx/Behaviors/c0000.xml' `
-    'build/development-game-data/11711000.graph-thrusting-shields.json'
+    'build/development-game-data/11711000.graph-straight-specials.json'
 ```
 
 This file has been generated locally and verified through the existing JSON
-round-trip. Choose a new output filename to rerun. It contains 1080
-supported weapons and seventy-five complete movesets. Across the twenty-two animation families,
-1222 definitions come from the graph and 105 use representative critical catalog mappings;
+round-trip. Choose a new output filename to rerun. It contains 1204
+supported weapons and eighty-two complete movesets. Across the twenty-eight animation families,
+1579 definitions come from the graph and 130 use representative critical catalog mappings;
 each exact behavior variation resolves its own hit data. Graph failures or mismatched affinity
 contexts reject the import; they do not fall back to a catalog animation.
 
@@ -320,8 +322,28 @@ These mappings describe selected attack states. Offhand assumes an attacking
 left-hand request (e.g. the L2 fallback without an active skill); native L1 can
 guard with this class. Guarded two-handed R1 (`AttackBothLightGuard`) is a
 separate state and is not added to the current normal-attack MoveId vocabulary.
-The current tests check ordinary optimization eligibility for all 1080variants
-and exclude the 39 thrusting-shield affinities from powerstance (1041 eligible).
+The current tests check ordinary optimization eligibility for all 1204variants
+and exclude the 39 thrusting-shield affinities and four ordinary torches from
+powerstance (1161 eligible).
+
+Ordinary torches require type 87/motion 21/behavior 2400–2499, 0/10 stances,
+special 0/catalyst 0/built-in-pair 0/enableThrow 0. Torch, Steel-Wire Torch,
+Beast-Repellent Torch and Sentry’s Torch add four weapons sharing base 2400.
+The complete parameter signature selects them; their utility/passive effects
+and weapon skills do not select or alter this normal-state catalog. Ghostflame,
+St. Trina’s and Nanaya’s Torch have special categories and remain excluded.
+
+`torchCatalog` derives from the unpaired thrusting-shield vocabulary and removes
+backstab whiff plus all five critical throws: 46 moves/46 events, all graph-derived.
+The 78 namespace-1 behavior rows resolve these with StateInfo 0 and opposing-target
+eligibility. The snapshot checks all twelve MV channels and raw provenance.
+Mounted phases keep 630/635 and 730/735. No powerstance, critical throws, feints
+or shieldpoke are enabled, and explicit torch throw queries reject.
+
+This API maps selected attack states. L1 guards with torches; offhand data assumes
+an already selected left-heavy attack request, such as the skill-disabled L2
+fallback. Mapping weapon skills or deciding whether that request is available
+under the current equipment/input/effect context remains separate.
 
 Heavy thrusting swords have asymmetric authored positions 3/10, now represented
 by the stance helper. Their five-stage ordinary/offhand chains and four feints
@@ -340,10 +362,10 @@ installed files and retained inputs were read only. This ignored extraction can
 be reused for later class audits.
 The development root above uses
 directory junctions to the retained parameters/messages/other TAE directories
-and to these fresh family extractions, including a24/a26/a27/a28/a31/a36/a37/a38/a39/a43/a50/a57/a60/a61.
+and to these fresh family extractions, including a21/a22/a24/a26/a27/a28/a31/a36/a37/a38/a39/a42/a43/a50/a57/a60/a61.
 It is an input view; do not unpack into it.
 The local test cache now uses this root. Other machines need a complete extraction
-of `c0000.anibnd.dcx`, including all twenty-two supported family TAEs and their
+of `c0000.anibnd.dcx`, including all twenty-four supported family TAEs and their
 alias targets (including a36); the negative
 twinblade regression also uses a24. No additional game archive is required.
 The retained a43 directory is empty; the whips view links it to the already
@@ -358,7 +380,13 @@ The great-katana view preserves every curved-view target and links empty retaine
 a61 to the same recovered archive. The light-greatsword view preserves those
 targets and links empty retained a60 to the same extraction. No new archive
 was unpacked or copied. The thrusting-shields view preserves these targets
-and links empty retained a57 to that same full archive (125 clips).
+and links empty retained a57 to that same full archive (125 clips). The
+torches view preserves those targets and links empty retained a21 to the existing
+full extraction (101 clips). The claws-complete view preserves those
+targets and links empty retained a22/a42 to156/151 clips. The fists view adds
+100a48 clips; the beast-claws view adds148a62 clips, and the current
+backhand-blades view adds131a58 clips. The current martial-arts view adds148a55
+clips from the same full extraction. No archive was copied or unpacked again.
 
 In the application, use **File → Load Game Data from Directory** (the existing
 action opens a file picker) and select this JSON. Then activate its entry under
@@ -369,7 +397,7 @@ JSON files remain unchanged.
 To rerun the complete workflow regression:
 
 ```powershell
-cmake --preset 'clang-24 Debug' '-DERDO_MOVESET_XML_ROOT=F:/Paul/Programmieren/cpp/elden-ring-damage-optimizer/build/development-xml/thrusting-shields'
+cmake --preset 'clang-24 Debug' '-DERDO_MOVESET_XML_ROOT=F:/Paul/Programmieren/cpp/elden-ring-damage-optimizer/build/development-xml/straight-specials'
 cmake --build --preset 'clang-24 Debug' --target tests -j 4
 ctest --test-dir 'build/clang-24 Debug' -R '^normal.UI moves - XML' --no-tests=error --output-on-failure
 ```
@@ -386,8 +414,8 @@ cmake --build --preset 'clang-24 Debug' --target tests -j 4
 ctest --test-dir 'build/clang-24 Debug' -R '^normal.behavior graph' --no-tests=error --output-on-failure
 ```
 
-With both local inputs configured the suite has 81 tests; with only local TAE/
-parameter XML it has 73, and without local inputs it has 69. The cases compare 83
+With both local inputs configured the suite has 85 tests; with only local TAE/
+parameter XML it has 77, and without local inputs it has 73. The cases compare
 graph-derived mappings and their imported hits with the existing catalogs;
 another case generates all 30 ordinary light-chain moves across both weapons
 from weapon parameters and graph states without catalog seeds, then compares
@@ -426,11 +454,11 @@ Target-query tests match character/throw-type/type-ID/attacker-state fields and
 resolve only if every candidate gives the same supported animation/category.
 They check deterministic candidate lists, no character-0 fallback, weapon
 `enableThrow`, unsupported candidates and genuine conflicting-animation groups.
-The real test resolves all eighty-five representative critical moves from target queries and weapon
+The real test resolves all135 representative critical queries across27 exact profiles from target queries and weapon
 parameters, including eight matching position variants for target c3950/type 22.
-The complete GameData bridge case checks all 1080 supported variants against the
+The complete GameData bridge case checks all 1204 supported variants against the
 default import, writes/loads JSON through the existing serializer, verifies shared
-moveset identity, and rejects missing graph states with reports for all seventy-five groups.
+moveset identity, and rejects missing graph states with reports for all eighty-two groups.
 It also checks a real unsupported twinblade case: explicit graph traversal selects
 four powerstance stages, but a24/34030 is absent even after fresh extraction. The
 import reports that missing fourth stage rather than silently shortening the chain.
@@ -444,9 +472,10 @@ check all ten 1H/2H movement/counter states, offsets, special/base selection and
 failure of missing running/counter entries in the full catalog bridge.
 Offhand/powerstance cases verify independent chain lengths, non-arithmetic clips,
 dual movement states, rejection of unsupported pair categories and missing states,
-and refusal to infer special-category priority. Explicit inspection still works
-when a caller supplies that context; automatic left/dual selection requires zero
-special category and assumes the appropriate offhand or matching-pair request.
+and rejection of unaudited special-category priority. Explicit inspection still
+works when a caller supplies that context; automatic left/dual selection admits
+zero special category and the scoped 55/246 pair described below, assuming the
+appropriate offhand or matching-pair request.
 These checks do not establish complete conditional reachability or universal
 weapon-category precedence.
 See [mapping investigation](../docs/moveset-mapping.md) for API and developer
@@ -541,7 +570,7 @@ an independently equipped second weapon is not part of this search space yet.
 Tests cover hand-specific and fractional status values, stance selection,
 serialization of evaluated hits, unknown inputs, whole-move versus first-hit
 optimal stats, both search algorithms, status objectives, unsupported candidates,
-and evaluation of every imported move on all 1080 supported weapon variants.
+and evaluation of every imported move on all 1204 supported weapon variants.
 The Qt application, move-selection widgets and result display are included in
 the build and covered by the real-data UI regression.
 
@@ -674,6 +703,213 @@ Offhand and mounted events retain raw `Source=0` (DEFAULT). They are not changed
 to a guessed left/right source. Weapon selection in those contexts belongs to
 the calculator's move context, not the XML event reader.
 
+# Ordinary paired claws and PCBehavior events
+
+Hookclaws, Venomous Fang and Bloodhound Claws share the audited complete profile
+**type37/motion22/behavior2200–2299/stances0,0/special0/catalyst0/built-in-pair1/
+enableThrow1**. This adds three bases/39 affinities/one exact-2200 shared set.
+Raptor Talons and Claws of Night retain unsupported special-category routing.
+The catalog has **68 moves/98 ordered events**, six ordinary/offhand and six
+matching-powerstance light stages, mounted charging/release phases, and five
+representative critical mappings. It enables no feints or shieldpoke.
+
+Two-handed native Both states use the selected paired weapon. All their raw
+weapon attack sources are DEFAULT0; no second equipped weapon is required.
+The existing `Weapon::paired` flag suppresses the two-handing Strength bonus.
+Powerstance Dual states remain a separate matching-equipped-pair request;
+Source2 still requires the explicit second weapon and matching behavior context.
+
+One-handed running/rolling R1 uses TAE **307 (PCBehavior)** with raw selector
+**PCBehaviorType16/Condition0x64_GetWeaponData0/Offset0**, and no Source or index.
+The pinned [DSAnimStudio event definition](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/Res/TAE.Template.ER.xml#L1004-L1010)
+preserves those fields; its [attack simulation and lookup](https://github.com/Meowmaritus/DSAnimStudio/blob/f1bff06cd422de991b0a0fa8a2da81db43417318/DSAnimStudioNETCore/TaeEditor/TaeActionSimulationEnvironment.cs#L523-L535)
+selects right-weapon behavior for16, then resolves the existing player behavior
+address and attack reference. Only this audited selector combination is admitted.
+Other combinations reject explicit type307 requests. `AttackEvent` retains three
+optional raw selector fields through the existing reflection serializer; legacy
+JSON lacking them keeps its previous behavior.
+
+`extractAttackEvents` and `AnimationCache::get` default to existing type1/304
+extraction. Their `includePCBehaviors` option retains type307 too, with separate
+cache entries and alias traversal for each mode. `importMoveset` opts in only
+when a definition explicitly selects eventType307. Existing categories and
+auxiliary body PCBehavior events are not reinterpreted as weapon attacks.
+The five claw jumping states also contain type4/judge550 body behaviors; body
+attack power/contact is outside the selected weapon-event catalog.
+
+The independent raw snapshot `expected_claw_2200_moves.inc` verifies every
+selected event and all12 channels, timing/order/source, aliases and behavior/
+attack IDs. All selected events have nonpositive/absent StateInfo and opposing-
+target eligibility. Portable tests cover strict selectors, malformed/missing/
+duplicate/overflowed fields, legacy JSON, separate cache modes, explicit event
+selection, built-in pairing and both optimizer scores. The synthetic complete
+bridge uses non-arithmetic clips and rejects missing sixth-stage states.
+Five representative target-throw queries and full real XML/JSON/UI checks cover
+all new affinities.
+
+The current642-TAE read-only view links **a22 (156 clips) and its a42 critical
+alias dependencies** to the existing full extraction. No archive was unpacked
+again. Never unpack into or recursively delete through these junctions.
+
+# Ordinary paired fists
+
+The complete ordinary profile requires weapon type35/motion42/behavior2100–2199,
+stance0/0, special0/catalyst0, `isDualBlade=1`, `enableThrow=1` and
+`bothHandEquipable=1`. Iron Ball and Star Fist share exact2100; Poisoned Hand
+and Madding Hand share exact2121: four bases/28 variants, two distinct sets.
+The 2121 overrides affect offhand and matching-powerstance behavior rows; both
+tracked snapshots preserve these differences. Names/IDs are test expectations;
+production uses parameter signatures and the native graph.
+
+`fistCatalog` reuses the 68-move six-stage claw vocabulary, restoring ordinary
+type1 for running R1. Only rolling R1 uses307/PCBehavior16/Condition0/Offset0,
+with raw Source/index=-1. Each set has96 ordered selected events; two-handed
+hits use DEFAULT0 and the selected paired weapon without a second rating or
+Strength bonus. Matching-equipped powerstance still requires a second rating.
+Body PCBehavior4/judge550 remains outside the selected weapon-event scope.
+All selected StateInfo are zero/absent and opposing-target flags are true.
+
+Grafted Dragon has the same ordinary motion signature but `bothHandEquipable=0`;
+it remains excluded from the complete catalog. Paired claw/fist admission and
+all graph group members now require the native both-hand flag, rejecting missing,
+non-1 or inconsistent availability. This avoids a weapon-ID exception. Special
+fist categories and unarmed remain outside this audited profile.
+
+Independent `audit_fists.py` and `audit_fist_graph.py` use raw default-merged
+params, aliases, native HKS limits and graph registrations, without importer
+output. `expected_fist_2100_moves.inc` and `expected_fist_2121_moves.inc` compare
+all68/96 moves/events per group, every MV channel, flags, timing/order/source,
+behavior/attack IDs and alias provenance. Existing Catch2 cases check strict
+signature mutations/deletions, non-arithmetic graph clips, unavailable/missing
+flags on later group members, six-stage completeness, critical target queries,
+shared JSON identity, every variant's move/hit powers and both UI optimizers.
+Baseline83/83 passed in126.75s; final83/83 passed in133.48s
+(`build/fist-final-tests.log`); app/core/Catch2 build and CLI JSON round-trip pass.
+Full previous-value/shared-identity comparison removes only the new42 assignments.
+At the fist milestone:167bases/1151variants/79sets; optimizer eligibility1151ordinary/1108powerstance.
+
+The previous fists junction view preserves claws-complete targets and adds the
+100 fresh a48 clips needed by six mounted light aliases. No archive extraction
+or production dependency change is needed; never unpack/delete through junctions.
+
+# Ordinary paired beast claws and offhand source roles
+
+The complete ordinary profile is type95/motion62/behavior6800–6899, stances0/0,
+special0/catalyst0, paired1/enableThrow1/bothHandEquipable1. Beast Claw and Red
+Bear’s Claw add two bases/14 variants sharing exact6800. `beastClawCatalog`
+contains64 moves/99 ordered selected weapon events: four ordinary/offhand and
+matching-powerstance light stages, four neutral feints, two type307 movement
+R1s, mounted charging/releases and the existing representative criticals.
+Five jumping body PCBehavior4/judge550 events remain outside weapon-event scope.
+All selected StateInfo are zero/absent and opposing-target flags are true.
+
+The raw offhand chain explicitly uses Source2 (left weapon), unlike the earlier
+Source0 chains. `hit_uses_secondary_weapon` now takes the MoveId: the selected
+primary weapon is left for OFFHAND_R1 moves. DEFAULT0 stays primary; explicit2
+is primary/explicit1 secondary for offhand, with the previous right-primary
+meaning elsewhere. Audited right-weapon PCBehavior16 follows that same role.
+The low-level calculation, MoveEvaluator validation and both optimizer
+preflights share this rule, retaining raw source values. Secondary context is
+still required when an event actually selects the other hand. Mounted DEFAULT
+sources and arbitrary mixed-pair behavior retain their previous scope.
+
+Independent raw `expected_beast_claw_6800_moves.inc` verifies every move/event,
+all12 MV channels, flags, timing/order/source and alias/behavior/attack IDs.
+Portable tests use different left/right powers to prove the chosen hand, cover
+all six offhand IDs and explicit/default/PC sources, secondary context, totals,
+selected-hit scores from both optimizers, and both UI tabs without a matching
+pair. Existing real XML/JSON/UI cases cover all14 new variants, offhand/Both
+single-weapon evaluation, shared identity and five critical target queries.
+
+Baseline83/83 passed in124.15s; final85/85 passed in117.57s
+(`build/beast-claw-tests.log`); app/core/Catch2 build and CLI JSON round-trip pass.
+Complete previous-value/shared-pointer identity comparison removes only new62
+assignments. Coverage169bases/1165variants/80sets; optimizer eligibility1165ordinary/1122powerstance.
+
+The read-only beast-claws junction view preserves previous inputs and supplies
+148 fresh a62 clips from the already extracted full archive; retaineda62 had0.
+No archive was copied/unpacked and no production dependency changed.
+
+# Ordinary paired backhand blades
+
+The complete audited profile is type92/motion58/behavior6400–6499, stances0/0,
+special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1. Backhand Blade
+and Reverse-Bladed Sword add two bases/26 affinities sharing exact6400.
+Smithscript Cirque and Curseblade’s Cirque remain outside the ordinary profile
+because their native special categories are251/265.
+
+Native HKS selects six ordinary/offhand and six matching-powerstance light
+stages. Its ordinary special-attack guard does not admit backhand blades.
+The complete graph bridge resolves all63 noncritical definitions, preserves
+non-arithmetic clip tests, and rejects missing sixth stages and unavailable
+both-hand flags on any shared group member. Five explicit target-critical
+contexts also resolve the native graph’s selected clips and hit data.
+
+`backhandBladeCatalog` reuses the existing six-stage vocabulary with ordinary
+type1 running/rolling R1. Both right mounted charging/release phases select
+**730/735**, as do the left phases; this follows raw a58 events rather than
+the conventional630/635. All68 moves/105 ordered selected weapon events are
+checked by independent `expected_backhand_6400_moves.inc`, including all12 MV
+channels, timing, source/index, aliases, behavior/attack IDs and target flags.
+Selected StateInfo values are zero/absent and all opposing-target flags true.
+Four jumping PCBehavior4/judge550 body events remain outside weapon-event scope.
+Both-state and offhand events use DEFAULT0; powerstance retains explicit1/2
+and DEFAULT0 events. Existing calculator, serializer, UI and both optimizers
+handle them without new models or per-weapon exceptions.
+
+The read-only `backhand-blades` view preserves641 prior TAE targets and links
+emptya58 to131 clips from the already recovered full archive. No archive was
+unpacked again, retained inputs changed, or bundled JSON regenerated.
+`11711000.graph-backhand-blades.json` has14673723bytes/3296weapons/1191with
+movesets. The full previous-value/shared-identity comparison removes ONLY
+new58 assignments and passes (`build/backhand-data-comparison.log`). Coverage
+is171bases/1191variants/81sets; ordinary/powerstance optimizer eligibility is
+1191/1148. Existing Catch2 case counts remain85both-input/77XML-only/73portable.
+Baseline85/85 passed in116.99s; final85/85 passed in127.05s
+(`build/backhand-final-tests.log`), with app/core/Catch2 builds passing.
+
+# Ordinary paired martial arts
+
+The complete audited profile is type88/motion55/behavior6300–6399, stances0/0,
+special0/catalyst0/isDualBlade1/enableThrow1/bothHandEquipable1. Dryleaf Arts
+adds one base/13 affinities sharing exact6300. Dane’s Footwork uses special246
+and remains outside the ordinary profile.
+
+Native HKS selects six ordinary/offhand and six matching-powerstance light
+stages, admits matching martial-art pairs and excludes ordinary feints.
+`martialArtsCatalog` reuses the existing six-stage vocabulary with type1 for
+both 1H movement R1 states and mounted630/635 (right),730/735 (left) phases.
+All68 moves/134 ordered selected weapon events are checked against independent
+`expected_martial_6300_moves.inc`: all12 MV channels, timing/order/source/index,
+aliases, behavior/attack IDs and target flags. All selected StateInfo values
+are zero/absent and all opposing-target flags true. Five jumping PCBehavior4/
+judge550 body events stay outside weapon-event scope. There are no selected
+PCBehavior events, feints or shieldpoke. Both/offhand events use DEFAULT0;
+powerstance uses explicit1/2. Existing calculator/serializer/UI/both optimizers
+handle this data without new models or per-weapon production exceptions.
+
+Critical and backstab-whiff clips aliasa42; small-PvE riposte31730 ultimately
+usesa42/31720’s two hits, preserving exact6300 behavior resolution. The current
+read-only `martial-arts` view preserves641 targets and links emptya55 to148
+clips from the already recovered archive. Alias dependencies are already in
+the previous view. No archive was unpacked, retained inputs altered or bundled
+JSON regenerated. Never unpack/delete through junctions or run generate_game_data.
+
+The full graph bridge checks all63 noncritical mappings, missing sixth stages,
+non-arithmetic clips, every profile-field mutation/deletion and unavailable
+both-hand flags on later group members. Five native target-critical contexts
+add135queries over27exact profiles in total. Full real integration checks
+all13 affinities, Both/offhand single-rating queries, every move/hit, JSON
+pointer identity and both application optimizers.
+
+`11711000.graph-martial-arts.json` has14740384bytes/3296weapons/1204with movesets.
+Full previous-value/shared-identity comparison passes, removing ONLY new55
+assignments (`build/martial-data-comparison.log`). Coverage172bases/1204variants/
+82sets; optimizer eligibility1204ordinary/1161powerstance. Existing Catch2
+counts remain85both-input/77XML-only/73portable. Baseline85/85 passed in102.44s;
+final85/85 passed in124.60s (`build/martial-tests.log`); existing app/core/
+Catch2 build passes.
+
 # Opposing-target eligibility
 
 `ResolvedHit::opposeTarget` retains the optional default-merged AtkParam flag.
@@ -717,3 +953,193 @@ existing unpacked directory and retains only extracted event sequences in the
 animation cache; it does not delete or regenerate the input XML. Archive-by-archive
 unpacking/cleanup can be added if measured disk usage warrants it, while preserving
 the development workflow that reuses retained unpacked data.
+
+# Partial special category regression
+
+The current XML input is `build/development-xml/footwork-audit`. It preserves
+the ordinary martial-art view and adds28 special246 clips. Existing exported
+coverage remains172bases/1204variants/82sharedsets; Dane's Footwork is still
+excluded until its Bullet reference is supported.
+
+The representative `footworkCatalog` and independent
+`expected_footwork_6301_moves.inc` verify67 complete moves/136 events. Native
+graph resolution chooses26 special overrides and falls back to base55 for
+absent registrations. The entire Both guard counter must fail with owned
+Behavior106301311/refType1/Bullet200031311 provenance, even though the6300
+family has a direct zero-MV helper. Partial moves must not reach GameData.
+The native target-critical comparison includes this profile (140 queries in
+total). Portable special/base tests cover non-arithmetic clip IDs, fallback
+and rejection of unaudited special categories. This is a scoped inferred
+priority policy, not a recovered universal native algorithm.
+
+Recovered Bullet XML is under the physical ignored workspace audit directory,
+not the junction view. All recovered weapon/behavior/attack rows match retained
+data. Bullet200031311 explicitly linksAtk6301311; emission/shared-hit semantics
+still need auditing. See [mapping evidence](../docs/moveset-mapping.md#scoped-special-martial-art-routing-and-the-bullet-boundary).
+
+Final85/85 passed in130.63s (`build/footwork-final-tests.log`), with the
+application/core/Catch2 builds passing and coverage/benchmarks OFF. Existing
+85both-input/77XML-only/73portable counts are unchanged. CLI semantic save/load
+`11711000.graph-footwork-audit.json` preserves every prior value/shared identity
+(`build/footwork-data-comparison.log`). Bundled JSON and retained inputs unchanged.
+
+# Opt-in Bullet references
+
+Current input view: `build/development-xml/footwork-bullets`. It preserves all642
+TAE links and messages and uses recovered, matching regulation XML including
+Bullet.param.xml. These optional real checks run when BulletParamFile exists in
+the configured XML root. No extra CMake option, test executable or game archive
+is needed; older roots still run direct-attack regressions.
+
+Explicitly pass a Bullet ParamTable as the final pointer argument to
+resolveAttackEvents/importMoveset to inspect single-shot leaf links. Existing
+default calls reject Bullet references. `ResolvedHit::bulletParamId` preserves
+the link in existing JSON; active records remain unsupported in calculation
+and both optimizers until projectile context is verified. Native graph and raw
+XML diagnostic imports resolve68 Footwork moves/140 linked records, while the
+original67 direct-move snapshot and no-table whole-counter rejection remain.
+No Footwork affinity is exported yet. See [mapping details](../docs/moveset-mapping.md#opt-in-bullet-reference-resolution).
+
+Two new portable Catch2 cases cover link/default/ambiguity/category failures,
+unsupported child/interval/multiple/continuous paths, legacy/current JSON and
+calculation/optimizer support boundaries. Full **87/87 in 145.78s**
+(`build/bullet-reference-tests.log`), plus three targeted Bullet/raw-XML cases after the
+final fixture assertions. Counts87both-input/79XML-only/75portable. Existing
+app/core/Catch2 builds pass, coverage/benchmarks OFF. GameData coverage remains
+172bases/1204variants/82sets. CLI `11711000.graph-footwork-bullets.json` retains
+every previous value/shared identity (`build/bullet-reference-data-comparison.log`).
+
+# BulletBehavior event controls
+
+The importer now explicitly reads type2 BulletBehavior through
+extractAttackEvents/cache.get's fourth includeBulletBehaviors argument, or
+MoveDefinition.eventType=2 with a supplied Bullet table. The third cache argument
+still selects PCBehavior. Default calls retain direct/critical event scope.
+
+The portable control case covers strict parsing, raw False/zero JSON preservation,
+source/index/order/timing, wrong reference-type rejection and calculation guards.
+The existing import case verifies all four cache modes, alias isolation, missing
+table rejection and explicit component import. Real XML independently verifies
+all54 type2 records over both martial-art vocabularies using
+expected_martial_bullet_events.inc, including all12 MV channels and raw controls.
+Both guard counters have separate type2 160+160-MV records in addition to the
+previously inspected type1 references. Neither the old134/140 record counts nor
+the new27-per-vocabulary projectile count establishes contact/emission count.
+
+**Current exported coverage and scores retain direct/critical/verified PC scope;
+martial-art projectile contributions are not included.** Active Bullet records
+remain unsupported for calculation, with no new production weapon admission.
+See [projectile scope and evidence](../docs/moveset-mapping.md#bulletbehavior-events-and-projectile-coverage).
+
+Full **88/88 in180.41s**, five targeted importer/Bullet/raw-XML checks after
+the54-record snapshot, and a final focused false/zero JSON check all pass.
+Counts88both-input/80XML-only/76portable. App/core/Catch2 builds pass; coverage/
+benchmarks OFF. CLI `11711000.graph-bullet-behavior.json` preserves every previous
+value/shared identity:172bases/1204variants/82sets. Inputs and bundled JSON unchanged.
+
+# Explicit composed phases
+
+`MoveDefinition::additionalEventSelections` composes explicit event-type and
+judge/category/behavior selections into one existing Move. Tests verify original
+record order, equal-time records, reversed selector declarations, restrictions,
+JSON and graph metadata preservation. Overlap, missing phases and failed
+references reject the entire move. Combined missing-phase/reference failures
+retain all owned diagnostics; absent extras preserve legacy definition JSON.
+
+Real XML regressions compose six Both-counter records for variations 6300/6301
+and two records per mounted release. Charging remains separate; absent charging
+Bullets never borrow release data. These records remain diagnostic: native
+emission/contact rules and projectile calculation support are unresolved.
+See [composition details](../docs/moveset-mapping.md#explicit-composition-of-attack-event-phases).
+
+The existing full suite and app/core/Catch2 builds are used; see the latest
+handoff for final results. Coverage/benchmarks OFF. Counts remain 88 with both
+inputs / 80 XML-only / 76 portable. CLI `11711000.graph-bullet-phases.json`
+preserves all prior data/sharing: 172 bases / 1204 variants / 82 sets with
+direct/critical/verified-PC scope. Inputs and bundled JSON remain unchanged.
+
+Final full regression suite: **88/88 in 129.10s**
+(`build/bullet-phase-report-tests.log`); final app/core/Catch2 build passed
+(`build/bullet-phase-report-build.log`). Diff and UTF-8 checks pass.
+
+# Owned Bullet parameter metadata
+
+The new portable `moveset - Bullet parameter ownership and serialization` case
+checks default/row merging, independent damping channels, unknown fields,
+false/zero/-1, malformed values and ownership after XML reload. It round-trips
+complete GameData through the existing serializer and verifies shared Moveset
+identity. The raw XML case checks all 37 distinct selected Bullet rows against
+`expected_martial_bullet_parameters.inc`, generated independently from native
+XML rather than importer output. Calculation regressions reject metadata missing
+its Bullet ID in calculate_move, MoveEvaluator and both optimizers.
+
+Baseline 88/88 in 192.10s; final **89/89 in 176.98s**
+(`build/bullet-parameter-tests.log`), existing app/core/Catch2 build passes
+(`build/bullet-parameter-build.log`). Coverage/benchmarks OFF. Counts now 89 with
+both inputs / 81 XML-only / 77 portable. CLI
+`11711000.graph-bullet-parameters.json` preserves all prior data/sharing; production
+coverage remains 172 bases / 1204 variants / 82 shared sets. Inputs and bundled
+JSON remain unchanged. Projectile calculation and native emission/contact rules
+are still unresolved. See [metadata details](../docs/moveset-mapping.md#bullet-parameters-retained-after-import).
+
+# Independent selected-hit evaluation
+
+The portable `move calculation - selected hits isolate unsupported siblings`
+case checks Bullet, unknown source/MV/StateInfo and missing-second-weapon siblings
+in both orders. It verifies original indices, bounds, empty/missing moves,
+matching/mismatched pairs, stance, inactive records and agreement with both
+optimizers' selected-hit scores. The new UI regression round-trips mixed direct/
+Bullet data and checks stats versus optimizer eligibility. Existing UI cases
+also verify independent selection with unknown StateInfo and missing-pair siblings.
+
+Baseline **89/89 in 131.97s** (`build/projectile-contact-baseline.log`); final
+**91/91 in 128.66s** (`build/selected-hit-tests.log`), app/core/Catch2 build
+passes (`build/selected-hit-build.log`). Coverage/benchmarks OFF. Counts now
+91 with both inputs / 83 XML-only / 79 portable. Exported data/scope is unchanged.
+All hits remains strict; selected unsupported Bullets remain unscoreable.
+See [selected-hit API](../docs/moveset-mapping.md#independent-selected-hit-calculation).
+
+# Special straight-sword category110
+
+The independent `expected_straight_110_201_moves.inc` snapshot covers all63 moves/
+72 records for the shared Broadsword/Cane Sword/Stone-Sheathed Sword profile.
+Existing portable importer tests verify full-signature admission with arbitrary
+IDs, grouping by special context, field mutation/deletion and strict selected-
+clip failures. Graph fixtures test non-arithmetic clips, special overrides,
+absent-registration fallback and malformed-registration rejection. Native
+GameData/JSON/UI/both-optimizer regressions include all27 new variants.
+
+Baseline91/91 in131.08s; final **91/91 in 121.35s**
+(`build/straight-110-tests.log`), app/core/Catch2 build passes
+(`build/straight-110-build.log`). Coverage/benchmarks OFF. Counts remain91 with
+both inputs /83 XML-only /79 portable. Coverage now175 bases/1231 variants/83
+shared sets; optimizer eligibility1231 ordinary/1188 matching-powerstance.
+CLI `11711000.graph-straight-110.json` preserves every previous value/shared
+identity after removing only the new27 assignments. Current root/cache is
+`build/development-xml/straight-special-110`; no archives or inputs changed.
+See [routing details](../docs/moveset-mapping.md#special-straight-sword-family-110).
+
+
+# Remaining straight-sword specials 111/112/113/117
+
+The independent expected_straight_111_209_moves.inc, expected_straight_112_210_moves.inc,
+expected_straight_113_202_moves.inc and expected_straight_117_208_moves.inc
+snapshots cover all63 moves for the Short Sword, Miquellan Knight's Sword,
+Carian Knight's Sword + Lazuli Glintstone Sword and Warhawk's Talon profiles
+(72/72/72/78 records; Warhawk's Talon's heavies are double-hit). The shared
+straightSwordHeavySpecialCatalog(int) sets all eight R2 overrides per special.
+Portable tests verify eight overrides, full-signature admission with arbitrary
+IDs, grouping by special context and field mutation/deletion (spAtkcategory now
+mutates to114, outside the audited set). Graph fixtures retain the non-arithmetic
+clip77 and absent-registration fallback checks. Native GameData/JSON/UI/both-
+optimizer regressions include all29 new variants.
+
+Baseline was the prior 91/91 (straight-110). Final **91/91 in 310.83s**
+(uild/straight-specials-tests.log), app/core/Catch2 build passes
+(uild/straight-specials-build.log). Coverage/benchmarks OFF. Counts remain91
+with both inputs /83 XML-only /79 portable. Coverage now180 bases/1260 variants/
+87 shared sets; optimizer eligibility1260 ordinary/1217 matching-powerstance.
+CLI 11711000.graph-straight-specials.json preserves every previous value/shared
+identity after removing only the new29 assignments. Current root/cache is
+uild/development-xml/straight-specials; no archives or inputs changed.
+See [routing details](../docs/moveset-mapping.md#remaining-straight-sword-specials-111112113117).

@@ -240,6 +240,9 @@ export namespace erdo::witchy
             return std::unexpected("Weapon motion category is outside the supported TAE range");
         if (*position != ordinaryWeaponMotionPosition(*category, twoHanded) || *catalyst != 0)
             return std::unexpected("Weapon requires unsupported stance or catalyst routing");
+        if (ordinaryWeaponUsesBuiltInPair(*category) &&
+            (weapons.integer(row, "isDualBlade") != 1 || weapons.integer(row, "bothHandEquipable") != 1))
+            return std::unexpected("Paired weapon routing requires built-in pairing and both-hand availability");
         if (ordinaryWeaponMotionPosition(*category, false) != 0 && *special != 0)
             return std::unexpected("Special-category routing with this stance requires explicit context");
         const auto chain = lightAttackChain(*category, *special, twoHanded
@@ -252,8 +255,9 @@ export namespace erdo::witchy
     }
     catch (const std::runtime_error& error) { return std::unexpected(error.what()); }
 
-    // No inferred special/base ordering for left/dual contexts yet. With a
-    // zero special category there is only the selected weapon's base category.
+    // Left/dual special priority is admitted only for an audited category pair.
+    // This scoped policy is inferred, not a recovered native selector algorithm.
+    // Other nonzero special categories still require explicit context.
     // Offhand assumes the request already selected an attacking left weapon;
     // powerstance assumes two copies, not arbitrary mixed-weapon compatibility.
     std::expected<std::vector<int>, std::string> offhandOrMatchingPairCategories(
@@ -263,7 +267,7 @@ export namespace erdo::witchy
         if (!categories) return std::unexpected(categories.error());
         const auto row = weapons.find(weaponId);
         const int special = *weapons.integer(row, "spAtkcategory");
-        if (special != 0)
+        if (special != 0 && !auditedSpecialWeaponRouting(*weapons.integer(row, "wepmotionCategory"), special))
             return std::unexpected("Special-category offhand/powerstance priority requires explicit context");
         if (powerstance) {
             const auto chain = lightAttackChain(*weapons.integer(row, "wepmotionCategory"), special,
@@ -781,7 +785,7 @@ export namespace erdo::witchy
             return resolve(definition, route->stateName, route->offsetType, *categories, route->variables);
         }
 
-        // Neutral selected-weapon feint for audited thrusting, curved and great katanas.
+        // Neutral selected-weapon feint for audited thrusting, curved, great katanas and beast claws.
         // Effects, specials and left-two-handing need context.
         std::expected<MoveDefinition, std::string> resolveWeaponFeintMove(
             MoveDefinition definition, const ParamTable& weapons, int weaponId) const
@@ -794,7 +798,7 @@ export namespace erdo::witchy
             if (weapons.integer(row, "spAtkcategory") != 0)
                 return std::unexpected("Special-category feint priority requires explicit context");
             const int category = categories->front();
-            if (category != 27 && category != 28 && category != 39 && category != 61)
+            if (category != 27 && category != 28 && category != 39 && category != 61 && category != 62)
                 return std::unexpected("Motion category requires unsupported feint routing");
             return resolve(definition, state->first, state->second, *categories);
         }
@@ -889,7 +893,9 @@ export namespace erdo::witchy
                 return std::unexpected("Weapon requires enableThrow=1");
             const auto categories = ordinaryWeaponCategories(weapons, weaponId, true);
             if (!categories) return std::unexpected(categories.error());
-            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0)
+            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0
+                && !auditedSpecialWeaponRouting(*weapons.integer(weapons.find(weaponId), "wepmotionCategory"),
+                    *weapons.integer(weapons.find(weaponId), "spAtkcategory")))
                 return std::unexpected("Special-category throw priority requires explicit context");
             const auto candidates = playerThrowCandidates(throws, query);
             if (!candidates) return std::unexpected(candidates.error());
@@ -913,7 +919,9 @@ export namespace erdo::witchy
                 return std::unexpected("Backstab whiff requires its MoveId and explicit strike phase filter");
             const auto categories = ordinaryWeaponCategories(weapons, weaponId, true);
             if (!categories) return std::unexpected(categories.error());
-            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0)
+            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0
+                && !auditedSpecialWeaponRouting(*weapons.integer(weapons.find(weaponId), "wepmotionCategory"),
+                    *weapons.integer(weapons.find(weaponId), "spAtkcategory")))
                 return std::unexpected("Special-category backstab priority requires explicit context");
             return resolve(definition, "ThrowBackStab", 16, *categories);
         }
@@ -956,7 +964,9 @@ export namespace erdo::witchy
                 return std::unexpected("Mounted charging/release requires an explicit event phase filter");
             const auto categories = ordinaryWeaponCategories(weapons, weaponId, true);
             if (!categories) return std::unexpected(categories.error());
-            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0)
+            if (weapons.integer(weapons.find(weaponId), "spAtkcategory") != 0
+                && !auditedSpecialWeaponRouting(*weapons.integer(weapons.find(weaponId), "wepmotionCategory"),
+                    *weapons.integer(weapons.find(weaponId), "spAtkcategory")))
                 return std::unexpected("Special-category mounted priority requires explicit context");
             return resolve(definition, state->first, state->second, *categories);
         }
@@ -1012,6 +1022,9 @@ export namespace erdo::witchy
                 }
                 if (sharedContext && *sharedContext != context)
                     throw std::runtime_error(std::format("Weapon {} has different graph inputs within a shared moveset", id));
+                if (ordinaryWeaponUsesBuiltInPair(context[0]) &&
+                    weapons.integer(weapons.find(static_cast<int>(id)), "bothHandEquipable") != 1)
+                    throw std::runtime_error(std::format("Weapon {} requires both-hand availability for this paired catalog", id));
                 sharedContext = context;
             }
             const int weaponId = static_cast<int>(weaponIds.front());
