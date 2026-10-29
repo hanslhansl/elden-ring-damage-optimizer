@@ -203,7 +203,7 @@ namespace erdo::ui
         std::shared_ptr<const calculator::GameData> active_game_data{};
         std::vector<QSpinBox*> attribute_spinboxes{};
 
-        QSet<bool> base_game_dlc_filter{};
+        QSet<int> base_game_dlc_filter{};
         QSet<int> type_filter{};
         QSet<QString> base_name_filter{};
         QSet<int> affinity_filter{};
@@ -218,7 +218,7 @@ namespace erdo::ui
             for (int i = 0; i < this->base_game_dlc_list->count(); ++i)
             {
                 auto item = this->base_game_dlc_list->item(i);
-                const auto dlc_value = item->data(Qt::UserRole).toBool();
+                const auto dlc_value = item->data(Qt::UserRole).toInt();
                 auto visible = true;
                 item->setHidden(!visible);
                 if (visible && item->isSelected())
@@ -449,7 +449,7 @@ namespace erdo::ui
                 | std::ranges::to<std::set>()
             )
             {
-                auto item = new QListWidgetItem(dlc ? "DLC" : "Base Game", this->base_game_dlc_list);
+                auto item = new QListWidgetItem(dlc ? QString("DLC %1").arg(dlc) : QString("Base Game"), this->base_game_dlc_list);
                 item->setData(Qt::UserRole, dlc);
             }
 

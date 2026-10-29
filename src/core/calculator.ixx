@@ -289,8 +289,8 @@ export namespace erdo::calculator
         std::string full_name;
         // the base weapon name without an affinity specified, e.g. "Nightrider Glaive"
         std::string base_name;
-        // true if the weapon was introduced with SOTE
-        bool dlc;
+        // 0: base game, else: dlc number (1 or 2)
+        int dlc;
         // true if the weapon doesn't get a strength bonus when two-handing
         bool paired;
         // true if this weapon can cast glintstone sorceries

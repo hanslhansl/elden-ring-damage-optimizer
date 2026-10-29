@@ -276,7 +276,7 @@ namespace erdo::ui
             {
                 auto&& weapon = attack_options.weapon.get();
 
-                (*this)[0][0] = weapon.dlc ? "DLC" : "Base Game";
+                (*this)[0][0] = weapon.dlc ? QString("DLC %1").arg(weapon.dlc) : QString("Base Game");
                 (*this)[0][1] = weapon.dlc;
             }
         };
@@ -1047,7 +1047,7 @@ namespace erdo::ui
     template<typename Row>
     class RowSortFilterModel : public QSortFilterProxyModel
     {
-        QSet<bool> base_game_dlc; // true = dlc, false = base game
+        QSet<int> base_game_dlc; // 0 = base game, otherwise DLC number
         QSet<int> types;
         QSet<QString> base_names;
         QSet<int> affinities;
@@ -1058,7 +1058,7 @@ namespace erdo::ui
             this->setSortRole(Qt::UserRole);
         }
 
-        void set_filters(QSet<bool> base_game_dlc, QSet<int> types, QSet<QString> base_names, QSet<int> affinities)
+        void set_filters(QSet<int> base_game_dlc, QSet<int> types, QSet<QString> base_names, QSet<int> affinities)
         {
             this->beginFilterChange();
 
