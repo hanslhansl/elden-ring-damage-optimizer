@@ -1285,7 +1285,61 @@ namespace erdo::ui
         {
             QMenu menu(this);
 
-            if (!header_context_menu)
+            if (header_context_menu)
+            {
+                auto index = this->indexAt(pos);
+                if (index.isValid())
+                {
+                    auto section_index = Row::column_index_to_section_index.at(index.column());
+                    auto name = Row::section_name(section_index);
+                    if (name.isEmpty())
+                        name = Row::column_name(Row::section_column_begin_indices[section_index]);
+
+                    QAction *action = menu.addAction("Show " + name);
+                    action->setCheckable(true);
+                    action->setChecked(!this->header->is_section_hidden(section_index));
+
+                    connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                        this->header->set_section_hidden(section_index, !visible);
+                    });
+                }
+                QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
+                std::map<QString, QMenu*> section_group_menus{};
+                for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
+                {
+                    auto name = Row::section_name(section_index);
+                    if (name.isEmpty())
+                        name = Row::column_name(Row::section_column_begin_indices[section_index]);
+
+                    auto group_name = Row::group_name(section_index);
+                    QAction *action;
+
+                    if (group_name.isEmpty())
+                    {
+                        action = sections_menu->addAction(name);
+                    }
+                    else
+                    {
+                        if (!section_group_menus.contains(group_name))
+                            section_group_menus[group_name] = sections_menu->addMenu(group_name);
+                        action = section_group_menus[group_name]->addAction(name);
+                    }
+
+                    action->setCheckable(true);
+                    action->setChecked(!this->header->is_section_hidden(section_index));
+
+                    connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
+                        this->header->set_section_hidden(section_index, !visible);
+                    });
+                }
+                menu.addSeparator();
+
+                menu.addAction(
+                    QString::fromStdString("Adjust Column Widths to Contents"),
+                    [&](){ this->resize_columns_to_contents(); }
+                );
+            }
+            else
             {
                 auto row_indices = this->selectionModel()->selectedRows()
                     | std::views::transform([this](const QModelIndex& index){
@@ -1354,62 +1408,8 @@ namespace erdo::ui
                         }
                     );
                 }
-                    
-                menu.addSeparator();
             }
-
-            auto index = this->indexAt(pos);
-            if (index.isValid())
-            {
-                auto section_index = Row::column_index_to_section_index.at(index.column());
-                auto name = Row::section_name(section_index);
-                if (name.isEmpty())
-                    name = Row::column_name(Row::section_column_begin_indices[section_index]);
-
-                QAction *action = menu.addAction("Show " + name);
-                action->setCheckable(true);
-                action->setChecked(!this->header->is_section_hidden(section_index));
-
-                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
-                    this->header->set_section_hidden(section_index, !visible);
-                });
-            }
-            QMenu *sections_menu = menu.addMenu(tr("Show/Hide Sections"));
-            std::map<QString, QMenu*> section_group_menus{};
-            for (auto section_index : std::views::iota(0ull, std::tuple_size_v<Row>))
-            {
-                auto name = Row::section_name(section_index);
-                if (name.isEmpty())
-                    name = Row::column_name(Row::section_column_begin_indices[section_index]);
-
-                auto group_name = Row::group_name(section_index);
-                QAction *action;
-
-                if (group_name.isEmpty())
-                {
-                    action = sections_menu->addAction(name);
-                }
-                else
-                {
-                    if (!section_group_menus.contains(group_name))
-                        section_group_menus[group_name] = sections_menu->addMenu(group_name);
-                    action = section_group_menus[group_name]->addAction(name);
-                }
-
-                action->setCheckable(true);
-                action->setChecked(!this->header->is_section_hidden(section_index));
-
-                connect(action, &QAction::toggled, this, [this, section_index](bool visible) {
-                    this->header->set_section_hidden(section_index, !visible);
-                });
-            }
-
-            menu.addSeparator();
-            menu.addAction(
-                QString::fromStdString("Adjust Column Widths to Contents"),
-                [&](){ this->resize_columns_to_contents(); }
-            );
-
+            
             if (header_context_menu)
                 menu.exec(this->mapToGlobal(pos));
             else
